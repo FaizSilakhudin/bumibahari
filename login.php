@@ -3,26 +3,37 @@ require 'config/koneksi.php';
 
 $error = '';
 if(isset($_POST['login'])){
-    $username = mysqli_real_escape_string($conn, $_POST['username']);
-    $password = $_POST['password'];
-    
-    $query = mysqli_query($conn, "SELECT * FROM users WHERE username='$username'");
-    $user = mysqli_fetch_assoc($query);
-    
-    if($user && password_verify($password, $user['password'])){
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['role'] = $user['role'];
-        $_SESSION['id_cabang'] = $user['id_cabang'];
-        $_SESSION['nama_pengelola'] = $user['nama_pengelola'];
-        
-        if($user['role'] == 'pusat'){
-            header("Location: admin_pusat/index.php");
-        } else {
-            header("Location: admin_cabang/input_data.php");
-        }
-        exit;
+    if(!csrf_check($_POST['csrf']?? '')){ 
+        $error = "Sesi tidak valid. Silakan refresh halaman.";
     } else {
-        $error = "Username atau password salah!";
+        $username = $_POST['username'];
+        $password = $_POST['password'];
+        
+        // 1. PAKAI PREPARED STATEMENT
+        $stmt = $conn->prepare("SELECT * FROM users WHERE username=? LIMIT 1");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user = $result->fetch_assoc();
+        
+        if($user && password_verify($password, $user['password'])){
+            // 2. ANTI SESSION FIXATION
+            session_regenerate_id(true);
+            
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['role'] = $user['role'];
+            $_SESSION['id_cabang'] = $user['id_cabang'];
+            $_SESSION['nama_pengelola'] = $user['nama_pengelola'];
+            
+            if($user['role'] == 'pusat'){
+                header("Location: admin_pusat/index"); // TANPA .PHP
+            } else {
+                header("Location: admin_cabang/input_data"); // TANPA .PHP
+            }
+            exit;
+        } else {
+            $error = "Username atau password salah!";
+        }
     }
 }
 ?>
@@ -190,14 +201,15 @@ if(isset($_POST['login'])){
                 <p class="brand-subtitle mb-0">Sistem Informasi Rekapitulasi & Keuntungan</p>
             </div>
             
-            <?php if($error): ?>
+            <?php if($error):?>
                 <div class="alert alert-custom d-flex align-items-center mb-4" role="alert">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <div><?= $error ?></div>
+                    <div><?= h($error)?></div> <!-- XSS -->
                 </div>
-            <?php endif; ?>
+            <?php endif;?>
             
             <form method="POST" autocomplete="off">
+                <input type="hidden" name="csrf" value="<?=csrf_token()?>"> <!-- CSRF -->
                 <div class="mb-3">
                     <label class="form-label">Username</label>
                     <div class="input-group-custom">

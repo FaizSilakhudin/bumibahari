@@ -2,27 +2,38 @@
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
+// 1. PROTEKSI ROLE PUSAT
+if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
+    header("Location:../login"); exit;
+}
+
 $upload_dir = '../uploads/surat_perjanjian/';
 
 // Proses tambah/edit/hapus
 if(isset($_POST['simpan'])){
+    if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
+    
     $id = $_POST['id_investor'] ?? '';
-    $nama = mysqli_real_escape_string($conn, $_POST['nama_investor']);
-    $hp = mysqli_real_escape_string($conn, $_POST['no_hp']);
-    $alamat = mysqli_real_escape_string($conn, $_POST['alamat']);
-    $no_rek = mysqli_real_escape_string($conn, $_POST['no_rekening']);
-    $nama_bank = mysqli_real_escape_string($conn, $_POST['nama_bank']);
+    $nama = $_POST['nama_investor'];
+    $hp = $_POST['no_hp'];
+    $alamat = $_POST['alamat'];
+    $no_rek = $_POST['no_rekening'];
+    $nama_bank = $_POST['nama_bank'];
     $file_lama = $_POST['file_lama'] ?? '';
     
-    // Upload file surat perjanjian
+    // 2. UPLOAD FILE AMAN: Validasi tipe, ukuran 5MB, rename
     $file_surat = $file_lama;
-    if(isset($_FILES['surat_perjanjian']) && $_FILES['surat_perjanjian']['error'] == 0 && $_FILES['surat_perjanjian']['name'] != ''){
-        if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+    if(isset($_FILES['surat_perjanjian']) && $_FILES['surat_perjanjian']['error'] == 0 && $_FILES['surat_perjanjian']['name']!= ''){
+        if(!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+        $cek = getimagesize($_FILES['surat_perjanjian']['tmp_name']);
         $ext = strtolower(pathinfo($_FILES['surat_perjanjian']['name'], PATHINFO_EXTENSION));
         $allowed = ['pdf','jpg','jpeg','png'];
         
-        if(in_array($ext, $allowed)){
-            $file_surat = 'SP_'.time().'_'.uniqid().'.'.$ext;
+        $is_pdf = $ext=='pdf' && $_FILES['surat_perjanjian']['type']=='application/pdf';
+        $is_img = $cek!== false && in_array($ext, ['jpg','jpeg','png']);
+        
+        if(($is_pdf || $is_img) && $_FILES['surat_perjanjian']['size'] < 5000000){ // max 5MB
+            $file_surat = 'SP_'.uniqid().'.'.$ext;
             move_uploaded_file($_FILES['surat_perjanjian']['tmp_name'], $upload_dir.$file_surat);
             
             // hapus file lama kalau ada
@@ -31,44 +42,63 @@ if(isset($_POST['simpan'])){
     }
 
     if($id){
-        $id = mysqli_real_escape_string($conn, $id);
-        mysqli_query($conn, "UPDATE investor SET nama_investor='$nama', no_hp='$hp', alamat='$alamat', no_rekening='$no_rek', nama_bank='$nama_bank', surat_perjanjian='$file_surat' WHERE id_investor='$id'");
+        $stmt = $conn->prepare("UPDATE investor SET nama_investor=?, no_hp=?, alamat=?, no_rekening=?, nama_bank=?, surat_perjanjian=? WHERE id_investor=?");
+        $stmt->bind_param("ssssssi", $nama,$hp,$alamat,$no_rek,$nama_bank,$file_surat,$id);
+        $stmt->execute();
     } else {
-        mysqli_query($conn, "INSERT INTO investor (nama_investor, no_hp, alamat, no_rekening, nama_bank, surat_perjanjian) VALUES ('$nama','$hp','$alamat','$no_rek','$nama_bank','$file_surat')");
+        $stmt = $conn->prepare("INSERT INTO investor (nama_investor, no_hp, alamat, no_rekening, nama_bank, surat_perjanjian) VALUES (?,?,?,?,?,?)");
+        $stmt->bind_param("ssssss", $nama,$hp,$alamat,$no_rek,$nama_bank,$file_surat);
+        $stmt->execute();
     }
-    echo "<script>alert('Data berhasil disimpan');location='data_investor.php'</script>";
+    echo "<script>alert('Data berhasil disimpan');location='data_investor'</script>"; // TANPA .PHP
 }
 
-if(isset($_GET['hapus'])){
-    $id = mysqli_real_escape_string($conn, $_GET['hapus']);
-    $q = mysqli_query($conn, "SELECT surat_perjanjian FROM investor WHERE id_investor='$id'");
-    if($q && mysqli_num_rows($q) > 0){
-        $file = mysqli_fetch_assoc($q)['surat_perjanjian'];
+// 3. HAPUS PAKAI POST + CSRF
+if(isset($_POST['hapus'])){
+    if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
+    
+    $id = $_POST['id_investor'];
+    $q = $conn->prepare("SELECT surat_perjanjian FROM investor WHERE id_investor=?");
+    $q->bind_param("i", $id);
+    $q->execute();
+    $res = $q->get_result();
+    if($res->num_rows > 0){
+        $file = $res->fetch_assoc()['surat_perjanjian'];
         if($file && file_exists($upload_dir.$file)) unlink($upload_dir.$file);
     }
     
-    mysqli_query($conn, "UPDATE cabang SET id_investor=NULL WHERE id_investor='$id'");
-    mysqli_query($conn, "DELETE FROM investor WHERE id_investor='$id'");
-    echo "<script>alert('Data berhasil dihapus');location='data_investor.php'</script>";
+    $conn->prepare("UPDATE cabang SET id_investor=NULL WHERE id_investor=?")->bind_param("i",$id)->execute();
+    $del = $conn->prepare("DELETE FROM investor WHERE id_investor=?");
+    $del->bind_param("i", $id);
+    $del->execute();
+    echo "<script>alert('Data berhasil dihapus');location='data_investor'</script>";
 }
 
-$investor = mysqli_query($conn, "SELECT * FROM investor ORDER BY id_investor DESC");
-$edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM investor WHERE id_investor='".mysqli_real_escape_string($conn, $_GET['edit'])."'")) : null;
+$investor = $conn->query("SELECT * FROM investor ORDER BY id_investor DESC");
+
+// 4. EDIT PAKAI GET TAPI AMAN DENGAN PREPARED
+$edit = null;
+if(isset($_GET['edit'])){
+    $stmt = $conn->prepare("SELECT * FROM investor WHERE id_investor=?");
+    $stmt->bind_param("i", $_GET['edit']);
+    $stmt->execute();
+    $edit = $stmt->get_result()->fetch_assoc();
+}
 ?>
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
     body {
-        background-color: #f4f7fe !important;
-        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        background-color: #f4f7fe!important;
+        font-family: 'Plus Jakarta Sans', sans-serif!important;
         color: #1b2559;
     }
     
     .saas-card {
         background: #ffffff;
-        border: none !important;
-        border-radius: 20px !important;
-        box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.06) !important;
+        border: none!important;
+        border-radius: 20px!important;
+        box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.06)!important;
         padding: 24px;
     }
 
@@ -82,9 +112,9 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
     }
 
     .btn-premium {
-        background-color: #4318ff !important;
-        color: #ffffff !important;
-        border: none !important;
+        background-color: #4318ff!important;
+        color: #ffffff!important;
+        border: none!important;
         padding: 10px 20px;
         border-radius: 12px;
         font-weight: 600;
@@ -92,14 +122,14 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
         transition: all 0.2s ease;
     }
     .btn-premium:hover {
-        background-color: #3310cc !important;
+        background-color: #3310cc!important;
         transform: translateY(-1px);
         box-shadow: 0px 8px 20px rgba(67, 24, 255, 0.15);
     }
     .btn-premium-outline {
-        background-color: #f4f7fe !important;
-        color: #4318ff !important;
-        border: 1px solid #e0e7ff !important;
+        background-color: #f4f7fe!important;
+        color: #4318ff!important;
+        border: 1px solid #e0e7ff!important;
         padding: 10px 20px;
         border-radius: 12px;
         font-weight: 600;
@@ -107,15 +137,15 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
     }
 
     .form-control-premium {
-        border-radius: 12px !important;
-        border: 1px solid #e0e7ff !important;
+        border-radius: 12px!important;
+        border: 1px solid #e0e7ff!important;
         padding: 10px 16px;
         color: #1b2559;
         font-size: 14px;
     }
     .form-control-premium:focus {
-        border-color: #4318ff !important;
-        box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1) !important;
+        border-color: #4318ff!important;
+        box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1)!important;
     }
 
     .btn-action-edit {
@@ -163,22 +193,22 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
     /* Table Base Layout */
     .table-saas {
         margin-bottom: 0;
-        width: 100% !important;
+        width: 100%!important;
     }
     .table-saas thead th {
-        background-color: #f8f9fc !important;
-        color: #8f9bba !important;
+        background-color: #f8f9fc!important;
+        color: #8f9bba!important;
         font-weight: 600;
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        border-bottom: 1px solid #eef2f9 !important;
+        border-bottom: 1px solid #eef2f9!important;
         padding: 16px 12px;
-        border-top: none !important;
+        border-top: none!important;
     }
     .table-saas tbody td {
         padding: 16px 12px;
-        border-bottom: 1px solid #f4f7fe !important;
+        border-bottom: 1px solid #f4f7fe!important;
         color: #1b2559;
         font-size: 14px;
         vertical-align: middle;
@@ -188,20 +218,20 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
     }
 
     .modal-premium .modal-content {
-        border-radius: 24px !important;
-        border: none !important;
-        box-shadow: 0px 24px 48px rgba(112, 144, 176, 0.15) !important;
+        border-radius: 24px!important;
+        border: none!important;
+        box-shadow: 0px 24px 48px rgba(112, 144, 176, 0.15)!important;
     }
-    .modal-premium .modal-header { border-bottom: 1px solid #f4f7fe !important; padding: 20px 24px !important; }
-    .modal-premium .modal-body { padding: 24px !important; }
-    .modal-premium .modal-footer { border-top: 1px solid #f4f7fe !important; padding: 16px 24px !important; }
+    .modal-premium .modal-header { border-bottom: 1px solid #f4f7fe!important; padding: 20px 24px!important; }
+    .modal-premium .modal-body { padding: 24px!important; }
+    .modal-premium .modal-footer { border-top: 1px solid #f4f7fe!important; padding: 16px 24px!important; }
 
     .badge.bg-primary-subtle{background:#dbeafe; color:#2563eb;}
 
     /* Perubahan Khusus Layar HP / Mobile */
     @media (max-width: 767.98px) {
-        .saas-card { padding: 16px !important; }
-        .header-container { flex-direction: column; align-items: flex-start !start; gap: 16px; }
+        .saas-card { padding: 16px!important; }
+        .header-container { flex-direction: column; align-items: flex-start!important; gap: 16px; }
         .header-container button { width: 100%; justify-content: center; }
         
         /* Mengubah struktur tabel menjadi kartu list yang rapi di HP */
@@ -219,11 +249,11 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
-            padding: 8px 0 !important; 
-            border-bottom: 1px dashed #f4f7fe !important;
+            padding: 8px 0!important; 
+            border-bottom: 1px dashed #f4f7fe!important;
             text-align: right;
         }
-        .table-saas tbody td:last-child { border-bottom: none !important; padding-top: 12px !important; }
+        .table-saas tbody td:last-child { border-bottom: none!important; padding-top: 12px!important; }
         
         /* Membuat label data otomatis di sebelah kiri pada tampilan HP */
         .table-saas tbody td::before {
@@ -272,47 +302,53 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if(mysqli_num_rows($investor)==0):?>
+                    <?php if($investor->num_rows==0):?>
                     <tr>
                         <td colspan="8" class="text-center py-5 text-muted">
                             <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                             Belum ada data investor
                         </td>
                     </tr>
-                    <?php else: $no=1; while($d=mysqli_fetch_assoc($investor)):?>
+                    <?php else: $no=1; while($d=$investor->fetch_assoc()):?>
                     <tr>
                         <td data-label="No" class="text-center text-muted fw-semibold"><?= $no++?></td>
-                        <td data-label="Nama Investor"><span class="fw-bold" style="color: #1b2559;"><?= htmlspecialchars($d['nama_investor'])?></span></td>
-                        <td data-label="No HP" class="text-secondary"><?= htmlspecialchars($d['no_hp'])?></td>
-                        <td data-label="Alamat" class="text-secondary" title="<?= htmlspecialchars($d['alamat']) ?>"><?= substr($d['alamat'],0,30)?><?= strlen($d['alamat'])>30?'...':''?></td>
-                        <td data-label="No Rekening" class="font-monospace text-secondary" style="font-size: 13px;"><?= htmlspecialchars($d['no_rekening'])?></td>
+                        <td data-label="Nama Investor"><span class="fw-bold" style="color: #1b2559;"><?= h($d['nama_investor'])?></span></td>
+                        <td data-label="No HP" class="text-secondary"><?= h($d['no_hp'])?></td>
+                        <td data-label="Alamat" class="text-secondary" title="<?= h($d['alamat'])?>"><?= substr(h($d['alamat']),0,30)?><?= strlen($d['alamat'])>30?'...':''?></td>
+                        <td data-label="No Rekening" class="font-monospace text-secondary" style="font-size: 13px;"><?= h($d['no_rekening'])?></td>
                         <td data-label="Nama Bank">
-                            <?php if($d['nama_bank']): ?>
-                                <span class="badge bg-light text-dark px-2 py-1 border text-uppercase" style="font-size: 10px; letter-spacing: 0.5px;"><?= htmlspecialchars($d['nama_bank'])?></span>
-                            <?php else: ?>
+                            <?php if($d['nama_bank']):?>
+                                <span class="badge bg-light text-dark px-2 py-1 border text-uppercase" style="font-size: 10px; letter-spacing: 0.5px;"><?= h($d['nama_bank'])?></span>
+                            <?php else:?>
                                 <span class="text-muted">-</span>
-                            <?php endif; ?>
+                            <?php endif;?>
                         </td>
                         <td data-label="Surat">
-                            <?php if($d['surat_perjanjian']): ?>
-                                <a href="../uploads/surat_perjanjian/<?= $d['surat_perjanjian']?>" target="_blank" class="btn btn-sm btn-outline-success" style="font-size: 12px; padding: 4px 8px;">
+                            <?php if($d['surat_perjanjian']):?>
+                                <a href="../uploads/surat_perjanjian/<?= h($d['surat_perjanjian'])?>" target="_blank" class="btn btn-sm btn-outline-success" style="font-size: 12px; padding: 4px 8px;">
                                     <i class="bi bi-file-earmark-pdf"></i> Lihat
                                 </a>
-                            <?php else: ?>
+                            <?php else:?>
                                 <span class="text-muted small">-</span>
-                            <?php endif; ?>
+                            <?php endif;?>
                         </td>
                         <td data-label="Aksi" class="text-center">
                             <div class="d-inline-flex gap-2 w-100 justify-content-end justify-content-md-center">
                                 <button class="btn btn-action-info" data-bs-toggle="modal" data-bs-target="#modalDetail<?= $d['id_investor']?>" title="Detail Cabang">
                                     <i class="bi bi-eye me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-eye"></i></span> Detail
                                 </button>
-                                <button class="btn btn-action-edit" data-bs-toggle="modal" data-bs-target="#modalInvestor" onclick="editInvestor(<?= $d['id_investor']?>, '<?= addslashes($d['nama_investor'])?>', '<?= addslashes($d['no_hp'])?>', '<?= addslashes($d['alamat'])?>', '<?= addslashes($d['no_rekening'])?>', '<?= addslashes($d['nama_bank'])?>', '<?= $d['surat_perjanjian']?>')" title="Edit">
+                                <button class="btn btn-action-edit" data-bs-toggle="modal" data-bs-target="#modalInvestor" onclick="editInvestor(<?= $d['id_investor']?>, '<?= addslashes(h($d['nama_investor']))?>', '<?= addslashes(h($d['no_hp']))?>', '<?= addslashes(h($d['alamat']))?>', '<?= addslashes(h($d['no_rekening']))?>', '<?= addslashes(h($d['nama_bank']))?>', '<?= h($d['surat_perjanjian'])?>')" title="Edit">
                                     <i class="bi bi-pencil-square me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-pencil-square"></i></span> Edit
                                 </button>
-                                <a href="?hapus=<?= $d['id_investor']?>" class="btn btn-action-delete" onclick="return confirm('Yakin hapus investor <?= addslashes($d['nama_investor'])?>?')" title="Hapus">
-                                    <i class="bi bi-trash-fill me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-trash-fill"></i></span> Hapus
-                                </a>
+                                
+                                <!-- 5. HAPUS JADI FORM POST -->
+                                <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus investor <?= addslashes(h($d['nama_investor']))?>?')">
+                                    <input type="hidden" name="csrf" value="<?=csrf_token()?>">
+                                    <input type="hidden" name="id_investor" value="<?= $d['id_investor']?>">
+                                    <button type="submit" name="hapus" class="btn btn-action-delete" title="Hapus">
+                                        <i class="bi bi-trash-fill me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-trash-fill"></i></span> Hapus
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>
@@ -322,22 +358,24 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
         </div>
     </div>
 
-    <?php mysqli_data_seek($investor, 0); while($d=mysqli_fetch_assoc($investor)): ?>
+    <?php $investor->data_seek(0); while($d=$investor->fetch_assoc()):?>
     <div class="modal fade modal-premium" id="modalDetail<?= $d['id_investor']?>" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <h5 class="modal-title fw-bold" style="color: #1b2559;">Cabang Milik <?= htmlspecialchars($d['nama_investor'])?></h5>
+                        <h5 class="modal-title fw-bold" style="color: #1b2559;">Cabang Milik <?= h($d['nama_investor'])?></h5>
                         <small class="text-muted">Daftar cabang yang diinvestasikan</small>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <?php 
-                    $id_safe = mysqli_real_escape_string($conn, $d['id_investor']);
-                    $cabang_inv = mysqli_query($conn, "SELECT nama_cabang, nama_pengelola, alamat FROM cabang WHERE id_investor='$id_safe' ORDER BY nama_cabang ASC");
-                    if(mysqli_num_rows($cabang_inv) > 0): ?>
+                    $stmt = $conn->prepare("SELECT nama_cabang, nama_pengelola, alamat FROM cabang WHERE id_investor=? ORDER BY nama_cabang ASC");
+                    $stmt->bind_param("i", $d['id_investor']);
+                    $stmt->execute();
+                    $cabang_inv = $stmt->get_result();
+                    if($cabang_inv->num_rows > 0):?>
                     <div class="table-responsive">
                         <table class="table table-saas table-sm mb-0">
                             <thead>
@@ -348,22 +386,22 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php while($c=mysqli_fetch_assoc($cabang_inv)): ?>
+                                <?php while($c=$cabang_inv->fetch_assoc()):?>
                                 <tr>
-                                    <td class="fw-semibold"><?= htmlspecialchars($c['nama_cabang'])?></td>
-                                    <td><?= htmlspecialchars($c['nama_pengelola'])?></td>
-                                    <td class="text-secondary"><?= htmlspecialchars($c['alamat'])?></td>
+                                    <td class="fw-semibold"><?= h($c['nama_cabang'])?></td>
+                                    <td><?= h($c['nama_pengelola'])?></td>
+                                    <td class="text-secondary"><?= h($c['alamat'])?></td>
                                 </tr>
-                                <?php endwhile; ?>
+                                <?php endwhile;?>
                             </tbody>
                         </table>
                     </div>
-                    <?php else: ?>
+                    <?php else:?>
                     <div class="text-center py-4 text-muted">
                         <i class="bi bi-building-x fs-2 d-block mb-2"></i>
                         Investor ini belum memiliki cabang
                     </div>
-                    <?php endif; ?>
+                    <?php endif;?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-premium-outline text-secondary" data-bs-dismiss="modal">Tutup</button>
@@ -371,12 +409,13 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
             </div>
         </div>
     </div>
-    <?php endwhile; ?>
+    <?php endwhile;?>
 </div>
 
 <div class="modal fade modal-premium" id="modalInvestor" tabindex="-1">
 <div class="modal-dialog modal-dialog-centered modal-lg">
 <form method="POST" enctype="multipart/form-data">
+<input type="hidden" name="csrf" value="<?=csrf_token()?>"> <!-- CSRF -->
 <div class="modal-content">
     <div class="modal-header">
         <div>
@@ -392,38 +431,38 @@ $edit = isset($_GET['edit']) ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT * 
         <div class="row g-3">
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-muted mb-1">Nama Investor <span class="text-danger">*</span></label>
-                <input type="text" name="nama_investor" id="nama_investor" class="form-control form-control-premium" value="<?= $edit['nama_investor']?? ''?>" required>
+                <input type="text" name="nama_investor" id="nama_investor" class="form-control form-control-premium" value="<?= h($edit['nama_investor']?? '')?>" required>
             </div>
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-muted mb-1">Telepohone</label>
-                <input type="text" name="no_hp" id="no_hp" class="form-control form-control-premium" value="<?= $edit['no_hp']?? ''?>" placeholder="08xxxxxxxxxx">
+                <input type="text" name="no_hp" id="no_hp" class="form-control form-control-premium" value="<?= h($edit['no_hp']?? '')?>" placeholder="08xxxxxxxxxx">
             </div>
         </div>
 
         <div class="mt-3">
             <label class="form-label small fw-bold text-muted mb-1">Alamat</label>
-            <textarea name="alamat" id="alamat" class="form-control form-control-premium" rows="2" placeholder="Alamat lengkap"><?= $edit['alamat']?? ''?></textarea>
+            <textarea name="alamat" id="alamat" class="form-control form-control-premium" rows="2" placeholder="Alamat lengkap"><?= h($edit['alamat']?? '')?></textarea>
         </div>
 
         <div class="row g-3 mt-1">
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-muted mb-1">Rekening</label>
-                <input type="text" name="no_rekening" id="no_rekening" class="form-control form-control-premium" value="<?= $edit['no_rekening']?? ''?>" placeholder="1234567890">
+                <input type="text" name="no_rekening" id="no_rekening" class="form-control form-control-premium" value="<?= h($edit['no_rekening']?? '')?>" placeholder="1234567890">
             </div>
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-muted mb-1">Bank</label>
-                <input type="text" name="nama_bank" id="nama_bank" class="form-control form-control-premium" value="<?= $edit['nama_bank']?? ''?>" placeholder="BCA / BNI / Mandiri">
+                <input type="text" name="nama_bank" id="nama_bank" class="form-control form-control-premium" value="<?= h($edit['nama_bank']?? '')?>" placeholder="BCA / BNI / Mandiri">
             </div>
         </div>
 
         <div class="mt-3">
             <label class="form-label small fw-bold text-muted mb-1">Surat Perjanjian</label>
             <input type="file" name="surat_perjanjian" class="form-control form-control-premium" accept=".pdf,.jpg,.jpeg,.png">
-            <?php if($edit && $edit['surat_perjanjian']): ?>
-            <small class="text-muted" id="file_info">File saat ini: <?= $edit['surat_perjanjian']?>. Upload baru untuk ganti.</small>
-            <?php else: ?>
+            <?php if($edit && $edit['surat_perjanjian']):?>
+            <small class="text-muted" id="file_info">File saat ini: <?= h($edit['surat_perjanjian'])?>. Upload baru untuk ganti.</small>
+            <?php else:?>
             <small class="text-muted" id="file_info"></small>
-            <?php endif; ?>
+            <?php endif;?>
         </div>
     </div>
     <div class="modal-footer">
@@ -460,7 +499,7 @@ function editInvestor(id, nama, hp, alamat, no_rek, bank, file){
     document.getElementById('nama_bank').value = bank;
     document.getElementById('modalTitle').innerText = 'Modifikasi Data Investor';
     document.getElementById('modalSub').innerText = 'Perbarui data investor';
-    document.getElementById('file_info').innerText = file ? 'File saat ini: ' + file + '. Upload baru untuk ganti.' : '';
+    document.getElementById('file_info').innerText = file? 'File saat ini: ' + file + '. Upload baru untuk ganti.' : '';
 }
 
 // Buka modal otomatis kalau mode edit

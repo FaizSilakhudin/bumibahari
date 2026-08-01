@@ -2,119 +2,115 @@
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
+// 1. PROTEKSI ROLE PUSAT
+if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
+    header("Location:../login"); exit;
+}
+
 $bulan_ini = date('Y-m');
 $bulan_lalu = date('Y-m', strtotime('-1 month'));
-$hari_ini = date('Y-m-d'); // BARU: Tanggal hari ini
+$hari_ini = date('Y-m-d');
 
-// Filter investor - pakai alias biar gak ambiguous
+// Filter investor - PAKAI PREPARED
 $filter_investor = $_GET['investor'] ?? '';
-$filter_investor = $filter_investor ? mysqli_real_escape_string($conn, $filter_investor) : '';
-$where_filter = $filter_investor ? "AND l.id_cabang IN (SELECT c.id_cabang FROM cabang c WHERE c.id_investor='$filter_investor')" : "";
-$where_filter_cabang = $filter_investor ? "AND c.id_investor='$filter_investor'" : "";
+$where_filter = "";
+$where_filter_cabang = "";
+$params = [];
+$types = "";
+
+if($filter_investor){
+    $where_filter = "AND l.id_cabang IN (SELECT c.id_cabang FROM cabang c WHERE c.id_investor=?)";
+    $where_filter_cabang = "AND c.id_investor=?";
+    $params[] = $filter_investor;
+    $types .= "i";
+}
 
 // Ambil list investor
 $list_investor = [];
-$res_inv = mysqli_query($conn, "SELECT id_investor, nama_investor FROM investor ORDER BY nama_investor ASC");
-while($row = mysqli_fetch_assoc($res_inv)) $list_investor[] = $row;
+$res_inv = $conn->query("SELECT id_investor, nama_investor FROM investor ORDER BY nama_investor ASC");
+while($row = $res_inv->fetch_assoc()) $list_investor[] = $row;
 
 $nama_filter = '';
 if($filter_investor){
-    $q = mysqli_query($conn, "SELECT nama_investor FROM investor WHERE id_investor='$filter_investor'");
-    $nama_filter = $q ? mysqli_fetch_assoc($q)['nama_investor'] : '';
+    $stmt = $conn->prepare("SELECT nama_investor FROM investor WHERE id_investor=?");
+    $stmt->bind_param("i", $filter_investor);
+    $stmt->execute();
+    $nama_filter = $stmt->get_result()->fetch_assoc()['nama_investor']?? '';
 }
 
 // 1. KPI Bulan Ini
-$kpi = mysqli_fetch_assoc(mysqli_query($conn, "
-    SELECT 
-        COALESCE(SUM(l.total_omset),0) as omzet,
-        COALESCE(SUM(l.net_profit),0) as laba,
-        COALESCE(AVG(l.persentase),0) as margin
-    FROM laporan_cabang l
-    WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = '$bulan_ini'
-    $where_filter
-"));
+$sql_kpi = "SELECT COALESCE(SUM(l.total_omset),0) as omzet, COALESCE(SUM(l.net_profit),0) as laba, COALESCE(AVG(l.persentase),0) as margin FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter";
+$stmt = $conn->prepare($sql_kpi);
+$bind_params = array_merge([$bulan_ini], $params);
+$bind_types = "s".$types;
+$stmt->bind_param($bind_types, ...$bind_params);
+$stmt->execute();
+$kpi = $stmt->get_result()->fetch_assoc();
 
-// 1.1 KPI HARI INI - BARU
-$kpi_hari_ini = mysqli_fetch_assoc(mysqli_query($conn, "
-    SELECT 
-        COALESCE(SUM(l.total_omset),0) as omzet,
-        COALESCE(SUM(l.net_profit),0) as laba
-    FROM laporan_cabang l
-    WHERE l.tanggal = '$hari_ini'
-    $where_filter
-"));
+// 1.1 KPI HARI INI
+$sql_hari = "SELECT COALESCE(SUM(l.total_omset),0) as omzet, COALESCE(SUM(l.net_profit),0) as laba FROM laporan_cabang l WHERE l.tanggal = ? $where_filter";
+$stmt = $conn->prepare($sql_hari);
+$bind_params = array_merge([$hari_ini], $params);
+$stmt->bind_param($bind_types, ...$bind_params);
+$stmt->execute();
+$kpi_hari_ini = $stmt->get_result()->fetch_assoc();
 
-// 2. KPI Bulan Lalu buat perbandingan %
-$kpi_lalu = mysqli_fetch_assoc(mysqli_query($conn, "
-    SELECT COALESCE(SUM(l.total_omset),0) as omzet FROM laporan_cabang l
-    WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = '$bulan_lalu'
-    $where_filter
-"));
-$naik_turun = $kpi_lalu['omzet'] > 0 ? (($kpi['omzet'] - $kpi_lalu['omzet']) / $kpi_lalu['omzet']) * 100 : 0;
+// 2. KPI Bulan Lalu
+$sql_lalu = "SELECT COALESCE(SUM(l.total_omset),0) as omzet FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter";
+$stmt = $conn->prepare($sql_lalu);
+$bind_params = array_merge([$bulan_lalu], $params);
+$stmt->bind_param($bind_types, ...$bind_params);
+$stmt->execute();
+$kpi_lalu = $stmt->get_result()->fetch_assoc();
+$naik_turun = $kpi_lalu['omzet'] > 0? (($kpi['omzet'] - $kpi_lalu['omzet']) / $kpi_lalu['omzet']) * 100 : 0;
 
 // 3. Cabang aktif bulan ini
-$cabang_aktif = mysqli_fetch_assoc(mysqli_query($conn, "
-    SELECT COUNT(DISTINCT l.id_cabang) as total 
-    FROM laporan_cabang l
-    WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = '$bulan_ini'
-    $where_filter
-"))['total'];
+$sql_aktif = "SELECT COUNT(DISTINCT l.id_cabang) as total FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter";
+$stmt = $conn->prepare($sql_aktif);
+$stmt->bind_param($bind_types, ...$bind_params);
+$stmt->execute();
+$cabang_aktif = $stmt->get_result()->fetch_assoc()['total'];
 
 // 4. Total cabang
-$total_cabang = $filter_investor 
-    ? mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM cabang c WHERE c.id_investor='$filter_investor'"))['total']
-    : mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM cabang c"))['total'];
+if($filter_investor){
+    $stmt = $conn->prepare("SELECT COUNT(*) as total FROM cabang c WHERE c.id_investor=?");
+    $stmt->bind_param("i", $filter_investor);
+    $stmt->execute();
+    $total_cabang = $stmt->get_result()->fetch_assoc()['total'];
+} else {
+    $total_cabang = $conn->query("SELECT COUNT(*) as total FROM cabang c")->fetch_assoc()['total'];
+}
 
 // 5. Top 5 cabang bulan ini
-$top_cabang = mysqli_query($conn, "
-    SELECT c.nama_cabang, SUM(l.total_omset) as omzet 
-    FROM laporan_cabang l 
-    JOIN cabang c ON l.id_cabang = c.id_cabang 
-    WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = '$bulan_ini'
-    $where_filter
-    GROUP BY l.id_cabang 
-    ORDER BY omzet DESC LIMIT 5
-");
+$sql_top = "SELECT c.nama_cabang, SUM(l.total_omset) as omzet FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter GROUP BY l.id_cabang ORDER BY omzet DESC LIMIT 5";
+$stmt = $conn->prepare($sql_top);
+$bind_params = array_merge([$bulan_ini], $params);
+$stmt->bind_param($bind_types, ...$bind_params);
+$stmt->execute();
+$top_cabang = $stmt->get_result();
 
 // 6. Data grafik 6 bulan
-$grafik = mysqli_query($conn, "
-    SELECT 
-        DATE_FORMAT(l.tanggal, '%b %Y') as bulan,
-        COALESCE(SUM(l.total_omset),0) as omzet,
-        COALESCE(SUM(l.net_profit),0) as laba
-    FROM laporan_cabang l
-    WHERE l.tanggal >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-    $where_filter
-    GROUP BY DATE_FORMAT(l.tanggal, '%Y-%m')
-    ORDER BY l.tanggal ASC
-");
+$sql_grafik = "SELECT DATE_FORMAT(l.tanggal, '%b %Y') as bulan, COALESCE(SUM(l.total_omset),0) as omzet, COALESCE(SUM(l.net_profit),0) as laba FROM laporan_cabang l WHERE l.tanggal >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) $where_filter GROUP BY DATE_FORMAT(l.tanggal, '%Y-%m') ORDER BY l.tanggal ASC";
+$stmt = $conn->prepare($sql_grafik);
+if($filter_investor) $stmt->bind_param($types, ...$params);
+$stmt->execute();
+$grafik = $stmt->get_result();
 $label_grafik = $data_omzet = $data_laba = [];
-while($g = mysqli_fetch_assoc($grafik)){
+while($g = $grafik->fetch_assoc()){
     $label_grafik[] = $g['bulan'];
     $data_omzet[] = $g['omzet'];
     $data_laba[] = $g['laba'];
 }
 
-// 7. Peringatan Dini - Ditambahkan kolom c.nama_pengelola agar dinamis
-$peringatan = mysqli_query($conn, "
-    SELECT 
-        c.id_cabang,
-        c.nama_cabang, 
-        c.nama_pengelola,
-        MAX(l.tanggal) as input_terakhir,
-        DATEDIFF(CURDATE(), MAX(l.tanggal)) as selisih_hari
-    FROM cabang c
-    LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang
-    WHERE c.id_cabang NOT IN (
-        SELECT id_cabang FROM laporan_cabang WHERE tanggal = CURDATE()
-    )
-    $where_filter_cabang
-    GROUP BY c.id_cabang
-    ORDER BY selisih_hari DESC, c.nama_cabang ASC
-");
+// 7. Peringatan Dini
+$sql_peringatan = "SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola, MAX(l.tanggal) as input_terakhir, DATEDIFF(CURDATE(), MAX(l.tanggal)) as selisih_hari FROM cabang c LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = CURDATE()) $where_filter_cabang GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC";
+$stmt = $conn->prepare($sql_peringatan);
+if($filter_investor) $stmt->bind_param("i", $filter_investor);
+$stmt->execute();
+$peringatan = $stmt->get_result();
 
-$share_pengelola_kotor = ($kpi['laba'] ?? 0) * 0.50; 
-$admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5% dari Laba Bersih
+$share_pengelola_kotor = ($kpi['laba']?? 0) * 0.50; 
+$admin_fee = $share_pengelola_kotor * 0.03;
 ?>
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -122,24 +118,24 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
 
 <style>
     body {
-        background-color: #f8fafc !important;
-        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        background-color: #f8fafc!important;
+        font-family: 'Plus Jakarta Sans', sans-serif!important;
         color: #1e293b;
     }
     
     /* Global Soft Glassmorphism Card Style */
     .saas-card {
         background: #ffffff;
-        border: 1px solid #f1f5f9 !important;
-        border-radius: 18px !important;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02), 0 10px 15px -3px rgb(0 0 0 / 0.01) !important;
+        border: 1px solid #f1f5f9!important;
+        border-radius: 18px!important;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02), 0 10px 15px -3px rgb(0 0 0 / 0.01)!important;
         padding: 24px;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
     }
     .saas-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05) !important;
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05)!important;
     }
 
     /* KPI Premium Card Refinement */
@@ -243,8 +239,8 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
 
     /* Clean Form Elements */
     .form-select-filter {
-        border-radius: 12px !important;
-        border: 1px solid #e2e8f0 !important;
+        border-radius: 12px!important;
+        border: 1px solid #e2e8f0!important;
         font-size: 14px;
         font-weight: 600;
         color: #334155;
@@ -254,8 +250,8 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
         transition: all 0.2s ease;
     }
     .form-select-filter:focus {
-        border-color: #4318ff !important;
-        box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1) !important;
+        border-color: #4318ff!important;
+        box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1)!important;
     }
 
     /* Elegant SaaS Tables */
@@ -322,11 +318,11 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
-            padding: 10px 0 !important; 
-            border-bottom: 1px dashed #e2e8f0 !important;
+            padding: 10px 0!important; 
+            border-bottom: 1px dashed #e2e8f0!important;
             text-align: right;
         }
-        .table-saas tbody td:last-child { border-bottom: none !important; }
+        .table-saas tbody td:last-child { border-bottom: none!important; }
         .table-saas tbody td::before {
             content: attr(data-label);
             font-weight: 700;
@@ -341,9 +337,9 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
 <div class="container-fluid py-4 px-3 px-md-4">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
         <div>
-            <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 10px; letter-spacing: 1px; color:#94a3b8 !important;">Main Administration</span>
-            <h3 class="fw-bold mb-0 mt-1" style="color: #0f172a !important; font-size: 24px; letter-spacing: -0.5px;">
-                Dashboard Pusat <?= $nama_filter ? "<span style='color: #4318ff;'>• $nama_filter</span>" : "" ?>
+            <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 10px; letter-spacing: 1px; color:#94a3b8!important;">Main Administration</span>
+            <h3 class="fw-bold mb-0 mt-1" style="color: #0f172a!important; font-size: 24px; letter-spacing: -0.5px;">
+                Dashboard Pusat <?= $nama_filter? "<span style='color: #4318ff;'>• ".h($nama_filter)."</span>" : ""?>
             </h3>
         </div>
         
@@ -351,20 +347,20 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
             <form method="GET" class="d-flex align-items-center gap-2 flex-grow-1 flex-sm-grow-0">
                 <select name="investor" class="form-select form-select-filter" onchange="this.form.submit()">
                     <option value="">Semua Investor</option>
-                    <?php foreach($list_investor as $inv): ?>
-                    <option value="<?= $inv['id_investor'] ?>" <?= $filter_investor==$inv['id_investor']?'selected':'' ?>>
-                        <?= htmlspecialchars($inv['nama_investor']) ?>
+                    <?php foreach($list_investor as $inv):?>
+                    <option value="<?= $inv['id_investor']?>" <?= $filter_investor==$inv['id_investor']?'selected':''?>>
+                        <?= h($inv['nama_investor'])?>
                     </option>
-                    <?php endforeach; ?>
+                    <?php endforeach;?>
                 </select>
-                <?php if($filter_investor): ?>
-                <a href="index.php" class="btn btn-light" style="border-radius: 12px; padding: 10px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter">
+                <?php if($filter_investor):?>
+                <a href="index" class="btn btn-light" style="border-radius: 12px; padding: 10px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter"> <!-- TANPA .PHP -->
                     <i class="bi bi-x-lg text-danger"></i>
                 </a>
-                <?php endif; ?>
+                <?php endif;?>
             </form>
-            <div class="bg-white px-3 py-2 rounded-3 border d-flex align-items-center justify-content-center" style="border-radius: 12px !important; font-weight: 600; color: #475569 !important; font-size: 14px; border-color: #e2e8f0 !important;">
-                <i class="bi bi-calendar4-event me-2 text-primary" style="color: #4318ff !important;"></i><?= date('F Y') ?>
+            <div class="bg-white px-3 py-2 rounded-3 border d-flex align-items-center justify-content-center" style="border-radius: 12px!important; font-weight: 600; color: #475569!important; font-size: 14px; border-color: #e2e8f0!important;">
+                <i class="bi bi-calendar4-event me-2 text-primary" style="color: #4318ff!important;"></i><?= date('F Y')?>
             </div>
         </div>
     </div>
@@ -375,17 +371,17 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="d-flex flex-column">
                         <span class="kpi-meta">Total Omzet</span>
-                        <h4 class="kpi-value">Rp <?= number_format($kpi['omzet'] ?? 0,0,',','.') ?></h4>
-                        <span class="kpi-subvalue">Hari ini: <span class="fw-semibold text-dark">Rp <?= number_format($kpi_hari_ini['omzet'] ?? 0,0,',','.') ?></span></span>
+                        <h4 class="kpi-value">Rp <?= number_format($kpi['omzet']?? 0,0,',','.')?></h4>
+                        <span class="kpi-subvalue">Hari ini: <span class="fw-semibold text-dark">Rp <?= number_format($kpi_hari_ini['omzet']?? 0,0,',','.')?></span></span>
                     </div>
                     <div class="kpi-badge-icon" style="--badge-bg: rgba(67, 24, 255, 0.06); --badge-color: #4318ff;">
                         <i class="bi bi-graph-up"></i>
                     </div>
                 </div>
-                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9 !important;">
-                    <span class="<?= $naik_turun >= 0 ? 'badge-modern-success' : 'badge-modern-danger' ?>">
-                        <i class="bi bi-<?= $naik_turun >= 0 ? 'arrow-up-short' : 'arrow-down-short' ?> fs-6"></i> 
-                        <?= number_format(abs($naik_turun),1) ?>%
+                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9!important;">
+                    <span class="<?= $naik_turun >= 0? 'badge-modern-success' : 'badge-modern-danger'?>">
+                        <i class="bi bi-<?= $naik_turun >= 0? 'arrow-up-short' : 'arrow-down-short'?> fs-6"></i> 
+                        <?= number_format(abs($naik_turun),1)?>%
                     </span>
                     <span class="text-muted small ms-1" style="font-size: 12px;">vs bulan lalu</span>
                 </div>
@@ -397,16 +393,16 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="d-flex flex-column">
                         <span class="kpi-meta">Laba Bersih</span>
-                        <h4 class="kpi-value">Rp <?= number_format($kpi['laba'] ?? 0,0,',','.') ?></h4>
-                        <span class="kpi-subvalue">Hari ini: <span class="fw-semibold text-dark">Rp <?= number_format($kpi_hari_ini['laba'] ?? 0,0,',','.') ?></span></span>
+                        <h4 class="kpi-value">Rp <?= number_format($kpi['laba']?? 0,0,',','.')?></h4>
+                        <span class="kpi-subvalue">Hari ini: <span class="fw-semibold text-dark">Rp <?= number_format($kpi_hari_ini['laba']?? 0,0,',','.')?></span></span>
                     </div>
                     <div class="kpi-badge-icon" style="--badge-bg: rgba(14, 165, 233, 0.06); --badge-color: #0ea5e9;">
                         <i class="bi bi-wallet2"></i>
                     </div>
                 </div>
-                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9 !important;">
+                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9!important;">
                     <span class="badge-modern-success" style="background-color: #f0f9ff; color: #0ea5e9; border-color: #e0f2fe;">
-                        <i class="bi bi-pie-chart-fill me-1"></i> Margin <?= number_format($kpi['margin'] ?? 0,2) ?>%
+                        <i class="bi bi-pie-chart-fill me-1"></i> Margin <?= number_format($kpi['margin']?? 0,2)?>%
                     </span>
                 </div>
             </div>
@@ -417,7 +413,7 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="d-flex flex-column">
                         <span class="kpi-meta">Cabang Aktif</span>
-                        <h4 class="kpi-value"><?= $cabang_aktif ?> <span style="font-size: 14px; color:#94a3b8; font-weight: 500;">/ <?= $total_cabang ?> Unit</span></h4>
+                        <h4 class="kpi-value"><?= $cabang_aktif?> <span style="font-size: 14px; color:#94a3b8; font-weight: 500;">/ <?= $total_cabang?> Unit</span></h4>
                     </div>
                     <div class="kpi-badge-icon" style="--badge-bg: rgba(16, 185, 129, 0.06); --badge-color: #10b981;">
                         <i class="bi bi-building-check"></i>
@@ -425,7 +421,7 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
                 </div>
                 <div class="pt-2">
                     <div class="progress" style="height: 6px; border-radius: 10px; background-color: #f1f5f9;">
-                        <div class="progress-bar" style="width:<?= $total_cabang>0 ? ($cabang_aktif/$total_cabang)*100 : 0 ?>%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 10px;"></div>
+                        <div class="progress-bar" style="width:<?= $total_cabang>0? ($cabang_aktif/$total_cabang)*100 : 0?>%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 10px;"></div>
                     </div>
                 </div>
             </div>
@@ -436,13 +432,13 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="d-flex flex-column">
                         <span class="kpi-meta">Admin Fee (3%)</span>
-                        <h4 class="kpi-value" style="color: #0f172a;">Rp <?= number_format($admin_fee,0,',','.') ?></h4>
+                        <h4 class="kpi-value" style="color: #0f172a;">Rp <?= number_format($admin_fee,0,',','.')?></h4>
                     </div>
                     <div class="kpi-badge-icon" style="--badge-bg: rgba(245, 158, 11, 0.06); --badge-color: #f59e0b;">
                         <i class="bi bi-shield-check"></i>
                     </div>
                 </div>
-                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9 !important; font-size: 12px; color: #64748b; font-weight: 500;">
+                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9!important; font-size: 12px; color: #64748b; font-weight: 500;">
                     <i class="bi bi-info-circle me-1 text-warning"></i> Estimasi bagi hasil pusat
                 </div>
             </div>
@@ -467,27 +463,27 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
                     <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 15px;">Top 5 Cabang Terlaris</h6>
                 </div>
                 <div class="d-flex flex-column gap-2">
-                    <?php $no=1; while($t=mysqli_fetch_assoc($top_cabang)): ?>
-                    <div class="d-flex justify-content-between align-items-center" style="background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px !important; padding: 12px 14px;">
+                    <?php $no=1; while($t=$top_cabang->fetch_assoc()):?>
+                    <div class="d-flex justify-content-between align-items-center" style="background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px!important; padding: 12px 14px;">
                         <div class="d-flex align-items-center">
-                            <div class="rank-box me-3"><?= $no++ ?></div>
-                            <span class="fw-semibold" style="font-size: 14px; color: #334155;"><?= htmlspecialchars($t['nama_cabang']) ?></span>
+                            <div class="rank-box me-3"><?= $no++?></div>
+                            <span class="fw-semibold" style="font-size: 14px; color: #334155;"><?= h($t['nama_cabang'])?></span>
                         </div>
-                        <span class="text-end" style="color: #4318ff; font-size: 14px; font-weight:700;">Rp <?= number_format($t['omzet'],0,',','.') ?></span>
+                        <span class="text-end" style="color: #4318ff; font-size: 14px; font-weight:700;">Rp <?= number_format($t['omzet'],0,',','.')?></span>
                     </div>
-                    <?php endwhile; ?>
+                    <?php endwhile;?>
                     
-                    <?php if(mysqli_num_rows($top_cabang)==0): ?>
-                    <div class="text-muted text-center py-5" style="color: #94a3b8 !important;">
+                    <?php if($top_cabang->num_rows==0):?>
+                    <div class="text-muted text-center py-5" style="color: #94a3b8!important;">
                         <i class="bi bi-folder-x fs-2 d-block mb-2"></i> Tidak ada data penjualan
                     </div>
-                    <?php endif; ?>
+                    <?php endif;?>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card saas-card p-0 overflow-hidden mb-4" style="border: 1px solid #e2e8f0 !important;">
+    <div class="card saas-card p-0 overflow-hidden mb-4" style="border: 1px solid #e2e8f0!important;">
         <div class="px-4 pt-4 pb-3">
             <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 15px;">🚨 Peringatan Dini Operasional</h6>
             <p class="text-muted small mb-0 mt-1">Daftar cabang terdeteksi yang belum mengirimkan data transaksi hari ini.</p>
@@ -506,16 +502,16 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if(mysqli_num_rows($peringatan) == 0): ?>
+                        <?php if($peringatan->num_rows == 0):?>
                         <tr>
-                            <td colspan="5" class="text-center text-success py-5 fw-bold" style="color: #16a34a !important; background: #ffffff;">
+                            <td colspan="5" class="text-center text-success py-5 fw-bold" style="color: #16a34a!important; background: #ffffff;">
                                 <div class="d-flex align-items-center justify-content-center gap-2 fs-6">
                                     <i class="bi bi-shield-check fs-4"></i> Luar Biasa! Semua pengelola cabang sudah menginput laporan hari ini.
                                 </div>
                             </td>
                         </tr>
-                        <?php else: while($p=mysqli_fetch_assoc($peringatan)): 
-                            $hari_telat = $p['selisih_hari'] ?? 0;
+                        <?php else: while($p=$peringatan->fetch_assoc()): 
+                            $hari_telat = $p['selisih_hari']?? 0;
                             
                             if ($hari_telat == 0 || $p['input_terakhir'] == NULL) {
                                 $status_badge = '<span class="badge-modern-danger"><i class="bi bi-exclamation-circle-fill"></i> Terlambat</span>';
@@ -528,18 +524,18 @@ $admin_fee = $share_pengelola_kotor * 0.03; // Baru: 3% dari 50% Pengelola = 1.5
                             }
                         ?>
                         <tr>
-                            <td data-label="Status"><?= $status_badge ?></td>
-                            <td data-label="Nama Cabang"><span class="fw-bold" style="color: #0f172a;"><?= htmlspecialchars($p['nama_cabang']) ?></span></td>
+                            <td data-label="Status"><?= $status_badge?></td>
+                            <td data-label="Nama Cabang"><span class="fw-bold" style="color: #0f172a;"><?= h($p['nama_cabang'])?></span></td>
                             <td data-label="Nama Pengelola">
                                 <div class="fw-semibold text-secondary" style="font-size: 13.5px;">
-                                    <i class="bi bi-person-badge me-1 text-primary" style="color: #4318ff !important;"></i>
-                                    <?= htmlspecialchars($p['nama_pengelola'] ?? 'Belum Diatur') ?>
+                                    <i class="bi bi-person-badge me-1 text-primary" style="color: #4318ff!important;"></i>
+                                    <?= h($p['nama_pengelola']?? 'Belum Diatur')?>
                                 </div>
                             </td>
-                            <td data-label="Masalah"><?= $masalah_text ?></td>
-                            <td data-label="Input Terakhir" class="text-muted fw-medium"><?= $txt_terakhir ?></td>
+                            <td data-label="Masalah"><?= $masalah_text?></td>
+                            <td data-label="Input Terakhir" class="text-muted fw-medium"><?= $txt_terakhir?></td>
                         </tr>
-                        <?php endwhile; endif; ?>
+                        <?php endwhile; endif;?>
                     </tbody>
                 </table>
             </div>
@@ -563,10 +559,10 @@ gradLaba.addColorStop(1, 'rgba(14, 165, 233, 0.0)');
 new Chart(ctx, {
     type: 'line',
     data: {
-        labels: <?= json_encode($label_grafik) ?>,
+        labels: <?= json_encode($label_grafik)?>,
         datasets: [{
             label: 'Omzet',
-            data: <?= json_encode($data_omzet) ?>,
+            data: <?= json_encode($data_omzet)?>,
             borderColor: '#4318ff',
             backgroundColor: gradOmzet,
             borderWidth: 2.5,
@@ -579,7 +575,7 @@ new Chart(ctx, {
             pointHoverBorderWidth: 2
         }, {
             label: 'Laba Bersih',
-            data: <?= json_encode($data_laba) ?>,
+            data: <?= json_encode($data_laba)?>,
             borderColor: '#0ea5e9',
             backgroundColor: gradLaba,
             borderWidth: 2.5,
@@ -624,7 +620,7 @@ new Chart(ctx, {
                         if (label) {
                             label += ': ';
                         }
-                        if (context.parsed.y !== null) {
+                        if (context.parsed.y!== null) {
                             label += 'Rp ' + context.parsed.y.toLocaleString('id-ID');
                         }
                         return label;

@@ -1,4 +1,13 @@
-<?php if($_SESSION['role'] != 'pusat'){ header("Location: ../login.php"); exit; } ?>
+<?php 
+// PROTEKSI HALAMAN: Harus login dan role pusat
+if(!isset($_SESSION['role']) || $_SESSION['role'] != 'pusat'){ 
+    header("Location: ../login"); // TANPA .PHP
+    exit; 
+}
+
+// Auto deteksi menu aktif berdasarkan nama file
+$current_page = basename($_SERVER['PHP_SELF'], ".php"); 
+?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -152,40 +161,40 @@
     <div class="nav-section">Menu Utama</div>
     <ul class="nav flex-column flex-grow-1">
         <li class="nav-item">
-            <a class="nav-link <?= basename($_SERVER['PHP_SELF'])=='index.php'?'active':'' ?>" href="index.php">
+            <a class="nav-link <?=($current_page=='index')?'active':''?>" href="index"> <!-- 1. TANPA .PHP -->
                 <i class="bi bi-grid-1x2-fill"></i> Dashboard
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?= basename($_SERVER['PHP_SELF'])=='data_cabang.php'?'active':'' ?>" href="data_cabang.php">
+            <a class="nav-link <?=($current_page=='data_cabang')?'active':''?>" href="data_cabang"> <!-- 2. TANPA .PHP -->
                 <i class="bi bi-buildings-fill"></i> Data Cabang
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?= basename($_SERVER['PHP_SELF'])=='data_pengelola.php'?'active':'' ?>" href="data_pengelola.php">
+            <a class="nav-link <?=($current_page=='data_pengelola')?'active':''?>" href="data_pengelola"> <!-- 3. TANPA .PHP -->
                 <i class="bi bi-people-fill"></i> Data Pengelola
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?= basename($_SERVER['PHP_SELF'])=='data_investor.php'?'active':'' ?>" href="data_investor.php">
+            <a class="nav-link <?=($current_page=='data_investor')?'active':''?>" href="data_investor"> <!-- 4. TANPA .PHP -->
                 <i class="bi bi-person-badge-fill"></i> Data Investor
             </a>
         </li>
         <div class="nav-section">Laporan</div>
         <li class="nav-item">
-            <a class="nav-link <?= basename($_SERVER['PHP_SELF'])=='laporan.php'?'active':'' ?>" href="laporan.php">
+            <a class="nav-link <?=($current_page=='laporan')?'active':''?>" href="laporan"> <!-- 5. TANPA .PHP -->
                 <i class="bi bi-file-earmark-text-fill"></i> Laporan Harian
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?= basename($_SERVER['PHP_SELF'])=='rekapitulasi.php'?'active':'' ?>" href="rekapitulasi.php">
+            <a class="nav-link <?=($current_page=='rekapitulasi')?'active':''?>" href="rekapitulasi"> <!-- 6. TANPA .PHP -->
                 <i class="bi bi-graph-up-arrow"></i> Rekapitulasi
             </a>
         </li>
     </ul>
     
     <div class="logout-link">
-        <a class="nav-link text-danger" href="../logout.php">
+        <a class="nav-link text-danger" href="../logout"> <!-- 7. TANPA .PHP -->
             <i class="bi bi-box-arrow-right"></i> Logout
         </a>
     </div>

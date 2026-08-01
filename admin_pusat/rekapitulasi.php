@@ -2,6 +2,11 @@
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
+// 1. PROTEKSI ROLE PUSAT
+if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
+    header("Location:../login"); exit;
+}
+
 $periode = $_GET['periode'] ?? 'bulanan';
 $tahun = $_GET['tahun'] ?? date('Y');
 $bulan = $_GET['bulan'] ?? date('m');
@@ -9,41 +14,57 @@ $id_cabang = $_GET['id_cabang'] ?? '';
 
 // Ambil nama cabang yang kepilih biar input keisi
 $nama_cabang_terpilih = '';
-if($id_cabang != ''){
-    $q_nama = mysqli_query($conn, "SELECT nama_cabang FROM cabang WHERE id_cabang=".(int)$id_cabang);
-    if($q_nama && mysqli_num_rows($q_nama)>0){
-        $nama_cabang_terpilih = mysqli_fetch_assoc($q_nama)['nama_cabang'];
-    }
+if($id_cabang!= ''){
+    $stmt = $conn->prepare("SELECT nama_cabang FROM cabang WHERE id_cabang=?");
+    $stmt->bind_param("i", $id_cabang);
+    $stmt->execute();
+    $nama_cabang_terpilih = $stmt->get_result()->fetch_assoc()['nama_cabang']?? '';
 }
 
-$list_cabang = mysqli_query($conn, "SELECT id_cabang, nama_cabang FROM cabang ORDER BY nama_cabang");
+$list_cabang = $conn->query("SELECT id_cabang, nama_cabang FROM cabang ORDER BY nama_cabang");
 
-// Periode
+// 2. BUAT WHERE PAKAI PREPARED
+$where_sql = "";
+$params = [];
+$types = "";
+
 if($periode == 'mingguan'){
-    $where = "WHERE YEAR(l.tanggal)=$tahun AND WEEK(l.tanggal,1) = WEEK(CURDATE(),1)";
+    $where_sql = "WHERE YEAR(l.tanggal)=? AND WEEK(l.tanggal,1) = WEEK(CURDATE(),1)";
+    $params[] = $tahun;
+    $types .= "i";
     $judul = "Rekap Mingguan - Minggu ".date('W');
 } 
 elseif($periode == 'tahunan'){
-    $where = "WHERE YEAR(l.tanggal)=$tahun";
+    $where_sql = "WHERE YEAR(l.tanggal)=?";
+    $params[] = $tahun;
+    $types .= "i";
     $judul = "Rekap Tahunan - Tahun $tahun";
 } 
 else {
-    $where = "WHERE YEAR(l.tanggal)=$tahun AND MONTH(l.tanggal)=$bulan";
+    $where_sql = "WHERE YEAR(l.tanggal)=? AND MONTH(l.tanggal)=?";
+    $params[] = $tahun;
+    $params[] = $bulan;
+    $types .= "ii";
     $judul = "Rekap Bulanan - ".date('F Y', strtotime("$tahun-$bulan-01"));
 }
 
 // Filter cabang
-if($id_cabang != ''){
-    $where .= " AND l.id_cabang = ".(int)$id_cabang;
-    $cabang_info = mysqli_fetch_assoc(mysqli_query($conn, "SELECT nama_cabang, investor, no_rekening, nama_bank FROM cabang WHERE id_cabang=".(int)$id_cabang));
-    $nama_cabang = $cabang_info['nama_cabang'] ?? "Semua Cabang";
+$cabang_info = ['investor'=>'-', 'no_rekening'=>'-', 'nama_bank'=>'-'];
+$nama_cabang = "Semua Cabang";
+if($id_cabang!= ''){
+    $where_sql .= " AND l.id_cabang = ?";
+    $params[] = (int)$id_cabang;
+    $types .= "i";
+    
+    $stmt = $conn->prepare("SELECT nama_cabang, investor, no_rekening, nama_bank FROM cabang WHERE id_cabang=?");
+    $stmt->bind_param("i", $id_cabang);
+    $stmt->execute();
+    $cabang_info = $stmt->get_result()->fetch_assoc()?? $cabang_info;
+    $nama_cabang = $cabang_info['nama_cabang']?? "Semua Cabang";
     $judul .= " - ".$nama_cabang;
-} else {
-    $nama_cabang = "Semua Cabang";
-    $cabang_info = ['investor'=>'-', 'no_rekening'=>'-', 'nama_bank'=>'-'];
 }
 
-// Query data utama + ambil data BO dari laporan_cabang
+// 3. QUERY DATA UTAMA PAKAI PREPARED
 $query = "SELECT c.nama_cabang, c.investor, c.no_rekening, c.nama_bank,
           SUM(l.total_omset) as penjualan,
           SUM(l.total_pengeluaran) as pengeluaran,
@@ -58,14 +79,17 @@ $query = "SELECT c.nama_cabang, c.investor, c.no_rekening, c.nama_bank,
           SUM(l.lain_lain) as lain_lain
           FROM laporan_cabang l
           JOIN cabang c ON l.id_cabang = c.id_cabang
-          $where
+          $where_sql
           GROUP BY l.id_cabang";
 
-$data = mysqli_query($conn, $query);
-$row = ($data && mysqli_num_rows($data) > 0) ? mysqli_fetch_assoc($data) : [];
+$stmt = $conn->prepare($query);
+if(!empty($params)) $stmt->bind_param($types, ...$params);
+$stmt->execute();
+$data = $stmt->get_result();
+$row = ($data->num_rows > 0)? $data->fetch_assoc() : [];
 
-$penjualan   = (float)($row['penjualan'] ?? 0);
-$pengeluaran = (float)($row['pengeluaran'] ?? 0);
+$penjualan   = (float)($row['penjualan']?? 0);
+$pengeluaran = (float)($row['pengeluaran']?? 0);
 
 /* Net Profit = Omzet - Total Pengeluaran */
 $laba_bersih = $penjualan - $pengeluaran;
@@ -76,14 +100,14 @@ $margin = $penjualan > 0
 
 // Data BO dari DB
 $bo_db = [
-    'sewa' => $row['sewa'] ?? 0,
-    'gaji' => $row['gaji'] ?? 0,
-    'listrik' => $row['listrik'] ?? 0,
-    'internet' => $row['internet'] ?? 0,
-    'sampah' => $row['sampah'] ?? 0,
-    'keamanan' => $row['keamanan'] ?? 0,
-    'air' => $row['air'] ?? 0,
-    'lain_lain' => $row['lain_lain'] ?? 0
+    'sewa' => $row['sewa']?? 0,
+    'gaji' => $row['gaji']?? 0,
+    'listrik' => $row['listrik']?? 0,
+    'internet' => $row['internet']?? 0,
+    'sampah' => $row['sampah']?? 0,
+    'keamanan' => $row['keamanan']?? 0,
+    'air' => $row['air']?? 0,
+    'lain_lain' => $row['lain_lain']?? 0
 ];
 
 // Revenue sharing
@@ -93,21 +117,21 @@ $persen_admin = 3; // 3% dari bagian pengelola
 
 $share_investor  = $laba_bersih * $persen_investor / 100;
 $share_pengelola = $laba_bersih * $persen_pengelola / 100; 
-$share_admin     = $share_pengelola * $persen_admin / 100; // FIX: 3% dari pengelola
+$share_admin     = $share_pengelola * $persen_admin / 100;
 
 // Pengelola bersih setelah kena admin
 $share_pengelola_bersih = $share_pengelola - $share_admin;
 
 // Data pengelola aman
 $pengelola = ['nama_pengelola' => '-', 'no_rekening' => '-', 'nama_bank' => '-'];
-if($id_cabang != ''){
-    $q_pengelola = mysqli_query($conn, "SELECT nama_pengelola, no_rekening, nama_bank FROM users WHERE id_cabang=".(int)$id_cabang." AND role='cabang' LIMIT 1");
-    if($q_pengelola && mysqli_num_rows($q_pengelola) > 0){
-        $pengelola = mysqli_fetch_assoc($q_pengelola);
-    }
+if($id_cabang!= ''){
+    $stmt = $conn->prepare("SELECT nama_pengelola, no_rekening, nama_bank FROM users WHERE id_cabang=? AND role='cabang' LIMIT 1");
+    $stmt->bind_param("i", $id_cabang);
+    $stmt->execute();
+    $pengelola = $stmt->get_result()->fetch_assoc()?? $pengelola;
 }
 
-// Format nama file export - urutan tahunbulan biar rapi
+// Format nama file export
 $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$tahun.$bulan;
 ?>
 
@@ -117,25 +141,25 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
 <!-- Kustomisasi CSS untuk kenyamanan mata & kerapian ekstra -->
 <style>
     .main-wrapper { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #334155; }
-    .card { border: 1px solid #e2e8f0 !important; border-radius: 14px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01) !important; background-color: #ffffff; }
-    .card-header { font-size: 0.95rem; letter-spacing: 0.02em; padding: 1rem 1.25rem !important; }
-    .table th { font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; color: #64748b; background-color: #f8fafc !important; border-bottom: 2px solid #e2e8f0 !important; padding: 12px 14px !important; }
-    .table td { padding: 12px 14px !important; font-size: 0.875rem; color: #475569; }
+    .card { border: 1px solid #e2e8f0!important; border-radius: 14px!important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01)!important; background-color: #ffffff; }
+    .card-header { font-size: 0.95rem; letter-spacing: 0.02em; padding: 1rem 1.25rem!important; }
+    .table th { font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; color: #64748b; background-color: #f8fafc!important; border-bottom: 2px solid #e2e8f0!important; padding: 12px 14px!important; }
+    .table td { padding: 12px 14px!important; font-size: 0.875rem; color: #475569; }
     
-    .table-clean-input input.form-control { border: 1px solid transparent !important; background-color: transparent !important; box-shadow: none !important; padding: 4px 8px; font-size: 0.875rem; transition: all 0.2s ease; border-radius: 6px !important; }
-    .table-clean-input input.form-control:hover { background-color: #f1f5f9 !important; border-color: #cbd5e1 !important; }
-    .table-clean-input input.form-control:focus { background-color: #ffffff !important; border-color: #3b82f6 !important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important; }
+    .table-clean-input input.form-control { border: 1px solid transparent!important; background-color: transparent!important; box-shadow: none!important; padding: 4px 8px; font-size: 0.875rem; transition: all 0.2s ease; border-radius: 6px!important; }
+    .table-clean-input input.form-control:hover { background-color: #f1f5f9!important; border-color: #cbd5e1!important; }
+    .table-clean-input input.form-control:focus { background-color: #ffffff!important; border-color: #3b82f6!important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15)!important; }
     .table-clean-input input.keterangan { text-align: left; }
     
     .form-label-sm { font-size: 0.785rem; font-weight: 600; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.02em; }
-    .form-control-premium { border: 2px solid #e2e8f0 !important; background-color: #f8fafc !important; border-radius: 8px !important; font-size: 0.9rem; padding: 0.5rem 0.75rem; }
-    .form-control-premium:focus { background-color: #ffffff !important; border-color: #3b82f6 !important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important; }
+    .form-control-premium { border: 2px solid #e2e8f0!important; background-color: #f8fafc!important; border-radius: 8px!important; font-size: 0.9rem; padding: 0.5rem 0.75rem; }
+    .form-control-premium:focus { background-color: #ffffff!important; border-color: #3b82f6!important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1)!important; }
 </style>
 
 <div class="container-fluid py-4 main-wrapper">
     <!-- Header Page -->
     <div class="mb-4">
-        <h3 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;"><?= $judul ?></h3>
+        <h3 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;"><?= h($judul)?></h3>
         <p class="text-secondary small mb-0">Halaman rekapitulasi performa finansial, rasio bagi hasil, serta perhitungan biaya operasional.</p>
     </div>
 
@@ -147,15 +171,15 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                     <label class="form-label-sm">Cari / Pilih Cabang</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-2 text-muted border-end-0" style="border-radius: 8px 0 0 8px;"><i class="bi bi-shop"></i></span>
-                        <input list="listCabang" id="inputCabang" class="form-control form-control-premium border-start-0" style="border-radius: 0 8px 8px 0 !important;" placeholder="Ketik nama cabang..." value="<?= $nama_cabang_terpilih ?>" autocomplete="off" required>
+                        <input list="listCabang" id="inputCabang" class="form-control form-control-premium border-start-0" style="border-radius: 0 8px 8px 0!important;" placeholder="Ketik nama cabang..." value="<?= h($nama_cabang_terpilih)?>" autocomplete="off" required>
                     </div>
-                    <input type="hidden" name="id_cabang" id="idCabang" value="<?= $id_cabang ?>">
+                    <input type="hidden" name="id_cabang" id="idCabang" value="<?= h($id_cabang)?>">
 
                     <datalist id="listCabang">
-                        <?php mysqli_data_seek($list_cabang, 0); 
-                        while($c=mysqli_fetch_assoc($list_cabang)): ?>
-                        <option value="<?= $c['nama_cabang'] ?>" data-id="<?= $c['id_cabang'] ?>"></option>
-                        <?php endwhile; ?>
+                        <?php $list_cabang->data_seek(0); 
+                        while($c=$list_cabang->fetch_assoc()):?>
+                        <option value="<?= h($c['nama_cabang'])?>" data-id="<?= $c['id_cabang']?>"></option>
+                        <?php endwhile;?>
                     </datalist>
                 </div>
                 <div class="col-xl-2 col-md-6">
@@ -169,7 +193,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                 <div class="col-xl-2 col-md-6">
                     <label class="form-label-sm">Tahun Buku</label>
                     <select name="tahun" class="form-select form-control-premium">
-                        <?php for($t=date('Y'); $t>=2024; $t--): ?>
+                        <?php for($t=date('Y'); $t>=2024; $t--):?>
                         <option value="<?= $t?>" <?= $tahun==$t?'selected':''?>><?= $t?></option>
                         <?php endfor;?>
                     </select>
@@ -177,7 +201,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                 <div class="col-xl-2 col-md-6">
                     <label class="form-label-sm">Bulan Buku</label>
                     <select name="bulan" class="form-select form-control-premium" <?= $periode=='tahunan'?'disabled':''?>>
-                        <?php for($b=1; $b<=12; $b++): ?>
+                        <?php for($b=1; $b<=12; $b++):?>
                         <option value="<?= str_pad($b,2,'0',STR_PAD_LEFT)?>" <?= $bulan==str_pad($b,2,'0',STR_PAD_LEFT)?'selected':''?>>
                             <?= date('F', mktime(0,0,0,$b,1))?>
                         </option>
@@ -191,15 +215,15 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
         </div>
     </div>
 
-    <?php if($id_cabang == ''): ?>
-    <div class="alert alert-warning border-0 p-4 d-flex align-items-center" role="alert" style="border-radius: 12px; background-color: #fffbeb; border: 1px solid #fde68a !important;">
+    <?php if($id_cabang == ''):?>
+    <div class="alert alert-warning border-0 p-4 d-flex align-items-center" role="alert" style="border-radius: 12px; background-color: #fffbeb; border: 1px solid #fde68a!important;">
         <i class="bi bi-exclamation-circle-fill fs-4 me-3 text-warning"></i>
         <div>
             <h6 class="fw-bold text-warning-emphasis mb-1">Pilih Cabang Terlebih Dahulu</h6>
             <span class="text-secondary small">Gunakan form pencarian di atas untuk memuat data transaksi, rincian biaya, dan grafik pembagian hasil.</span>
         </div>
     </div>
-    <?php else: ?>
+    <?php else:?>
 
     <!-- 1. Rekap Cabang Overview Widgets -->
     <div class="row g-3 mb-4">
@@ -208,7 +232,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                 <div class="card-body p-3 d-flex align-items-center justify-content-between">
                     <div>
                         <span class="text-muted small text-uppercase fw-semibold" style="font-size: 0.75rem;">Nama Cabang</span>
-                        <h5 class="fw-bold text-dark mb-0 mt-1"><?= $nama_cabang ?></h5>
+                        <h5 class="fw-bold text-dark mb-0 mt-1"><?= h($nama_cabang)?></h5>
                     </div>
                     <div class="bg-light text-dark p-2.5 rounded-3 border">
                         <i class="bi bi-shop fs-5"></i>
@@ -221,7 +245,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                 <div class="card-body p-3 d-flex align-items-center justify-content-between">
                     <div>
                         <span class="text-muted small text-uppercase fw-semibold" style="font-size: 0.75rem;">Total Penjualan</span>
-                        <h5 class="fw-bold text-primary mb-0 mt-1">Rp <?= number_format($penjualan,0,',','.') ?></h5>
+                        <h5 class="fw-bold text-primary mb-0 mt-1">Rp <?= number_format($penjualan,0,',','.')?></h5>
                     </div>
                     <div class="bg-primary bg-opacity-10 text-primary p-2.5 rounded-3">
                         <i class="bi bi-cash-stack fs-5"></i>
@@ -234,7 +258,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                 <div class="card-body p-3 d-flex align-items-center justify-content-between">
                     <div>
                         <span class="text-muted small text-uppercase fw-semibold" style="font-size: 0.75rem;">Total Pengeluaran</span>
-                        <h5 class="fw-bold text-secondary mb-0 mt-1">Rp <?= number_format($pengeluaran,0,',','.') ?></h5>
+                        <h5 class="fw-bold text-secondary mb-0 mt-1">Rp <?= number_format($pengeluaran,0,',','.')?></h5>
                     </div>
                     <div class="bg-secondary bg-opacity-10 text-secondary p-2.5 rounded-3">
                         <i class="bi bi-receipt fs-5"></i>
@@ -247,7 +271,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                 <div class="card-body p-3 d-flex align-items-center justify-content-between">
                     <div>
                         <span class="text-muted small text-uppercase fw-semibold" style="font-size: 0.75rem;">Laba Bersih (Margin)</span>
-                        <h5 class="fw-bold text-success mb-0 mt-1">Rp <?= number_format($laba_bersih,0,',','.') ?> <span class="fs-6 text-muted fw-normal">(<?= number_format($margin,2) ?>%)</span></h5>
+                        <h5 class="fw-bold text-success mb-0 mt-1">Rp <?= number_format($laba_bersih,0,',','.')?> <span class="fs-6 text-muted fw-normal">(<?= number_format($margin,2)?>%)</span></h5>
                     </div>
                     <div class="bg-success bg-opacity-10 text-success p-2.5 rounded-3">
                         <i class="bi bi-pie-chart fs-5"></i>
@@ -260,7 +284,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
     <!-- 1. Rekap Harian Sebulan Full -->
 <div class="card border-0 mt-4" style="overflow: hidden;">
     <div class="card-header bg-dark text-white py-3 d-flex align-items-center justify-content-between">
-        <span class="fw-bold"><i class="bi bi-calendar3 me-2"></i>1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date('F Y', strtotime("$tahun-$bulan-01")) ?></span>
+        <span class="fw-bold"><i class="bi bi-calendar3 me-2"></i>1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date('F Y', strtotime("$tahun-$bulan-01"))?></span>
         <span class="badge bg-light text-dark fw-medium px-3 py-1.5 rounded-pill">Detail per tanggal</span>
     </div>
     <div class="card-body p-0">
@@ -293,7 +317,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                         <th class="text-end">Toko</th>
                         <th class="text-end">Sewa Ruko</th>
                         <th class="text-end">Gaji Karyawan</th>
-                        <th class="text-end">Lain-Lain</th> <!-- FIX: Hapus << -->
+                        <th class="text-end">Lain-Lain</th>
                         <th></th>
                         <th></th>
                         <th></th>
@@ -301,6 +325,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                 </thead>
                 <tbody>
                     <?php 
+                    // 4. QUERY HARIAN PAKAI PREPARED
                     $query_harian = "SELECT l.tanggal, l.tunai, l.qris, l.go_food, l.grab_food, 
                     l.total_omset, l.total_pengeluaran, 
                     l.belanja_pasar, l.belanja_beras, l.belanja_sembako, l.belanja_toko,
@@ -308,40 +333,44 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                     l.net_profit, l.persentase 
                     FROM laporan_cabang l
                     JOIN cabang c ON l.id_cabang = c.id_cabang
-                    WHERE YEAR(l.tanggal) = $tahun 
-                    AND MONTH(l.tanggal) = $bulan
-                    AND l.id_cabang = ".(int)$id_cabang."
+                    WHERE YEAR(l.tanggal) = ? 
+                    AND MONTH(l.tanggal) = ?
+                    AND l.id_cabang = ?
                     ORDER BY l.tanggal ASC";
 
-                    $data_harian = mysqli_query($conn, $query_harian);
+                    $stmt = $conn->prepare($query_harian);
+                    $stmt->bind_param("iii", $tahun, $bulan, $id_cabang);
+                    $stmt->execute();
+                    $data_harian = $stmt->get_result();
+                    
                     $total_tunai = $total_qris = $total_gofood = $total_grab = 0;
                     $total_omzet = $total_belanja = $total_pasar = $total_beras = $total_sembako = $total_toko = 0;
                     $total_sewa = $total_gaji = $total_lain = 0;
                     $total_pengeluaran = $total_sisa_tunai = $total_laba = 0;
                     $no = 1;
 
-                    if($data_harian && mysqli_num_rows($data_harian) > 0):
-                        while($h = mysqli_fetch_assoc($data_harian)):
-                            $tunai         = (float)($h['tunai'] ?? 0);
-                            $qris          = (float)($h['qris'] ?? 0);
-                            $go_food       = (float)($h['go_food'] ?? 0);
-                            $grab_food     = (float)($h['grab_food'] ?? 0);
-                            $omzet         = (float)($h['total_omset'] ?? 0);
-                            $pasar         = (float)($h['belanja_pasar'] ?? 0);
-                            $beras         = (float)($h['belanja_beras'] ?? 0);
-                            $sembako       = (float)($h['belanja_sembako'] ?? 0);
-                            $toko          = (float)($h['belanja_toko'] ?? 0);
-                            $sewa          = (float)($h['sewa'] ?? 0);
-                            $gaji          = (float)($h['gaji'] ?? 0);
-                            $laba_harian   = (float)($h['net_profit'] ?? 0);
-                            $persentase    = (float)($h['persentase'] ?? 0);
+                    if($data_harian->num_rows > 0):
+                        while($h = $data_harian->fetch_assoc()):
+                            $tunai         = (float)($h['tunai']?? 0);
+                            $qris          = (float)($h['qris']?? 0);
+                            $go_food       = (float)($h['go_food']?? 0);
+                            $grab_food     = (float)($h['grab_food']?? 0);
+                            $omzet         = (float)($h['total_omset']?? 0);
+                            $pasar         = (float)($h['belanja_pasar']?? 0);
+                            $beras         = (float)($h['belanja_beras']?? 0);
+                            $sembako       = (float)($h['belanja_sembako']?? 0);
+                            $toko          = (float)($h['belanja_toko']?? 0);
+                            $sewa          = (float)($h['sewa']?? 0);
+                            $gaji          = (float)($h['gaji']?? 0);
+                            $laba_harian   = (float)($h['net_profit']?? 0);
+                            $persentase    = (float)($h['persentase']?? 0);
 
-                            $lain_lain_operasional = (float)($h['listrik'] ?? 0) 
-                                                   + (float)($h['air'] ?? 0) 
-                                                   + (float)($h['sampah'] ?? 0) 
-                                                   + (float)($h['keamanan'] ?? 0) 
-                                                   + (float)($h['internet'] ?? 0) 
-                                                   + (float)($h['lain_lain'] ?? 0);
+                            $lain_lain_operasional = (float)($h['listrik']?? 0) 
+                                                   + (float)($h['air']?? 0) 
+                                                   + (float)($h['sampah']?? 0) 
+                                                   + (float)($h['keamanan']?? 0) 
+                                                   + (float)($h['internet']?? 0) 
+                                                   + (float)($h['lain_lain']?? 0);
                             
                             $total_pengeluaran_harian = $pasar + $beras + $sembako + $toko + $sewa + $gaji + $lain_lain_operasional;
                             $sisa_tunai_harian = $tunai - $total_pengeluaran_harian;
@@ -357,70 +386,70 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                             $total_toko += $toko;
                             $total_sewa += $sewa;
                             $total_gaji += $gaji;
-                            $total_lain += $lain_lain_operasional; // FIX: Pake variabel, bukan $h[]
+                            $total_lain += $lain_lain_operasional;
                             $total_laba += $laba_harian;
                             $total_pengeluaran += $total_pengeluaran_harian;
                             $total_sisa_tunai += $sisa_tunai_harian;
                     ?>
                     <tr>
-                        <td class="text-center text-muted"><?= $no++ ?></td>
-                        <td class="fw-medium"><?= date('d/m/Y', strtotime($h['tanggal'])) ?></td>
-                        <td class="text-end"><?= number_format($tunai,0,',','.') ?></td>
-                        <td class="text-end"><?= $qris > 0 ? number_format($qris,0,',','.') : '-' ?></td>
-                        <td class="text-end"><?= $go_food > 0 ? number_format($go_food,0,',','.') : '-' ?></td>
-                        <td class="text-end"><?= $grab_food > 0 ? number_format($grab_food,0,',','.') : '-' ?></td>
-                        <td class="text-end fw-semibold"><?= number_format($omzet,0,',','.') ?></td>
-                        <td class="text-end"><?= number_format($pasar,0,',','.') ?></td>
-                        <td class="text-end"><?= number_format($beras,0,',','.') ?></td>
-                        <td class="text-end"><?= number_format($sembako,0,',','.') ?></td>
-                        <td class="text-end"><?= number_format($toko,0,',','.') ?></td>
-                        <td class="text-end"><?= number_format($sewa,0,',','.') ?></td>
-                        <td class="text-end"><?= number_format($gaji,0,',','.') ?></td>
-                        <td class="text-end"><?= number_format($lain_lain_operasional,0,',','.') ?></td> <!-- FIX -->
-                        <td class="text-end fw-semibold text-danger"><?= number_format($total_pengeluaran_harian,0,',','.') ?></td>
-                        <td class="text-end fw-bold text-success"><?= number_format($laba_harian,0,',','.') ?></td>
-                        <td class="text-center fw-semibold"><?= number_format($persentase,2) ?>%</td>
+                        <td class="text-center text-muted"><?= $no++?></td>
+                        <td class="fw-medium"><?= date('d/m/Y', strtotime($h['tanggal']))?></td>
+                        <td class="text-end"><?= number_format($tunai,0,',','.')?></td>
+                        <td class="text-end"><?= $qris > 0? number_format($qris,0,',','.') : '-'?></td>
+                        <td class="text-end"><?= $go_food > 0? number_format($go_food,0,',','.') : '-'?></td>
+                        <td class="text-end"><?= $grab_food > 0? number_format($grab_food,0,',','.') : '-'?></td>
+                        <td class="text-end fw-semibold"><?= number_format($omzet,0,',','.')?></td>
+                        <td class="text-end"><?= number_format($pasar,0,',','.')?></td>
+                        <td class="text-end"><?= number_format($beras,0,',','.')?></td>
+                        <td class="text-end"><?= number_format($sembako,0,',','.')?></td>
+                        <td class="text-end"><?= number_format($toko,0,',','.')?></td>
+                        <td class="text-end"><?= number_format($sewa,0,',','.')?></td>
+                        <td class="text-end"><?= number_format($gaji,0,',','.')?></td>
+                        <td class="text-end"><?= number_format($lain_lain_operasional,0,',','.')?></td>
+                        <td class="text-end fw-semibold text-danger"><?= number_format($total_pengeluaran_harian,0,',','.')?></td>
+                        <td class="text-end fw-bold text-success"><?= number_format($laba_harian,0,',','.')?></td>
+                        <td class="text-center fw-semibold"><?= number_format($persentase,2)?>%</td>
                     </tr>
                     <?php 
                         endwhile;
-                        $margin_total = $total_omzet > 0 ? ($total_laba / $total_omzet) * 100 : 0;
-                    else: ?>
+                        $margin_total = $total_omzet > 0? ($total_laba / $total_omzet) * 100 : 0;
+                    else:?>
                     <tr>
-                        <td colspan="17" class="text-center text-muted py-5"> <!-- FIX: colspan 17 -->
+                        <td colspan="17" class="text-center text-muted py-5">
                             <i class="bi bi-inbox fs-3 d-block mb-2"></i>
                             Belum ada data laporan untuk periode ini
                         </td>
                     </tr>
-                    <?php endif; ?>
+                    <?php endif;?>
                 </tbody>
-                <?php if($data_harian && mysqli_num_rows($data_harian) > 0): ?>
+                <?php if($data_harian->num_rows > 0):?>
                 <tfoot class="table-dark">
                 <tr class="fw-bold">
                     <td colspan="2" class="text-center">JUMLAH</td>
-                    <td class="text-end"><?= number_format($total_tunai,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_qris,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_gofood,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_grab,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_omzet,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_pasar,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_beras,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_sembako,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_toko,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_sewa,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_gaji,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_lain,0,',','.') ?></td>
-                    <td class="text-end text-danger"><?= number_format($total_pengeluaran,0,',','.') ?></td>
-                    <td class="text-end"><?= number_format($total_laba,0,',','.') ?></td>
-                    <td class="text-center"><?= number_format($margin_total,2) ?>%</td>
+                    <td class="text-end"><?= number_format($total_tunai,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_qris,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_gofood,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_grab,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_omzet,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_pasar,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_beras,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_sembako,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_toko,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_sewa,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_gaji,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_lain,0,',','.')?></td>
+                    <td class="text-end text-danger"><?= number_format($total_pengeluaran,0,',','.')?></td>
+                    <td class="text-end"><?= number_format($total_laba,0,',','.')?></td>
+                    <td class="text-center"><?= number_format($margin_total,2)?>%</td>
                 </tr>
                 </tfoot>
-                <?php endif; ?>
+                <?php endif;?>
             </table>
         </div>
     </div>
 </div>
 
-    <!-- 2. Rincian Beban Operasional -->
+ <!-- 2. Rincian Beban Operasional -->
     <div class="card border-0 mb-4" style="overflow: hidden;">
         <div class="card-header bg-light border-bottom py-3 d-flex align-items-center justify-content-between">
             <span class="fw-bold text-dark"><i class="bi bi-folder-symlink me-2 text-muted"></i>2. Rincian Beban Operasional</span>
@@ -452,7 +481,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                             6 => ['nama'=>'Mingguan Karyawan', 'field'=>''],
                             7 => ['nama'=>'Es Batu, Air Galon', 'field'=>''],
                             8 => ['nama'=>'Iuran Kebersihan', 'field'=>'sampah'],
-                            9 => ['nama'=>'Occasional Outlet', 'field'=>''],
+                            9 => ['nama'=>'Operasional Outlet', 'field'=>''],
                             10 => ['nama'=>'Kertas Nasi WBB', 'field'=>''],
                         ];
 
@@ -463,13 +492,13 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                         ?>
                         <tr>
                             <td class="text-center text-muted fw-medium"><?= $no ?></td>
-                            <td class="fw-semibold text-dark"><?= $item['nama'] ?></td>
+                            <td class="fw-semibold text-dark"><?= h($item['nama']) ?></td>
                             <td><input type="number" class="form-control text-center harian" data-no="<?= $no ?>" value="0" oninput="hitungBO()"></td>
                             <td><input type="number" class="form-control text-center bulanan" data-no="<?= $no ?>" value="<?= $val_bulanan ?>" oninput="hitungBO()"></td>
                             <td><input type="number" class="form-control text-center tahunan" data-no="<?= $no ?>" value="0" oninput="hitungBO()"></td>
                             <td><input type="number" class="form-control text-center dibayarkan" data-no="<?= $no ?>" value="0" oninput="hitungBO()"></td>
                             <td class="text-end fw-bold text-dark pe-3"><span class="jumlah" data-no="<?= $no ?>">0</span></td>
-                            <td class="ps-4"><input type="text" class="form-control keterangan" data-no="<?= $no ?>" placeholder="<?= $is_admin ? '3% Dari Nett Profit' : '...' ?>"></td>
+                            <td class="ps-4"><input type="text" class="form-control keterangan" data-no="<?= $no ?>" placeholder="<?= h($is_admin ? '3% Dari Nett Profit' : '...') ?>"></td>
                         </tr>
                         <?php endforeach; ?>
                         <tr class="table-light border-top border-2" style="background-color: #f8fafc !important;">
@@ -699,19 +728,19 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                     </thead>
                     <tbody>
                         <tr>
-                            <td class="px-4 fw-semibold text-dark"><?= $cabang_info['investor'] ?: '-' ?></td>
+                            <td class="px-4 fw-semibold text-dark"><?= h($cabang_info['investor'] ?: '-') ?></td>
                             <td><span class="badge bg-primary-subtle text-primary px-2.5 py-1">Investor Cabang</span></td>
-                            <td class="font-monospace text-secondary" style="font-size: 0.85rem; letter-spacing: 0.5px;"><?= $cabang_info['no_rekening'] ?: '-' ?></td>
-                            <td><?= $cabang_info['investor'] ?: '-' ?></td>
-                            <td><span class="badge bg-light text-dark border px-2 py-1 fw-medium"><?= $cabang_info['nama_bank'] ?: '-' ?></span></td>
+                            <td class="font-monospace text-secondary" style="font-size: 0.85rem; letter-spacing: 0.5px;"><?= h($cabang_info['no_rekening'] ?: '-') ?></td>
+                            <td><?= h($cabang_info['investor'] ?: '-') ?></td>
+                            <td><span class="badge bg-light text-dark border px-2 py-1 fw-medium"><?= h($cabang_info['nama_bank'] ?: '-') ?></span></td>
                             <td class="text-end px-4 fw-bold text-primary"><span id="final_inv" class="fs-6">Rp 0</span></td>
                         </tr>
                         <tr>
-                            <td class="px-4 fw-semibold text-dark"><?= $pengelola['nama_pengelola'] ?: '-' ?></td>
+                            <td class="px-4 fw-semibold text-dark"><?= h($pengelola['nama_pengelola'] ?: '-') ?></td>
                             <td><span class="badge bg-success-subtle text-success px-2.5 py-1">Pengelola Lapangan</span></td>
-                            <td class="font-monospace text-secondary" style="font-size: 0.85rem; letter-spacing: 0.5px;"><?= $pengelola['no_rekening'] ?: '-' ?></td>
-                            <td><?= $pengelola['nama_pengelola'] ?: '-' ?></td>
-                            <td><span class="badge bg-light text-dark border px-2 py-1 fw-medium"><?= $pengelola['nama_bank'] ?: '-' ?></span></td>
+                            <td class="font-monospace text-secondary" style="font-size: 0.85rem; letter-spacing: 0.5px;"><?= h($pengelola['no_rekening'] ?: '-') ?></td>
+                            <td><?= h($pengelola['nama_pengelola'] ?: '-') ?></td>
+                            <td><span class="badge bg-light text-dark border px-2 py-1 fw-medium"><?= h($pengelola['nama_bank'] ?: '-') ?></span></td>
                             <td class="text-end px-4 fw-bold text-success"><span id="final_pgl" class="fs-6">Rp 0</span></td>
                         </tr>
                         <tr class="table-light">
@@ -888,13 +917,13 @@ async function exportExcel() {
     // 1. BAGIAN KOP SURAT (Dibuat Rapih & Sejajar Seperti Laporan Perusahaan)
     // =========================================================================
     setCell('A', 1, 'WARTEG BUMI BAHARI');
-    setCell('A', 2, '<?= $alamat_cabang?? "Kantor Pusat : Kecamatan Pamulang Kota Tangerang Selatan | BANTEN 15417"?>');
-    setCell('A', 3, 'Phone : <?= $no_hp_cabang?? "+62 858 1111 2222"?>');
+    setCell('A', 2, <?= json_encode($alamat_cabang?? "Kantor Pusat : Kecamatan Pamulang Kota Tangerang Selatan | BANTEN 15417")?>);
+    setCell('A', 3, 'Phone : <?= h($no_hp_cabang?? "+62 858 1111 2222")?>');
 
-    setCell('F', 1, 'Cabang'); setCell('G', 1, ': <?= $nama_cabang?? "WBB Cabang"?>');
+    setCell('F', 1, 'Cabang'); setCell('G', 1, ': <?= h($nama_cabang?? "WBB Cabang")?>');
     setCell('F', 2, 'Periode'); setCell('G', 2, ': <?= date("F Y", strtotime("$tahun-$bulan-01"))?>');
-    setCell('F', 3, 'Pengelola'); setCell('G', 3, ': <?= $pengelola['nama_pengelola']?? "-"?>'); // FIX ambil dari PHP
-    setCell('F', 4, 'Investor'); setCell('G', 4, ': <?= $cabang_info['investor']?? "-"?>'); // FIX ambil dari PHP
+    setCell('F', 3, 'Pengelola'); setCell('G', 3, ': <?= h($pengelola['nama_pengelola']?? "-")?>'); // FIX ambil dari PHP
+    setCell('F', 4, 'Investor'); setCell('G', 4, ': <?= h($cabang_info['investor']?? "-")?>'); // FIX ambil dari PHP
 
     currentRow = 6;
 
@@ -1032,13 +1061,13 @@ async function exportExcel() {
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Rekapitulasi");
-    XLSX.writeFile(wb, "<?= $nama_file_export?>.xlsx");
+    XLSX.writeFile(wb, "<?= h($nama_file_export)?>.xlsx");
 }
 
 async function exportPDF(){
     const { jsPDF } = window.jspdf;
     let doc = new jsPDF('landscape', 'mm', 'a4');
-    
+
     const margin = 14;
     const baseTableStyles = {
         theme: 'grid',
@@ -1084,10 +1113,10 @@ async function exportPDF(){
     // HALAMAN 1: REKAPITULASI + KOP MELEBAR + LOGO & DATA SEJAJAR
     // =========================================================================
     addWatermark(doc);
-    let startYContent = 12; 
-    let textXPosition = margin; 
+    let startYContent = 12;
+    let textXPosition = margin;
 
-    let imgLogo = document.getElementById('logoWWB'); 
+    let imgLogo = document.getElementById('logoWWB');
     let logoHeight = 16;
     let logoWidth = 16;
     if (imgLogo) {
@@ -1095,60 +1124,60 @@ async function exportPDF(){
             let originalWidth = imgLogo.naturalWidth || 1;
             let originalHeight = imgLogo.naturalHeight || 1;
             let ratio = originalWidth / originalHeight;
-            logoWidth = logoHeight * ratio; 
+            logoWidth = logoHeight * ratio;
             doc.addImage(imgLogo, 'PNG', margin, startYContent, logoWidth, logoHeight);
-            textXPosition = margin + logoWidth + 5; 
+            textXPosition = margin + logoWidth + 5;
         } catch (e) {
             textXPosition = margin;
         }
     }
-    
-    let textYStart = imgLogo ? startYContent + 4.5 : startYContent; 
+
+    let textYStart = imgLogo? startYContent + 4.5 : startYContent;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.setTextColor(40, 40, 40); 
+    doc.setTextColor(40, 40, 40);
     doc.text('WARTEG BUMI BAHARI', textXPosition, textYStart);
-    
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.setTextColor(100, 100, 100); 
-    doc.text('<?= $alamat_cabang ?? "Kantor Pusat : Kecamatan Pamulang Kota Tangerang Selatan | BANTEN 15417" ?>', textXPosition, textYStart + 5);
-    doc.text('Phone : <?= $no_hp_cabang ?? "+62 858 1111 2222" ?>', textXPosition, textYStart + 9);
-    
+    doc.setTextColor(100, 100, 100);
+    doc.text(<?= json_encode($alamat_cabang?? "Kantor Pusat : Kecamatan Pamulang Kota Tangerang Selatan | BANTEN 15417")?>, textXPosition, textYStart + 5);
+    doc.text('Phone : <?= h($no_hp_cabang?? "+62 858 1111 2222")?>', textXPosition, textYStart + 9);
+
     let infoData = [
-        ['Cabang', ': <?= $nama_cabang ?? "WBB Cabang" ?>'],
-        ['Periode', ': <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>'],
-        ['Pengelola', ': <?= $pengelola['nama_pengelola'] ?? "-" ?>'],
-        ['Investor', ': <?= $cabang_info['investor'] ?? "-" ?>']   
+        ['Cabang', ': <?= h($nama_cabang?? "WBB Cabang")?>'],
+        ['Periode', ': <?= date("F Y", strtotime("$tahun-$bulan-01"))?>'],
+        ['Pengelola', ': <?= h($pengelola['nama_pengelola']?? "-")?>'],
+        ['Investor', ': <?= h($cabang_info['investor']?? "-")?>']
     ];
-    
+
     doc.autoTable({
         body: infoData,
-        startY: imgLogo ? startYContent + 1.5 : startYContent - 3, 
+        startY: imgLogo? startYContent + 1.5 : startYContent - 3,
         theme: 'plain',
         styles: { fontSize: 8.5, cellPadding: 0.3, fontStyle: 'bold', textColor: [40, 40, 40] },
         columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 80 } },
-        margin: { left: 190 } 
+        margin: { left: 190 }
     });
 
-    let yLine = startYContent + 20; 
-    doc.setDrawColor(200, 200, 200); 
+    let yLine = startYContent + 20;
+    doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.4);
-    doc.line(margin, yLine, 283, yLine); 
+    doc.line(margin, yLine, 283, yLine);
 
     let yTabelHarian = yLine + 7;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    doc.text('1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>', margin, yTabelHarian);
+    doc.text('1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date("F Y", strtotime("$tahun-$bulan-01"))?>', margin, yTabelHarian);
 
     doc.autoTable({
         html: '#tabelRekapHarian',
         startY: yTabelHarian + 4,
-        ...baseTableStyles,
-        styles: { fontSize: 7, cellPadding: 1.2 } 
+       ...baseTableStyles,
+        styles: { fontSize: 7, cellPadding: 1.2 }
     });
-    
+
     // =========================================================================
     // HALAMAN 2: Rincian Beban Operasional & Matriks Akumulasi
     // =========================================================================
@@ -1159,24 +1188,24 @@ async function exportPDF(){
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('2. Rincian Beban Operasional', margin, y);
-    
+
     let t2 = document.querySelector('.table-clean-input');
-    let elTabel2 = t2?.tagName === 'TABLE' ? t2 : t2?.querySelector('table');
+    let elTabel2 = t2?.tagName === 'TABLE'? t2 : t2?.querySelector('table');
     if (elTabel2) {
         doc.autoTable({
             html: elTabel2,
             startY: y + 5,
-            ...baseTableStyles
+           ...baseTableStyles
         });
         y = doc.lastAutoTable.finalY + 12;
     } else {
-        y += 15; 
+        y += 15;
     }
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('3. Matriks Akumulasi', margin, y);
-    
+
     let dataMatriks = [
         ['Omzet Penjualan', formatRupiahPDF(<?= $penjualan?>), 'Pendapatan bruto masuk'],
         ['Pengeluaran Belanja', formatRupiahPDF(document.getElementById('belanja')?.value || 0), 'Input manual belanja'],
@@ -1192,7 +1221,7 @@ async function exportPDF(){
         head: [['Komponen Pokok', 'Jumlah', 'Catatan Ringkas']],
         body: dataMatriks,
         startY: y + 5,
-        ...baseTableStyles
+       ...baseTableStyles
     });
 
     // =========================================================================
@@ -1219,7 +1248,7 @@ async function exportPDF(){
         head: [['Keterangan Komponen', 'Nilai']],
         body: dataInvestor,
         startY: y + 5,
-        ...baseTableStyles
+       ...baseTableStyles
     });
 
     y = doc.lastAutoTable.finalY + 12;
@@ -1240,7 +1269,7 @@ async function exportPDF(){
         head: [['Keterangan Komponen', 'Nilai']],
         body: dataPengelola,
         startY: y + 5,
-        ...baseTableStyles
+       ...baseTableStyles
     });
 
     y = doc.lastAutoTable.finalY + 12;
@@ -1250,17 +1279,17 @@ async function exportPDF(){
     doc.text('6. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)', margin, y);
 
     let wrapperPayroll = document.querySelector('.card.border-0.mb-5') || document.querySelector('.card.border-0.mb-5.table');
-    let elTabel6 = wrapperPayroll?.tagName === 'TABLE' ? wrapperPayroll : wrapperPayroll?.querySelector('table');
+    let elTabel6 = wrapperPayroll?.tagName === 'TABLE'? wrapperPayroll : wrapperPayroll?.querySelector('table');
 
     if (elTabel6) {
         doc.autoTable({
             html: elTabel6,
             startY: y + 5,
-            ...baseTableStyles,
+           ...baseTableStyles,
             columnStyles: { 5: { halign: 'right' } // Kolom ke-6 = Total Net Diterima
         }});
     }
 
-    doc.save("<?= $nama_file_export?>.pdf");
+    doc.save("<?= h($nama_file_export)?>.pdf");
 }
 </script>
