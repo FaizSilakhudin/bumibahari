@@ -2,6 +2,18 @@
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
+// HELPER
+if(!function_exists('h')){ function h($s){ return htmlspecialchars($s??'', ENT_QUOTES); } }
+if(!function_exists('csrf_token')){
+    function csrf_token(){
+        if(empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+        return $_SESSION['csrf'];
+    }
+}
+if(!function_exists('csrf_check')){
+    function csrf_check($t){ return hash_equals($_SESSION['csrf']??'', $t); }
+}
+
 // 1. PROTEKSI ROLE PUSAT
 if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
     header("Location:../login"); exit;
@@ -11,6 +23,10 @@ if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
 $tgl_awal = $_GET['tgl_awal'] ?? date('Y-m-01');
 $tgl_akhir = $_GET['tgl_akhir'] ?? date('Y-m-d');
 $id_cabang = $_GET['id_cabang'] ?? '';
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = $page < 1 ? 1 : $page;
+$limit = 10;
+$offset = ($page - 1) * $limit;
 
 // Proses update
 if(isset($_POST['update_laporan'])){
@@ -65,8 +81,8 @@ if(isset($_POST['update_laporan'])){
     );
     
     if($stmt->execute()){
-        $param = http_build_query(['tgl_awal'=>$tgl_awal, 'tgl_akhir'=>$tgl_akhir, 'id_cabang'=>$id_cabang]);
-        echo "<script>alert('Data berhasil diupdate'); window.location='laporan?$param';</script>"; // TANPA .PHP
+        $param = http_build_query(['tgl_awal'=>$tgl_awal, 'tgl_akhir'=>$tgl_akhir, 'id_cabang'=>$id_cabang, 'page'=>$page]);
+        echo "<script>alert('Data berhasil diupdate'); window.location='laporan?$param';</script>";
         exit;
     } else {
         echo "<script>alert('Gagal update: ".$stmt->error."');</script>";
@@ -83,9 +99,20 @@ if($id_cabang!= '') {
     $types .= "i";
 }
 
-$query = "SELECT l.*, c.nama_cabang FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang $where_sql ORDER BY l.tanggal DESC";
+// Hitung total data untuk pagination
+$sql_count = "SELECT COUNT(*) as total FROM laporan_cabang l $where_sql";
+$stmt_count = $conn->prepare($sql_count);
+$stmt_count->bind_param($types, ...$params);
+$stmt_count->execute();
+$total_data = $stmt_count->get_result()->fetch_assoc()['total'];
+$total_pages = ceil($total_data / $limit);
+
+// Query utama + LIMIT
+$query = "SELECT l.*, c.nama_cabang FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang $where_sql ORDER BY l.tanggal DESC LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($query);
-$stmt->bind_param($types, ...$params);
+$types_limit = $types."ii";
+$params_limit = array_merge($params, [$limit, $offset]);
+$stmt->bind_param($types_limit, ...$params_limit);
 $stmt->execute();
 $data = $stmt->get_result();
 
@@ -107,6 +134,11 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
 ?>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+.pagination .page-link {border-radius: 10px!important; margin: 0 3px; border: 1px solid #dee2e6; color: #0d6efd; font-weight: 600;}
+.pagination .page-item.active .page-link {background-color: #0d6efd; border-color: #0d6efd; color: #fff;}
+.pagination .page-link:hover {background-color: #e7f1ff;}
+</style>
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -131,7 +163,7 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                     <label class="form-label fw-semibold text-secondary small">Pilih Cabang</label>
                     <select name="id_cabang" class="form-select form-select-md border-2 bg-light">
                         <option value="">Semua Cabang</option>
-                        <?php while($c=$cabang->fetch_assoc()):?>
+                        <?php $cabang->data_seek(0); while($c=$cabang->fetch_assoc()):?>
                         <option value="<?= $c['id_cabang']?>" <?= $id_cabang==$c['id_cabang']?'selected':''?>>
                             <?= h($c['nama_cabang'])?>
                         </option>
@@ -195,7 +227,10 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                         </tr>
                     </thead>
                     <tbody>
-                        <?php $no=1; while($row=$data->fetch_assoc()): 
+                        <?php if($data->num_rows==0): ?>
+                        <tr><td colspan="10" class="text-center py-5 text-muted">Belum ada data laporan pada periode ini</td></tr>
+                        <?php endif; ?>
+                        <?php $no=$offset+1; while($row=$data->fetch_assoc()): 
                         $margin = $row['persentase']?? 0;
                         $id = $row['id'];
                         ?>
@@ -234,7 +269,7 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                 <div class="modal fade text-start" id="detailModal<?= $id?>" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered m-2 m-sm-auto">
                                         <form method="POST" class="w-100">
-                                            <input type="hidden" name="csrf" value="<?=csrf_token()?>"> <!-- CSRF -->
+                                            <input type="hidden" name="csrf" value="<?=csrf_token()?>">
                                             <input type="hidden" name="id" value="<?= $id?>">
                                             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
                                                 
@@ -391,6 +426,37 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                     </tbody>
                 </table>
             </div>
+
+            <!-- PAGINATION -->
+            <?php if($total_pages > 1): ?>
+            <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
+                <small class="text-muted">Menampilkan <?= $offset+1 ?> - <?= min($offset+$limit, $total_data) ?> dari <?= $total_data ?> data</small>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <?php 
+                        $base_url = "?tgl_awal=".urlencode($tgl_awal)."&tgl_akhir=".urlencode($tgl_akhir)."&id_cabang=".urlencode($id_cabang);
+                        ?>
+                        <?php if($page > 1): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="<?= $base_url ?>&page=<?= $page-1 ?>">Prev</a>
+                        </li>
+                        <?php endif; ?>
+
+                        <?php for($i=1; $i<=$total_pages; $i++): ?>
+                        <li class="page-item <?= $i==$page ? 'active' : '' ?>">
+                            <a class="page-link" href="<?= $base_url ?>&page=<?= $i ?>"><?= $i ?></a>
+                        </li>
+                        <?php endfor; ?>
+
+                        <?php if($page < $total_pages): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="<?= $base_url ?>&page=<?= $page+1 ?>">Next</a>
+                        </li>
+                        <?php endif; ?>
+                    </ul>
+                </nav>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>

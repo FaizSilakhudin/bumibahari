@@ -2,23 +2,35 @@
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
+// HELPER BIAR GAK ERROR
+if(!function_exists('h')){ function h($s){ return htmlspecialchars($s??'', ENT_QUOTES); } }
+if(!function_exists('csrf_token')){
+    function csrf_token(){
+        if(empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+        return $_SESSION['csrf'];
+    }
+}
+if(!function_exists('csrf_check')){
+    function csrf_check($t){ return hash_equals($_SESSION['csrf']??'', $t); }
+}
+
 // 1. PROTEKSI ROLE PUSAT
 if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
-    header("Location:../login"); exit;
+    header("Location:../login.php"); exit;
 }
 
 $upload_dir = '../uploads/surat_perjanjian/';
 
-// Proses tambah/edit/hapus
+// Proses tambah/edit
 if(isset($_POST['simpan'])){
     if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
     
     $id = $_POST['id_investor'] ?? '';
-    $nama = $_POST['nama_investor'];
-    $hp = $_POST['no_hp'];
-    $alamat = $_POST['alamat'];
-    $no_rek = $_POST['no_rekening'];
-    $nama_bank = $_POST['nama_bank'];
+    $nama = trim($_POST['nama_investor']);
+    $hp = trim($_POST['no_hp']);
+    $alamat = trim($_POST['alamat']);
+    $no_rek = trim($_POST['no_rekening']);
+    $nama_bank = trim($_POST['nama_bank']);
     $file_lama = $_POST['file_lama'] ?? '';
     
     // 2. UPLOAD FILE AMAN: Validasi tipe, ukuran 5MB, rename
@@ -37,7 +49,7 @@ if(isset($_POST['simpan'])){
             move_uploaded_file($_FILES['surat_perjanjian']['tmp_name'], $upload_dir.$file_surat);
             
             // hapus file lama kalau ada
-            if($file_lama && file_exists($upload_dir.$file_lama)) unlink($upload_dir.$file_lama);
+            if($file_lama && file_exists($upload_dir.$file_lama)) @unlink($upload_dir.$file_lama);
         }
     }
 
@@ -45,44 +57,97 @@ if(isset($_POST['simpan'])){
         $stmt = $conn->prepare("UPDATE investor SET nama_investor=?, no_hp=?, alamat=?, no_rekening=?, nama_bank=?, surat_perjanjian=? WHERE id_investor=?");
         $stmt->bind_param("ssssssi", $nama,$hp,$alamat,$no_rek,$nama_bank,$file_surat,$id);
         $stmt->execute();
+        $stmt->close();
     } else {
         $stmt = $conn->prepare("INSERT INTO investor (nama_investor, no_hp, alamat, no_rekening, nama_bank, surat_perjanjian) VALUES (?,?,?,?,?,?)");
         $stmt->bind_param("ssssss", $nama,$hp,$alamat,$no_rek,$nama_bank,$file_surat);
         $stmt->execute();
+        $stmt->close();
     }
-    echo "<script>alert('Data berhasil disimpan');location='data_investor'</script>"; // TANPA .PHP
+    echo "<script>alert('Data berhasil disimpan');window.location='data_investor.php'</script>"; exit;
 }
 
 // 3. HAPUS PAKAI POST + CSRF
 if(isset($_POST['hapus'])){
     if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
     
-    $id = $_POST['id_investor'];
+    $id = (int)$_POST['id_investor'];
+
+    // Ambil nama file dulu buat dihapus
     $q = $conn->prepare("SELECT surat_perjanjian FROM investor WHERE id_investor=?");
     $q->bind_param("i", $id);
     $q->execute();
     $res = $q->get_result();
     if($res->num_rows > 0){
         $file = $res->fetch_assoc()['surat_perjanjian'];
-        if($file && file_exists($upload_dir.$file)) unlink($upload_dir.$file);
+        if($file && file_exists($upload_dir.$file)) @unlink($upload_dir.$file);
     }
+    $q->close();
     
-    $conn->prepare("UPDATE cabang SET id_investor=NULL WHERE id_investor=?")->bind_param("i",$id)->execute();
+    // Lepas relasi dulu biar gak error FK
+    $up = $conn->prepare("UPDATE cabang SET id_investor=NULL WHERE id_investor=?");
+    $up->bind_param("i",$id);
+    $up->execute();
+    $up->close();
+
+    // Baru hapus investor
     $del = $conn->prepare("DELETE FROM investor WHERE id_investor=?");
     $del->bind_param("i", $id);
     $del->execute();
-    echo "<script>alert('Data berhasil dihapus');location='data_investor'</script>";
+    $del->close();
+
+    echo "<script>alert('Data berhasil dihapus');window.location='data_investor.php'</script>"; exit;
 }
 
-$investor = $conn->query("SELECT * FROM investor ORDER BY id_investor DESC");
+// 4. FILTER + PAGINATION - TAMBAHAN
+$search = $_GET['search'] ?? '';
+$where_sql = "";
+$params = [];
+$types = "";
 
-// 4. EDIT PAKAI GET TAPI AMAN DENGAN PREPARED
+if($search != ''){
+    $where_sql = "WHERE nama_investor LIKE ? OR no_hp LIKE ? OR nama_bank LIKE ?";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+    $types = "sss";
+}
+
+$limit = 10;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = $page < 1 ? 1 : $page;
+$offset = ($page - 1) * $limit;
+
+// Hitung total data
+$sql_count = "SELECT COUNT(*) as total FROM investor $where_sql";
+$stmt_count = $conn->prepare($sql_count);
+if($search) $stmt_count->bind_param($types, ...$params);
+$stmt_count->execute();
+$total_data = $stmt_count->get_result()->fetch_assoc()['total'];
+$total_pages = ceil($total_data / $limit);
+
+// Ambil data dengan LIMIT
+$sql = "SELECT * FROM investor $where_sql ORDER BY id_investor DESC LIMIT ? OFFSET ?";
+$stmt = $conn->prepare($sql);
+if($search){
+    $types .= "ii";
+    $params[] = $limit;
+    $params[] = $offset;
+    $stmt->bind_param($types, ...$params);
+} else {
+    $stmt->bind_param("ii", $limit, $offset);
+}
+$stmt->execute();
+$investor = $stmt->get_result();
+
+// 5. EDIT PAKAI GET TAPI AMAN DENGAN PREPARED
 $edit = null;
 if(isset($_GET['edit'])){
     $stmt = $conn->prepare("SELECT * FROM investor WHERE id_investor=?");
     $stmt->bind_param("i", $_GET['edit']);
     $stmt->execute();
     $edit = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 }
 ?>
 
@@ -190,6 +255,11 @@ if(isset($_GET['edit'])){
     } 
     .btn-action-info:hover { background-color: #bfdbfe; }
 
+    /* Pagination Style */
+    .pagination .page-link {border-radius: 10px!important; margin: 0 3px; border: 1px solid #e0e7ff; color: #4318ff; font-weight: 600;}
+    .pagination .page-item.active .page-link {background-color: #4318ff; border-color: #4318ff; color: #fff;}
+    .pagination .page-link:hover {background-color: #e0e7ff;}
+
     /* Table Base Layout */
     .table-saas {
         margin-bottom: 0;
@@ -233,8 +303,9 @@ if(isset($_GET['edit'])){
         .saas-card { padding: 16px!important; }
         .header-container { flex-direction: column; align-items: flex-start!important; gap: 16px; }
         .header-container button { width: 100%; justify-content: center; }
+        .search-box-container { width: 100%!important; }
+        .search-box-container input { width: 100%!important; }
         
-        /* Mengubah struktur tabel menjadi kartu list yang rapi di HP */
         .table-saas thead { display: none; }
         .table-saas tbody tr { 
             display: block; 
@@ -255,7 +326,6 @@ if(isset($_GET['edit'])){
         }
         .table-saas tbody td:last-child { border-bottom: none!important; padding-top: 12px!important; }
         
-        /* Membuat label data otomatis di sebelah kiri pada tampilan HP */
         .table-saas tbody td::before {
             content: attr(data-label);
             font-weight: 600;
@@ -286,6 +356,21 @@ if(isset($_GET['edit'])){
         </button>
     </div>
 
+    <!-- FORM FILTER -->
+    <div class="d-flex flex-column flex-md-row justify-content-end gap-2 mb-3">
+        <form method="GET" class="d-flex gap-2 search-box-container">
+            <input type="text" name="search" class="form-control form-control-premium" placeholder="Cari nama, no HP, bank..." value="<?= h($search)?>" style="width: 280px;">
+            <button type="submit" class="btn btn-premium-outline d-flex align-items-center gap-2">
+                <i class="bi bi-search"></i> Cari
+            </button>
+            <?php if($search):?>
+            <a href="data_investor.php" class="btn btn-premium-outline bg-white text-secondary d-flex align-items-center justify-content-center">
+                <i class="bi bi-arrow-clockwise"></i>
+            </a>
+            <?php endif;?>
+        </form>
+    </div>
+
     <div class="card saas-card p-0 overflow-hidden border-0">
         <div class="table-responsive-md">
             <table class="table table-saas align-middle mb-0">
@@ -309,7 +394,7 @@ if(isset($_GET['edit'])){
                             Belum ada data investor
                         </td>
                     </tr>
-                    <?php else: $no=1; while($d=$investor->fetch_assoc()):?>
+                    <?php else: $no=$offset+1; while($d=$investor->fetch_assoc()):?>
                     <tr>
                         <td data-label="No" class="text-center text-muted fw-semibold"><?= $no++?></td>
                         <td data-label="Nama Investor"><span class="fw-bold" style="color: #1b2559;"><?= h($d['nama_investor'])?></span></td>
@@ -341,8 +426,7 @@ if(isset($_GET['edit'])){
                                     <i class="bi bi-pencil-square me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-pencil-square"></i></span> Edit
                                 </button>
                                 
-                                <!-- 5. HAPUS JADI FORM POST -->
-                                <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus investor <?= addslashes(h($d['nama_investor']))?>?')">
+                                <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus investor <?= addslashes(h($d['nama_investor']))?>? Data cabang akan dilepas.')">
                                     <input type="hidden" name="csrf" value="<?=csrf_token()?>">
                                     <input type="hidden" name="id_investor" value="<?= $d['id_investor']?>">
                                     <button type="submit" name="hapus" class="btn btn-action-delete" title="Hapus">
@@ -356,9 +440,55 @@ if(isset($_GET['edit'])){
                 </tbody>
             </table>
         </div>
+
+        <!-- PAGINATION -->
+        <?php if($total_pages > 1): ?>
+        <div class="d-flex justify-content-between align-items-center p-3 border-top">
+            <small class="text-muted">Menampilkan <?= $offset+1 ?> - <?= min($offset+$limit, $total_data) ?> dari <?= $total_data ?> data</small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <?php if($page > 1): ?>
+                    <li class="page-item">
+                        <a class="page-link" href="?page=<?= $page-1 ?>&search=<?= urlencode($search) ?>">Prev</a>
+                    </li>
+                    <?php endif; ?>
+
+                    <?php for($i=1; $i<=$total_pages; $i++): ?>
+                    <li class="page-item <?= $i==$page ? 'active' : '' ?>">
+                        <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
+                    </li>
+                    <?php endfor; ?>
+
+                    <?php if($page < $total_pages): ?>
+                    <li class="page-item">
+                        <a class="page-link" href="?page=<?= $page+1 ?>&search=<?= urlencode($search) ?>">Next</a>
+                    </li>
+                    <?php endif; ?>
+                </ul>
+            </nav>
+        </div>
+        <?php endif; ?>
     </div>
 
-    <?php $investor->data_seek(0); while($d=$investor->fetch_assoc()):?>
+    <?php 
+    
+    // Loop modal detail - harus ikut filter juga tapi jangan pakai LIMIT
+    $where_modal = "";
+    $params_modal = [];
+    $types_modal = "";
+    if($search != ''){
+        $where_modal = "WHERE nama_investor LIKE ? OR no_hp LIKE ? OR nama_bank LIKE ?";
+        $params_modal = ["%$search%", "%$search%", "%$search%"];
+        $types_modal = "sss";
+    }
+
+    $sql_modal = "SELECT * FROM investor $where_modal ORDER BY id_investor DESC";
+    $stmt_modal = $conn->prepare($sql_modal);
+    if($search) $stmt_modal->bind_param($types_modal, ...$params_modal);
+    $stmt_modal->execute();
+    $investor_modal = $stmt_modal->get_result();
+    while($d=$investor_modal->fetch_assoc()):
+    ?>
     <div class="modal fade modal-premium" id="modalDetail<?= $d['id_investor']?>" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
@@ -401,7 +531,7 @@ if(isset($_GET['edit'])){
                         <i class="bi bi-building-x fs-2 d-block mb-2"></i>
                         Investor ini belum memiliki cabang
                     </div>
-                    <?php endif;?>
+                    <?php endif; $stmt->close();?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-premium-outline text-secondary" data-bs-dismiss="modal">Tutup</button>
@@ -415,7 +545,7 @@ if(isset($_GET['edit'])){
 <div class="modal fade modal-premium" id="modalInvestor" tabindex="-1">
 <div class="modal-dialog modal-dialog-centered modal-lg">
 <form method="POST" enctype="multipart/form-data">
-<input type="hidden" name="csrf" value="<?=csrf_token()?>"> <!-- CSRF -->
+<input type="hidden" name="csrf" value="<?=csrf_token()?>">
 <div class="modal-content">
     <div class="modal-header">
         <div>

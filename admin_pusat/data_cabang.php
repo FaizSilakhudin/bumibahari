@@ -40,7 +40,7 @@ if(isset($_POST['tambah'])){
         $stmt = $conn->prepare("INSERT INTO cabang (nama_cabang, alamat, no_telp, nama_pengelola, id_investor) VALUES (?,?,?,?,?)");
         $stmt->bind_param("ssssi", $nama,$alamat,$telp,$pengelola,$id_investor);
         $stmt->execute();
-        echo "<script>alert('Cabang berhasil ditambah'); window.location='data_cabang';</script>"; // TANPA .PHP
+        echo "<script>alert('Cabang berhasil ditambah'); window.location='data_cabang';</script>";
     }
 }
 
@@ -80,13 +80,34 @@ if(isset($_POST['hapus'])){
     }
 }
 
-// 4. SELECT DATA PAKAI PREPARED
-$sql = "SELECT c.*, i.nama_investor FROM cabang c LEFT JOIN investor i ON c.id_investor=i.id_investor $where_sql ORDER BY c.id_cabang DESC";
+// 4. PAGINATION - TAMBAHAN
+$limit = 10; // tampil 10 data per halaman
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = $page < 1 ? 1 : $page;
+$offset = ($page - 1) * $limit;
+
+// Hitung total data
+$sql_count = "SELECT COUNT(*) as total FROM cabang c $where_sql";
+$stmt_count = $conn->prepare($sql_count);
+if($search) $stmt_count->bind_param($types, ...$params);
+$stmt_count->execute();
+$total_data = $stmt_count->get_result()->fetch_assoc()['total'];
+$total_pages = ceil($total_data / $limit);
+
+// 5. SELECT DATA PAKAI PREPARED + LIMIT
+$sql = "SELECT c.*, i.nama_investor FROM cabang c LEFT JOIN investor i ON c.id_investor=i.id_investor $where_sql ORDER BY c.id_cabang DESC LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($sql);
-if($search) $stmt->bind_param($types, ...$params);
+if($search){
+    $types .= "ii";
+    $params[] = $limit;
+    $params[] = $offset;
+    $stmt->bind_param($types, ...$params);
+} else {
+    $stmt->bind_param("ii", $limit, $offset);
+}
 $stmt->execute();
 $data = $stmt->get_result();
-$no = 1;
+$no = $offset + 1; // nomor urut ikut halaman
 ?>
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -104,6 +125,11 @@ $no = 1;
     .btn-action-delete {background-color: #fde8e8; color: #ef4444; border: none; padding: 8px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;}
     .btn-action-delete:hover {background-color: #fbd5d5;}
     
+    /* Pagination Style */
+    .pagination .page-link {border-radius: 10px!important; margin: 0 3px; border: 1px solid #e0e7ff; color: #4318ff; font-weight: 600;}
+    .pagination .page-item.active .page-link {background-color: #4318ff; border-color: #4318ff; color: #fff;}
+    .pagination .page-link:hover {background-color: #e0e7ff;}
+
     /* Responsive Table Styles */
     .table-saas {margin-bottom: 0; width: 100%!important;}
     .table-saas thead th {background-color: #f8f9fc!important; color: #8f9bba!important; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eef2f9!important; padding: 16px 12px; border-top: none!important;}
@@ -122,7 +148,6 @@ $no = 1;
         .search-box-container input { width: 100%!important; }
         .btn-premium, .btn-premium-outline { width: 100%; justify-content: center; }
         
-        /* Mengubah struktur tabel menjadi kartu list yang rapi di HP */
         .table-saas thead { display: none; }
         .table-saas tbody tr { 
             display: block; 
@@ -144,7 +169,6 @@ $no = 1;
         }
         .table-saas tbody td:last-child { border-bottom: none!important; padding-top: 12px!important; }
         
-        /* Membuat label data otomatis di sebelah kiri pada tampilan HP */
         .table-saas tbody td::before {
             content: attr(data-label);
             font-weight: 600;
@@ -183,7 +207,7 @@ $no = 1;
                 <i class="bi bi-funnel-fill"></i> <span class="d-none d-sm-inline">Filter</span>
             </button>
             <?php if($search):?>
-            <a href="data_cabang" class="btn btn-premium-outline bg-white text-secondary d-flex align-items-center justify-content-center"> <!-- TANPA .PHP -->
+            <a href="data_cabang" class="btn btn-premium-outline bg-white text-secondary d-flex align-items-center justify-content-center">
                 <i class="bi bi-arrow-clockwise"></i>
             </a>
             <?php endif;?>
@@ -205,6 +229,9 @@ $no = 1;
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if($data->num_rows == 0): ?>
+                    <tr><td colspan="7" class="text-center py-5 text-muted">Data tidak ditemukan</td></tr>
+                    <?php endif; ?>
                     <?php while($row = $data->fetch_assoc()):?>
                     <tr>
                         <td data-label="No" class="text-center text-muted fw-semibold"><?= $no++?></td>
@@ -213,7 +240,6 @@ $no = 1;
                         <td data-label="No Telp" class="text-secondary"><?= h($row['no_telp'])?></td>
                         <td data-label="Pengelola"><span class="fw-semibold" style="color: #1b2559;"><?= h($row['nama_pengelola'])?></span></td>
                         
-                        <!-- FIX KOLOM INVESTOR -->
                         <td data-label="Investor">
                             <?= !empty($row['nama_investor']) ? h($row['nama_investor']) : '<span class="text-muted small">Belum ada</span>' ?>
                         </td>
@@ -224,7 +250,6 @@ $no = 1;
                                     <i class="bi bi-pencil-square me-1 d-md-none"></i> Edit
                                 </button>
                                 
-                                <!-- HAPUS UBAH JADI FORM POST -->
                                 <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus cabang <?= h($row['nama_cabang'])?>?')">
                                     <input type="hidden" name="csrf" value="<?=csrf_token()?>">
                                     <input type="hidden" name="id_cabang" value="<?= $row['id_cabang']?>">
@@ -239,7 +264,7 @@ $no = 1;
                     <div class="modal fade modal-premium" id="modalEdit<?= $row['id_cabang']?>" tabindex="-1">
                         <div class="modal-dialog modal-dialog-centered modal-lg">
                             <form method="POST">
-                                <input type="hidden" name="csrf" value="<?=csrf_token()?>"> <!-- CSRF -->
+                                <input type="hidden" name="csrf" value="<?=csrf_token()?>">
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <div>
@@ -292,13 +317,41 @@ $no = 1;
                 </tbody>
             </table>
         </div>
+
+        <!-- PAGINATION -->
+        <?php if($total_pages > 1): ?>
+        <div class="d-flex justify-content-between align-items-center p-3 border-top">
+            <small class="text-muted">Menampilkan <?= $offset+1 ?> - <?= min($offset+$limit, $total_data) ?> dari <?= $total_data ?> data</small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <?php if($page > 1): ?>
+                    <li class="page-item">
+                        <a class="page-link" href="?page=<?= $page-1 ?>&search=<?= urlencode($search) ?>">Prev</a>
+                    </li>
+                    <?php endif; ?>
+
+                    <?php for($i=1; $i<=$total_pages; $i++): ?>
+                    <li class="page-item <?= $i==$page ? 'active' : '' ?>">
+                        <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
+                    </li>
+                    <?php endfor; ?>
+
+                    <?php if($page < $total_pages): ?>
+                    <li class="page-item">
+                        <a class="page-link" href="?page=<?= $page+1 ?>&search=<?= urlencode($search) ?>">Next</a>
+                    </li>
+                    <?php endif; ?>
+                </ul>
+            </nav>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
 <div class="modal fade modal-premium" id="modalTambah" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <form method="POST">
-            <input type="hidden" name="csrf" value="<?=csrf_token()?>"> <!-- CSRF -->
+            <input type="hidden" name="csrf" value="<?=csrf_token()?>">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>

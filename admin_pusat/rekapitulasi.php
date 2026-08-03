@@ -56,7 +56,7 @@ if($id_cabang!= ''){
     $params[] = (int)$id_cabang;
     $types .= "i";
     
-    $stmt = $conn->prepare("SELECT nama_cabang, investor, no_rekening, nama_bank FROM cabang WHERE id_cabang=?");
+    $stmt = $conn->prepare("SELECT c.nama_cabang, i.nama_investor as investor, i.no_rekening, c.nama_bank FROM cabang c LEFT JOIN investor i ON i.id_investor = c.id_investor WHERE id_cabang=?");
     $stmt->bind_param("i", $id_cabang);
     $stmt->execute();
     $cabang_info = $stmt->get_result()->fetch_assoc()?? $cabang_info;
@@ -65,7 +65,7 @@ if($id_cabang!= ''){
 }
 
 // 3. QUERY DATA UTAMA PAKAI PREPARED
-$query = "SELECT c.nama_cabang, c.investor, c.no_rekening, c.nama_bank,
+$query = "SELECT c.nama_cabang, i.nama_investor as investor, i.no_rekening, c.nama_bank,
           SUM(l.total_omset) as penjualan,
           SUM(l.total_pengeluaran) as pengeluaran,
           SUM(l.net_profit) as laba_bersih,
@@ -79,6 +79,7 @@ $query = "SELECT c.nama_cabang, c.investor, c.no_rekening, c.nama_bank,
           SUM(l.lain_lain) as lain_lain
           FROM laporan_cabang l
           JOIN cabang c ON l.id_cabang = c.id_cabang
+          LEFT JOIN investor i ON i.id_investor = c.id_investor
           $where_sql
           GROUP BY l.id_cabang";
 
@@ -731,7 +732,7 @@ $nama_file_export = "Rekap Bulanan_".str_replace(' ', '_', $nama_cabang)."_".$ta
                             <td class="px-4 fw-semibold text-dark"><?= h($cabang_info['investor'] ?: '-') ?></td>
                             <td><span class="badge bg-primary-subtle text-primary px-2.5 py-1">Investor Cabang</span></td>
                             <td class="font-monospace text-secondary" style="font-size: 0.85rem; letter-spacing: 0.5px;"><?= h($cabang_info['no_rekening'] ?: '-') ?></td>
-                            <td><?= h($cabang_info['investor'] ?: '-') ?></td>
+                            <td><?=($cabang_info['investor'] ?: '-') ?></td>
                             <td><span class="badge bg-light text-dark border px-2 py-1 fw-medium"><?= h($cabang_info['nama_bank'] ?: '-') ?></span></td>
                             <td class="text-end px-4 fw-bold text-primary"><span id="final_inv" class="fs-6">Rp 0</span></td>
                         </tr>
@@ -1076,9 +1077,15 @@ async function exportPDF(){
     };
 
     // FIX: Fungsi parse biar angka 'Rp. 25.330.000' jadi 25330000 beneran
-    function parseAngka(val){
-        return parseFloat(String(val || 0).replace(/[^0-9.-]+/g,"")) || 0;
+    function parseAngka(val) {
+        return parseFloat(
+            String(val || 0)
+                .replace(/[^0-9,.-]+/g, "") // Izinkan angka, koma, titik, dan minus
+                .replace(/\./g, "")         // Hapus titik (pemisah ribuan)
+                .replace(",", ".")          // Ubah koma menjadi titik (format JavaScript)
+        ) || 0;
     }
+
     // FIX: Format Rp pake hasil parse biar gak jadi 25,33
     function formatRupiahPDF(angka){
         return 'Rp. ' + parseAngka(angka).toLocaleString('id-ID');
@@ -1259,10 +1266,10 @@ async function exportPDF(){
 
     let dataPengelola = [
         ['Profit Pengelola', formatRupiahPDF(sharePengelolaBersih)],
-        ['Admin Fee Cabang', formatRupiahPDF(0)],
+        ['Admin Fee Cabang', formatRupiahPDF(document.getElementById('pgl_admin')?.value || 0)],
         ['Beban Kertas Nasi', formatRupiahPDF(document.getElementById('pgl_kertas')?.value || 0)],
         ['Service Fee + BPJS', formatRupiahPDF(document.getElementById('pgl_service')?.value || 0)],
-        ['TOTAL BERSIH PENGELOLA', formatRupiahPDF(document.getElementById('final_pgl')?.innerText || sharePengelolaBersih)] // FIX: pake formatRupiahPDF
+        ['TOTAL BERSIH PENGELOLA', formatRupiahPDF(document.getElementById('final_pgl')?.innerText || sharePengelolaBe0rsih)] // FIX: pake formatRupiahPDF
     ];
 
     doc.autoTable({

@@ -2,6 +2,18 @@
 require '../config/koneksi.php';
 include 'sidebar.php';
 
+// HELPER BIAR GAK ERROR
+if(!function_exists('h')){ function h($s){ return htmlspecialchars($s??'', ENT_QUOTES); } }
+if(!function_exists('csrf_token')){
+    function csrf_token(){
+        if(empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+        return $_SESSION['csrf'];
+    }
+}
+if(!function_exists('csrf_check')){
+    function csrf_check($t){ return hash_equals($_SESSION['csrf']??'', $t); }
+}
+
 // 1. PROTEKSI LOGIN + ROLE
 if(!isset($_SESSION['user_id']) || $_SESSION['role']!= 'cabang'){
     header("Location:../login"); exit;
@@ -15,6 +27,7 @@ $stmt = $conn->prepare("SELECT nama_cabang FROM cabang WHERE id_cabang=?");
 $stmt->bind_param("i", $id_cabang);
 $stmt->execute();
 $cabang = $stmt->get_result()->fetch_assoc()['nama_cabang']?? '-';
+$stmt->close();
 
 if(isset($_POST['simpan'])){
 
@@ -56,11 +69,12 @@ if(isset($_POST['simpan'])){
     $sisa = $tunai - $total_pengeluaran;
     $net = $total_omset - $total_pengeluaran;
     $persen = $total_omset > 0? ($net / $total_omset) * 100 : 0;
-    $ket = $_POST['keterangan']; // nanti dibinding
+    $ket = $_POST['keterangan'];
 
     // 4. UPLOAD AMAN: Validasi tipe, ukuran, rename
     $foto = [];
     $upload_dir = "../uploads/nota/";
+    if(!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
     for($i=1; $i<=4; $i++){
         $foto[$i] = '';
         if(!empty($_FILES["foto_nota$i"]['name'])){
@@ -76,15 +90,44 @@ if(isset($_POST['simpan'])){
         }
     }
 
-  // 5. INSERT PAKAI PREPARED STATEMENT BIAR ANTI SQL INJECTION
-mysqli_query($conn, "INSERT INTO laporan_cabang (id_cabang,nama_pengelola,tanggal,tunai,qris,grab_food,go_food,total_omset,belanja_pasar,belanja_sembako,belanja_beras,belanja_toko,total_rutin,sewa,gaji,listrik,air,sampah,keamanan,internet,lain_lain,total_operasional,total_pengeluaran,sisa_tunai,net_profit,persentase,keterangan,foto_nota1,foto_nota2,foto_nota3,foto_nota4) VALUES ($id_cabang,'$nama_pengelola','$tgl',$tunai,$qris,$grab,$go,$total_omset,$pasar,$sembako,$beras,$toko,$total_rutin,$sewa,$gaji,$listrik,$air,$sampah,$keamanan,$internet,$lain,$total_op,$total_pengeluaran,$sisa,$net,$persen,'$ket','$foto[1]','$foto[2]','$foto[3]','$foto[4]')");
+ // 5. UPSERT: INSERT BARU ATAU UPDATE KALAU TANGGAL+CABANG SAMA
+$sql = "INSERT INTO laporan_cabang
+(id_cabang,nama_pengelola,tanggal,tunai,qris,grab_food,go_food,total_omset,belanja_pasar,belanja_sembako,belanja_beras,belanja_toko,total_rutin,sewa,gaji,listrik,air,sampah,keamanan,internet,lain_lain,total_operasional,total_pengeluaran,sisa_tunai,net_profit,persentase,keterangan,foto_nota1,foto_nota2,foto_nota3,foto_nota4)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+ON DUPLICATE KEY UPDATE
+nama_pengelola=VALUES(nama_pengelola),
+tunai=VALUES(tunai), qris=VALUES(qris), grab_food=VALUES(grab_food), go_food=VALUES(go_food), total_omset=VALUES(total_omset),
+belanja_pasar=VALUES(belanja_pasar), belanja_sembako=VALUES(belanja_sembako), belanja_beras=VALUES(belanja_beras), belanja_toko=VALUES(belanja_toko), total_rutin=VALUES(total_rutin),
+sewa=VALUES(sewa), gaji=VALUES(gaji), listrik=VALUES(listrik), air=VALUES(air), sampah=VALUES(sampah), keamanan=VALUES(keamanan), internet=VALUES(internet), lain_lain=VALUES(lain_lain), total_operasional=VALUES(total_operasional),
+total_pengeluaran=VALUES(total_pengeluaran), sisa_tunai=VALUES(sisa_tunai), net_profit=VALUES(net_profit), persentase=VALUES(persentase), keterangan=VALUES(keterangan),
+foto_nota1=IF(VALUES(foto_nota1)='', foto_nota1, VALUES(foto_nota1)),
+foto_nota2=IF(VALUES(foto_nota2)='', foto_nota2, VALUES(foto_nota2)),
+foto_nota3=IF(VALUES(foto_nota3)='', foto_nota3, VALUES(foto_nota3)),
+foto_nota4=IF(VALUES(foto_nota4)='', foto_nota4, VALUES(foto_nota4))";
+
+$stmt = $conn->prepare($sql);
+// 31 parameter: i=1, s=7, d=23
+$stmt->bind_param("issdddddddddddddddddddddddsssss",
+    $id_cabang, $nama_pengelola, $tgl,
+    $tunai, $qris, $grab, $go, $total_omset,
+    $pasar, $sembako, $beras, $toko, $total_rutin,
+    $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $lain, $total_op,
+    $total_pengeluaran, $sisa, $net, $persen,
+    $ket, $foto[1], $foto[2], $foto[3], $foto[4]
+);
+
+if($stmt->execute()){
     echo "<script>alert('Data berhasil disimpan!'); window.location='input_data.php';</script>";
+} else {
+    echo "<script>alert('Gagal simpan: ".$stmt->error."'); history.back();</script>";
 }
+$stmt->close();
+} // <- INI TADI YG KETINGGALAN
 ?>
 
 <style>
     body { background-color: #f6f8fa; }
-  .card-custom {
+ .card-custom {
         background: #ffffff;
         border: none;
         border-radius: 16px;
@@ -92,7 +135,7 @@ mysqli_query($conn, "INSERT INTO laporan_cabang (id_cabang,nama_pengelola,tangga
         margin-bottom: 24px;
         overflow: hidden;
     }
-  .card-custom-header {
+ .card-custom-header {
         padding: 16px 24px;
         font-weight: 600;
         font-size: 1.05rem;
@@ -101,37 +144,37 @@ mysqli_query($conn, "INSERT INTO laporan_cabang (id_cabang,nama_pengelola,tangga
         align-items: center;
         gap: 10px;
     }
-  .form-label {
+ .form-label {
         font-weight: 500;
         font-size: 0.85rem;
         color: #4A5568;
         margin-bottom: 6px;
     }
-  .input-group-text-custom {
+ .input-group-text-custom {
         background-color: #EDF2F7;
         border-color: #E2E8F0;
         color: #4A5568;
         font-weight: 600;
         font-size: 0.9rem;
     }
-  .form-control-custom {
+ .form-control-custom {
         border-color: #E2E8F0;
         font-size: 0.95rem;
         padding: 10px 14px;
         border-radius: 8px;
     }
-  .form-control-custom:focus {
+ .form-control-custom:focus {
         border-color: #4A5568;
         box-shadow: 0 0 0 3px rgba(74, 85, 104, 0.1);
     }
-  .bg-header-success { background: #E6FFFA; color: #00875A; }
-  .bg-header-warning { background: #FEF3C7; color: #B45309; }
-  .bg-header-info { background: #EBF8FF; color: #2B6CB0; }
-  .bg-header-danger { background: #FFF5F5; color: #C53030; }
-  .bg-header-secondary { background: #F7FAFC; color: #4A5568; }
+ .bg-header-success { background: #E6FFFA; color: #00875A; }
+ .bg-header-warning { background: #FEF3C7; color: #B45309; }
+ .bg-header-info { background: #EBF8FF; color: #2B6CB0; }
+ .bg-header-danger { background: #FFF5F5; color: #C53030; }
+ .bg-header-secondary { background: #F7FAFC; color: #4A5568; }
 
     /* Responsive Badge Info */
-  .badge-info-cabang {
+ .badge-info-cabang {
         background: linear-gradient(135deg, #2D3748 0%, #1A202C 100%);
         border-radius: 12px;
         padding: 16px 20px;
@@ -141,8 +184,8 @@ mysqli_query($conn, "INSERT INTO laporan_cabang (id_cabang,nama_pengelola,tangga
 
     /* Preview Grid for Form inputs on mobile */
     @media (max-width: 576px) {
-      .card-custom-header { padding: 12px 16px; }
-      .p-mobile-custom { padding: 16px!important; }
+     .card-custom-header { padding: 12px 16px; }
+     .p-mobile-custom { padding: 16px!important; }
     }
 </style>
 
