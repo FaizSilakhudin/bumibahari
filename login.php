@@ -42,7 +42,7 @@ if(isset($_POST['login'])){
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Warteg Bumi Bahari</title>
+    <title>SIMC-WBB</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -198,7 +198,7 @@ if(isset($_POST['login'])){
                     <img id="logoWWB" src="assets/img/wbb.png" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
                 </div>
                 <h3 class="brand-title mb-1">WARTEG BUMI BAHARI</h3>
-                <p class="brand-subtitle mb-0">Sistem Informasi Rekapitulasi & Keuntungan</p>
+                <p class="brand-subtitle mb-0">Budaya Kuliner Indonesia</p>
             </div>
             
             <?php if($error):?>

@@ -1,17 +1,11 @@
 <?php
-// 1. FIX: Inisialisasi Session dengan Benar
-if (session_status() === PHP_SESSION_NONE) {
-
-}
 require '../config/koneksi.php';
 include 'sidebar.php';
 
-// FUNGSI ANTI XSS + CSRF
 if (!function_exists('h')) {
     function h($str){ return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
 }
 
-// Proteksi Halaman
 if(!isset($_SESSION['role']) || $_SESSION['role'] != 'cabang'){
     header('Location: ../login');
     exit;
@@ -20,11 +14,23 @@ if(!isset($_SESSION['role']) || $_SESSION['role'] != 'cabang'){
 $id_cabang = $_SESSION['id_cabang'];
 $nama_pengelola = $_SESSION['nama_pengelola'];
 
-// Filter tanggal (Default: awal bulan ini s.d hari ini)
-$tgl_awal = $_GET['tgl_awal'] ?? date('Y-m-01');
-$tgl_akhir = $_GET['tgl_akhir'] ?? date('Y-m-d');
+// 1. LOGIKA PER BULAN - SUDAH DIFIX
+$bulan = $_GET['bulan'] ?? date('m');
+$tahun = $_GET['tahun'] ?? date('Y');
 
-// Ambil Data Laporan
+$tgl_awal = date("$tahun-$bulan-01");
+$tgl_akhir = date("Y-m-t", strtotime($tgl_awal)); // akhir bulan
+
+// Bulan sebelumnya & sesudahnya untuk navigasi - FIX
+$prev_time = strtotime('-1 month', strtotime($tgl_awal));
+$next_time = strtotime('+1 month', strtotime($tgl_awal));
+
+$prev_bulan = date('m', $prev_time);
+$prev_tahun = date('Y', $prev_time);
+$next_bulan = date('m', $next_time);
+$next_tahun = date('Y', $next_time);
+
+// 2. AMBIL DATA LAPORAN 1 BULAN
 $stmt = $conn->prepare("SELECT * FROM laporan_cabang WHERE id_cabang=? AND tanggal BETWEEN ? AND ? ORDER BY tanggal DESC");
 $stmt->bind_param("iss", $id_cabang, $tgl_awal, $tgl_akhir);
 $stmt->execute();
@@ -35,14 +41,15 @@ $stmt2 = $conn->prepare("SELECT nama_cabang FROM cabang WHERE id_cabang=?");
 $stmt2->bind_param("i", $id_cabang);
 $stmt2->execute();
 $cabang = $stmt2->get_result()->fetch_assoc()['nama_cabang'] ?? '-';
+$no = 1;
 ?>
 
 <!-- Custom CSS Tambahan untuk UI Premium & Modern Hijau -->
 <style>
     :root {
-        --primary-gradient: linear-gradient(135deg, #059669 0%, #10b981 100%); /* Emerald Green */
+        --primary-gradient: linear-gradient(135deg, #059669 0%, #10b981 100%);
         --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        --info-gradient: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); /* Teal */
+        --info-gradient: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
     }
     .custom-card {
         border: none;
@@ -65,8 +72,8 @@ $cabang = $stmt2->get_result()->fetch_assoc()['nama_cabang'] ?? '-';
         box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
     }
     .table-custom th {
-        background-color: #f0fdf4 !important; /* Soft Green Light tint */
-        color: #15803d; /* Dark Green Text */
+        background-color: #f0fdf4 !important;
+        color: #15803d;
         font-weight: 600;
         text-transform: uppercase;
         font-size: 0.75rem;
@@ -95,9 +102,17 @@ $cabang = $stmt2->get_result()->fetch_assoc()['nama_cabang'] ?? '-';
         opacity: 0.9;
         color: white;
     }
-    .form-control-green:focus {
-        border-color: #10b981;
-        box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
+    .btn-nav-bulan {
+        background: #ffffff;
+        border: 1px solid #bbf7d0;
+        color: #059669;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 8px 16px;
+    }
+    .btn-nav-bulan:hover {
+        background: #dcfce7;
+        color: #047857;
     }
 </style>
 
@@ -109,29 +124,25 @@ $cabang = $stmt2->get_result()->fetch_assoc()['nama_cabang'] ?? '-';
             <h4 class="mb-1 fw-bold"><i class="bi bi-clock-history me-2"></i> Riwayat Input Data</h4>
             <p class="mb-0 opacity-90"><i class="bi bi-shop me-1"></i> <strong><?= h($cabang) ?></strong> &nbsp;|&nbsp; Pengelola: <?= h($nama_pengelola) ?></p>
         </div>
-        <div class="bg-white bg-opacity-20 rounded-pill px-4 py-2 text-white border border-white border-opacity-25">
-            <span class="small fw-semibold"><i class="bi bi-circle-fill me-1 text-warning small animate-pulse"></i> Sistem Cabang Aktif</span>
+        <div class="bg-white bg-opacity-20 rounded-pill px-4 py-2 text-white border-white border-opacity-25">
+            <span class="small fw-semibold"><i class="bi bi-circle-fill me-1 text-warning small"></i> Sistem Cabang Aktif</span>
         </div>
     </div>
 
-    <!-- Filter Card -->
+    <!-- Navigasi Bulan -->
     <div class="card custom-card mb-4">
-        <div class="card-body p-4">
-            <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label text-muted small fw-semibold">Tanggal Awal</label>
-                    <input type="date" name="tgl_awal" value="<?= h($tgl_awal) ?>" class="form-control form-control-green rounded-3 border-light-subtle shadow-sm">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label text-muted small fw-semibold">Tanggal Akhir</label>
-                    <input type="date" name="tgl_akhir" value="<?= h($tgl_akhir) ?>" class="form-control form-control-green rounded-3 border-light-subtle shadow-sm">
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-green-filter w-100 rounded-3 py-2 shadow-sm fw-semibold">
-                        <i class="bi bi-funnel-fill me-2"></i> Terapkan Filter
-                    </button>
-                </div>
-            </form>
+        <div class="card-body p-3 d-flex justify-content-between align-items-center">
+            <a href="?bulan=<?= $prev_bulan ?>&tahun=<?= $prev_tahun ?>" class="btn btn-nav-bulan">
+                <i class="bi bi-chevron-left"></i> Bulan Sebelumnya
+            </a>
+            
+            <h5 class="fw-bold mb-0 text-center" style="color:#059669">
+                <i class="bi bi-calendar3 me-2"></i> <?= date('F Y', strtotime($tgl_awal)) ?>
+            </h5>
+
+            <a href="?bulan=<?= $next_bulan ?>&tahun=<?= $next_tahun ?>" class="btn btn-nav-bulan">
+                Bulan Berikutnya <i class="bi bi-chevron-right"></i>
+            </a>
         </div>
     </div>
 
@@ -156,25 +167,19 @@ $cabang = $stmt2->get_result()->fetch_assoc()['nama_cabang'] ?? '-';
                         <tr>
                             <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="bi bi-folder-x fs-1 d-block mb-2 text-success opacity-50"></i>
-                                Belum ada data dalam rentang tanggal ini.
+                                Belum ada data pada bulan <?= date('F Y', strtotime($tgl_awal)) ?>
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php $no=1; while($row=$data->fetch_assoc()): ?>
+                        <?php while($row=$data->fetch_assoc()): ?>
                         <tr>
                             <td class="ps-4 fw-semibold text-muted"><?= $no++ ?></td>
                             <td class="fw-bold text-secondary"><?= date("d M Y", strtotime($row['tanggal'])) ?></td>
+                            <td><span class="text-success fw-bold">Rp <?= number_format($row['total_omset'],0,',','.') ?></span></td>
+                            <td class="text-muted">Rp <?= number_format($row['total_pengeluaran'],0,',','.') ?></td>
+                            <td><span class="fw-bold" style="color: #047857 !important;">Rp <?= number_format($row['net_profit'],0,',','.') ?></span></td>
                             <td>
-                                <span class="text-success fw-bold">Rp <?= number_format($row['total_omset'],0,',','.') ?></span>
-                            </td>
-                            <td class="text-muted">
-                                Rp <?= number_format($row['total_pengeluaran'],0,',','.') ?>
-                            </td>
-                            <td>
-                                <span class="fw-bold text-success" style="color: #047857 !important;">Rp <?= number_format($row['net_profit'],0,',','.') ?></span>
-                            </td>
-                            <td>
-                                <span class="badge badge-modern bg-success-subtle text-success border border-success-subtle">
+                                <span class="badge badge-modern bg-success-subtle text-success border-success-subtle">
                                     <i class="bi bi-graph-up-arrow me-1"></i> <?= number_format($row['persentase'],2) ?>%
                                 </span>
                             </td>

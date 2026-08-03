@@ -13,7 +13,7 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Pusat - Warteg Bumi Bahari</title>
+    <title>SIMC-WBB</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -155,7 +155,7 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
     <div class="sidebar-brand text-center">
         <img id="logoWWB" src="../assets/img/wbb.png" alt="Logo WBB" class="img-fluid mb-2" style="max-height: 65px; object-fit: contain;">
         <h5 class="text-white mb-1">Warteg Bumi Bahari</h5>
-        <small class="d-block">Budaya Kuliner Indonesia</small>
+        <small class="d-block">Sistem Informasi Manajemen Cabang</small>
     </div>
     
     <div class="nav-section">Menu Utama</div>

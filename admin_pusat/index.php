@@ -102,12 +102,34 @@ while($g = $grafik->fetch_assoc()){
     $data_laba[] = $g['laba'];
 }
 
-// 7. Peringatan Dini
-$sql_peringatan = "SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola, MAX(l.tanggal) as input_terakhir, DATEDIFF(CURDATE(), MAX(l.tanggal)) as selisih_hari FROM cabang c LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = CURDATE()) $where_filter_cabang GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC";
+// 7. PERINGATAN DINI + PAGINATION
+$limit_peringatan = 10;
+$page_peringatan = isset($_GET['page_peringatan']) ? (int)$_GET['page_peringatan'] : 1;
+$page_peringatan = $page_peringatan < 1 ? 1 : $page_peringatan;
+$offset_peringatan = ($page_peringatan - 1) * $limit_peringatan;
+
+// 7.1 Hitung total data peringatan
+$sql_count_peringatan = "SELECT COUNT(*) as total FROM cabang c WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = CURDATE()) $where_filter_cabang";
+$stmt_count = $conn->prepare($sql_count_peringatan);
+if($filter_investor) $stmt_count->bind_param("i", $filter_investor);
+$stmt_count->execute();
+$total_peringatan = $stmt_count->get_result()->fetch_assoc()['total'];
+$total_pages_peringatan = ceil($total_peringatan / $limit_peringatan);
+
+// 7.2 Ambil data peringatan dengan LIMIT
+$sql_peringatan = "SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola, MAX(l.tanggal) as input_terakhir, DATEDIFF(CURDATE(), MAX(l.tanggal)) as selisih_hari FROM cabang c LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = CURDATE()) $where_filter_cabang GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($sql_peringatan);
-if($filter_investor) $stmt->bind_param("i", $filter_investor);
+if($filter_investor) $stmt->bind_param("iii", $filter_investor, $limit_peringatan, $offset_peringatan);
+else $stmt->bind_param("ii", $limit_peringatan, $offset_peringatan);
 $stmt->execute();
 $peringatan = $stmt->get_result();
+
+// Helper untuk build URL biar filter investor kebawa
+function build_url($page){
+    $params = $_GET;
+    $params['page_peringatan'] = $page;
+    return '?' . http_build_query($params);
+}
 
 $share_pengelola_kotor = ($kpi['laba']?? 0) * 0.50; 
 $admin_fee = $share_pengelola_kotor * 0.03;
@@ -286,6 +308,11 @@ $admin_fee = $share_pengelola_kotor * 0.03;
         color: #334155;
         font-size: 14px;
     }
+
+    /* Pagination Style Baru */
+    .pagination .page-link {border-radius: 10px!important; margin: 0 3px; border: 1px solid #e2e8f0; color: #4318ff; font-weight: 600;}
+    .pagination .page-item.active .page-link {background: #4318ff; border-color: #4318ff; color: #fff;}
+    .pagination .page-link:hover {background-color: #f1f5f9;}
     
     /* Leaderboard Rank Badges */
     .rank-box {
@@ -333,6 +360,245 @@ $admin_fee = $share_pengelola_kotor * 0.03;
         }
     }
 </style>
+<style>
+    body {
+        background-color: #f8fafc!important;
+        font-family: 'Plus Jakarta Sans', sans-serif!important;
+        color: #1e293b;
+    }
+    
+    /* Global Soft Glassmorphism Card Style */
+    .saas-card {
+        background: #ffffff;
+        border: 1px solid #f1f5f9!important;
+        border-radius: 18px!important;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02), 0 10px 15px -3px rgb(0 0 0 / 0.01)!important;
+        padding: 24px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+    .saas-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05)!important;
+    }
+
+    /* KPI Premium Card Refinement */
+    .kpi-premium-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        padding: 24px;
+        position: relative;
+        overflow: hidden;
+        min-height: 160px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .kpi-premium-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 20px -8px rgba(15, 23, 42, 0.08);
+    }
+    .kpi-premium-card::before {
+        content: '';
+        position: absolute;
+        top: -20px; right: -20px;
+        width: 140px; height: 140px;
+        background: radial-gradient(circle, var(--kpi-glow) 0%, transparent 75%);
+        opacity: 0.08;
+        pointer-events: none;
+    }
+    .kpi-badge-icon {
+        width: 46px; height: 46px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        background-color: var(--badge-bg);
+        color: var(--badge-color);
+        box-shadow: 0 4px 10px -2px var(--badge-bg);
+    }
+    .kpi-meta {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .kpi-value {
+        font-size: 24px;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.5px;
+        line-height: 1.2;
+        margin-top: 4px;
+    }
+    .kpi-subvalue {
+        font-size: 12px;
+        font-weight: 500;
+        color: #64748b;
+        margin-top: 4px;
+    }
+
+    /* Modernized Badges */
+    .badge-modern-danger {
+        background-color: #fef2f2;
+        color: #ef4444;
+        font-weight: 600;
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-size: 11px;
+        border: 1px solid #fee2e2;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .badge-modern-warning {
+        background-color: #fffbeb;
+        color: #f59e0b;
+        font-weight: 600;
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-size: 11px;
+        border: 1px solid #fef3c7;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .badge-modern-success {
+        background-color: #f0fdf4;
+        color: #22c55e;
+        font-weight: 600;
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-size: 11px;
+        border: 1px solid #dcfce7;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* Clean Form Elements */
+    .form-select-filter {
+        border-radius: 12px!important;
+        border: 1px solid #e2e8f0!important;
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
+        padding: 10px 16px;
+        min-width: 240px;
+        background-color: #ffffff;
+        transition: all 0.2s ease;
+    }
+    .form-select-filter:focus {
+        border-color: #4318ff!important;
+        box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1)!important;
+    }
+
+    /* Elegant SaaS Tables */
+    .table-saas-container {
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    }
+    .table-saas {
+        margin-bottom: 0;
+        background: #ffffff;
+    }
+    .table-saas thead th {
+        background-color: #f8fafc;
+        color: #475569;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 14px 20px;
+    }
+    .table-saas tbody tr {
+        transition: background-color 0.2s ease;
+    }
+    .table-saas tbody tr:hover {
+        background-color: #f8fafc;
+    }
+    .table-saas tbody td {
+        padding: 16px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        font-size: 14px;
+    }
+
+    /* Pagination Style Baru untuk Peringatan Dini */
+    .pagination .page-link {
+        border-radius: 10px!important; 
+        margin: 0 3px; 
+        border: 1px solid #e2e8f0; 
+        color: #4318ff; 
+        font-weight: 600;
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+    .pagination .page-item.active .page-link {
+        background: #4318ff; 
+        border-color: #4318ff; 
+        color: #fff;
+    }
+    .pagination .page-link:hover {
+        background-color: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #4318ff;
+    }
+    
+    /* Leaderboard Rank Badges */
+    .rank-box {
+        width: 26px;
+        height: 26px;
+        background: #f1f5f9;
+        color: #475569;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .d-flex:nth-child(1) .rank-box { background: rgba(67, 24, 255, 0.1); color: #4318ff; }
+    .d-flex:nth-child(2) .rank-box { background: rgba(14, 165, 233, 0.1); color: #0ea5e9; }
+    .d-flex:nth-child(3) .rank-box { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+    @media (max-width: 767.98px) {
+        .table-saas thead { display: none; }
+        .table-saas tbody tr { 
+            display: block; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 14px; 
+            margin: 12px; 
+            padding: 12px;
+            background: #ffffff;
+        }
+        .table-saas tbody td { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 10px 0!important; 
+            border-bottom: 1px dashed #e2e8f0!important;
+            text-align: right;
+        }
+        .table-saas tbody td:last-child { border-bottom: none!important; }
+        .table-saas tbody td::before {
+            content: attr(data-label);
+            font-weight: 700;
+            color: #94a3b8;
+            font-size: 11px;
+            text-transform: uppercase;
+            text-align: left;
+        }
+        .pagination { justify-content: center!important; }
+    }
+</style>
 
 <div class="container-fluid py-4 px-3 px-md-4">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
@@ -354,7 +620,7 @@ $admin_fee = $share_pengelola_kotor * 0.03;
                     <?php endforeach;?>
                 </select>
                 <?php if($filter_investor):?>
-                <a href="index" class="btn btn-light" style="border-radius: 12px; padding: 10px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter"> <!-- TANPA .PHP -->
+                <a href="index" class="btn btn-light" style="border-radius: 12px; padding: 10px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter">
                     <i class="bi bi-x-lg text-danger"></i>
                 </a>
                 <?php endif;?>
@@ -539,6 +805,37 @@ $admin_fee = $share_pengelola_kotor * 0.03;
                     </tbody>
                 </table>
             </div>
+
+            <!-- PAGINATION PERINGATAN DINI -->
+            <?php if($total_pages_peringatan > 1): ?>
+            <div class="d-flex justify-content-between align-items-center mt-3 px-2 flex-wrap gap-2">
+                <small class="text-muted">Menampilkan <?= $offset_peringatan+1 ?> - <?= min($offset_peringatan+$limit_peringatan, $total_peringatan) ?> dari <?= $total_peringatan ?> cabang</small>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <?php if($page_peringatan > 1): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="<?= build_url($page_peringatan-1) ?>"><i class="bi bi-chevron-left"></i> Prev</a>
+                        </li>
+                        <?php endif; ?>
+
+                        <?php 
+                        $start = max(1, $page_peringatan - 2);
+                        $end = min($total_pages_peringatan, $page_peringatan + 2);
+                        for($i=$start; $i<=$end; $i++): ?>
+                        <li class="page-item <?= $i==$page_peringatan ? 'active' : '' ?>">
+                            <a class="page-link" href="<?= build_url($i) ?>"><?= $i ?></a>
+                        </li>
+                        <?php endfor; ?>
+
+                        <?php if($page_peringatan < $total_pages_peringatan): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="<?= build_url($page_peringatan+1) ?>">Next <i class="bi bi-chevron-right"></i></a>
+                        </li>
+                        <?php endif; ?>
+                    </ul>
+                </nav>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
