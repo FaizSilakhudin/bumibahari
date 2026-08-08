@@ -1,4 +1,9 @@
 <?php
+
+use App\Models\Cabang;
+use App\Models\Investor;
+
+require '../bootstrap.php';
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
@@ -11,7 +16,7 @@ $bulan_ini = date('Y-m');
 $bulan_lalu = date('Y-m', strtotime('-1 month'));
 $hari_ini = date('Y-m-d');
 
-// Filter investor - PAKAI PREPARED
+// Filter investor - PAKAI PREPARED + TABEL RELASI
 $filter_investor = $_GET['investor'] ?? '';
 $where_filter = "";
 $where_filter_cabang = "";
@@ -19,8 +24,9 @@ $params = [];
 $types = "";
 
 if($filter_investor){
-    $where_filter = "AND l.id_cabang IN (SELECT c.id_cabang FROM cabang c WHERE c.id_investor=?)";
-    $where_filter_cabang = "AND c.id_investor=?";
+    // FIX 1: Ganti ke tabel relasi cabang_investor
+    $where_filter = "AND l.id_cabang IN (SELECT ci.id_cabang FROM cabang_investor ci WHERE ci.id_investor=?)";
+    $where_filter_cabang = "AND c.id_cabang IN (SELECT ci.id_cabang FROM cabang_investor ci WHERE ci.id_investor=?)"; // FIX buat query cabang
     $params[] = $filter_investor;
     $types .= "i";
 }
@@ -50,16 +56,16 @@ $kpi = $stmt->get_result()->fetch_assoc();
 // 1.1 KPI HARI INI
 $sql_hari = "SELECT COALESCE(SUM(l.total_omset),0) as omzet, COALESCE(SUM(l.net_profit),0) as laba FROM laporan_cabang l WHERE l.tanggal = ? $where_filter";
 $stmt = $conn->prepare($sql_hari);
-$bind_params = array_merge([$hari_ini], $params);
-$stmt->bind_param($bind_types, ...$bind_params);
+$bind_params_hari = array_merge([$hari_ini], $params); // FIX 2: variabel baru
+$stmt->bind_param($bind_types, ...$bind_params_hari);
 $stmt->execute();
 $kpi_hari_ini = $stmt->get_result()->fetch_assoc();
 
 // 2. KPI Bulan Lalu
 $sql_lalu = "SELECT COALESCE(SUM(l.total_omset),0) as omzet FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter";
 $stmt = $conn->prepare($sql_lalu);
-$bind_params = array_merge([$bulan_lalu], $params);
-$stmt->bind_param($bind_types, ...$bind_params);
+$bind_params_lalu = array_merge([$bulan_lalu], $params); // FIX 2: variabel baru
+$stmt->bind_param($bind_types, ...$bind_params_lalu);
 $stmt->execute();
 $kpi_lalu = $stmt->get_result()->fetch_assoc();
 $naik_turun = $kpi_lalu['omzet'] > 0? (($kpi['omzet'] - $kpi_lalu['omzet']) / $kpi_lalu['omzet']) * 100 : 0;
@@ -67,13 +73,15 @@ $naik_turun = $kpi_lalu['omzet'] > 0? (($kpi['omzet'] - $kpi_lalu['omzet']) / $k
 // 3. Cabang aktif bulan ini
 $sql_aktif = "SELECT COUNT(DISTINCT l.id_cabang) as total FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter";
 $stmt = $conn->prepare($sql_aktif);
-$stmt->bind_param($bind_types, ...$bind_params);
+$bind_params_aktif = array_merge([$bulan_ini], $params); // FIX 3: tadinya ketuker pake bulan_lalu
+$stmt->bind_param($bind_types, ...$bind_params_aktif);
 $stmt->execute();
 $cabang_aktif = $stmt->get_result()->fetch_assoc()['total'];
 
 // 4. Total cabang
 if($filter_investor){
-    $stmt = $conn->prepare("SELECT COUNT(*) as total FROM cabang c WHERE c.id_investor=?");
+    // FIX 4: Pakai $where_filter_cabang + DISTINCT biar gak double
+    $stmt = $conn->prepare("SELECT COUNT(DISTINCT c.id_cabang) as total FROM cabang c WHERE 1=1 $where_filter_cabang");
     $stmt->bind_param("i", $filter_investor);
     $stmt->execute();
     $total_cabang = $stmt->get_result()->fetch_assoc()['total'];
@@ -84,8 +92,8 @@ if($filter_investor){
 // 5. Top 5 cabang bulan ini
 $sql_top = "SELECT c.nama_cabang, SUM(l.total_omset) as omzet FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter GROUP BY l.id_cabang ORDER BY omzet DESC LIMIT 5";
 $stmt = $conn->prepare($sql_top);
-$bind_params = array_merge([$bulan_ini], $params);
-$stmt->bind_param($bind_types, ...$bind_params);
+$bind_params_top = array_merge([$bulan_ini], $params); // FIX 2: variabel baru
+$stmt->bind_param($bind_types, ...$bind_params_top);
 $stmt->execute();
 $top_cabang = $stmt->get_result();
 
@@ -599,6 +607,61 @@ $admin_fee = $share_pengelola_kotor * 0.03;
         .pagination { justify-content: center!important; }
     }
 </style>
+<!-- TARUH DISINI -->
+<audio id="notifSound" src="../assets/sound/notif.wav" preload="auto"></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- SCRIPT CHART KAMU YANG SUDAH ADA -->
+<script>
+const ctx = document.getElementById('grafikTrend').getContext('2d');
+... script chart kamu ...
+</script>
+
+<!-- SCRIPT NOTIFIKASI SUARA TARUH SETELAH SCRIPT CHART -->
+<script>
+let lastCheck = '<?= $hari_ini ?> 00:00:00'; 
+const notifSound = document.getElementById('notifSound');
+
+function cekLaporanBaru() {
+    fetch('../ajax/cek_laporan_baru.php?last=' + lastCheck)
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'baru'){
+            notifSound.play().catch(e => console.log("Browser blokir autoplay"));
+            showToast('Laporan Baru!', `Cabang ${data.nama_cabang} baru saja input laporan.`);
+            setTimeout(() => location.reload(), 1500); // reload biar tabel peringatan update
+        }
+        lastCheck = data.waktu_sekarang;
+    });
+}
+
+setInterval(cekLaporanBaru, 10000); // cek tiap 10 detik
+
+function showToast(title, message){
+    const toast = document.createElement('div');
+    toast.className = 'position-fixed top-0 end-0 p-3';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+    <div class="toast show align-items-center text-white bg-success border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body">
+          <i class="bi bi-bell-fill me-2"></i><b>${title}</b><br>${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+// biar bisa autoplay, browser harus ada interaksi 1x
+document.addEventListener('click', () => notifSound.play().then(()=>notifSound.pause()), {once: true});
+</script>
+
+</body>
+</html>
 
 <div class="container-fluid py-4 px-3 px-md-4">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">

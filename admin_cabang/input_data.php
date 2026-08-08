@@ -37,46 +37,52 @@ if(isset($_POST['simpan'])){
     }
 
     $tgl = $_POST['tanggal'];
+    $ket = $_POST['keterangan']?? ''; // FIX 1: ambil keterangan
 
     // BACKEND CLEANING: Membersihkan format koma/titik ribuan dari input text sebelum masuk ke kalkulasi PHP & Database
     function cleanNumber($val) {
-        return (int)preg_replace('/[^0-9]/', '', $val);
+        return (int)preg_replace('/[^0-9]/', '', $val ?? '');
     }
 
-    $tunai = cleanNumber($_POST['tunai']);
-    $qris = cleanNumber($_POST['qris']);
-    $grab = cleanNumber($_POST['grab_food']);
-    $go = cleanNumber($_POST['go_food']);
+    $tunai = cleanNumber($_POST['tunai'] ?? 0);
+    $qris = cleanNumber($_POST['qris'] ?? 0);
+    $grab = cleanNumber($_POST['grab_food'] ?? 0);
+    $go = cleanNumber($_POST['go_food'] ?? 0);
     $total_omset = $tunai + $qris + $grab + $go;
 
-    $pasar = cleanNumber($_POST['belanja_pasar']);
-    $sembako = cleanNumber($_POST['belanja_sembako']);
-    $beras = cleanNumber($_POST['belanja_beras']);
-    $toko = cleanNumber($_POST['belanja_toko']);
+    $pasar = cleanNumber($_POST['belanja_pasar'] ?? 0);
+    $sembako = cleanNumber($_POST['belanja_sembako'] ?? 0);
+    $beras = cleanNumber($_POST['belanja_beras'] ?? 0);
+    $toko = cleanNumber($_POST['belanja_toko'] ?? 0);
     $total_rutin = $pasar + $sembako + $beras + $toko;
 
-    $sewa = cleanNumber($_POST['sewa']);
-    $gaji = cleanNumber($_POST['gaji']);
-    $listrik = cleanNumber($_POST['listrik']);
-    $air = cleanNumber($_POST['air']);
-    $sampah = cleanNumber($_POST['sampah']);
-    $keamanan = cleanNumber($_POST['keamanan']);
-    $internet = cleanNumber($_POST['internet']);
-    $lain = cleanNumber($_POST['lain_lain']);
-    $total_op = $sewa + $gaji + $listrik + $air + $sampah + $keamanan + $internet + $lain;
+    $sewa = cleanNumber($_POST['sewa'] ?? 0);
+    $gaji = cleanNumber($_POST['gaji'] ?? 0);
+    $listrik = cleanNumber($_POST['listrik'] ?? 0);
+    $air = cleanNumber($_POST['air'] ?? 0);
+    $sampah = cleanNumber($_POST['sampah'] ?? 0);
+    $keamanan = cleanNumber($_POST['keamanan'] ?? 0);
+    $internet = cleanNumber($_POST['internet'] ?? 0);
+    $gas = cleanNumber($_POST['gas'] ?? 0);
+    $mingguan_karyawan = cleanNumber($_POST['mingguan_karyawan'] ?? 0);
+    $es_batu = cleanNumber($_POST['es_batu'] ?? 0);
+    $bensin = cleanNumber($_POST['bensin'] ?? 0);
+    $lain = cleanNumber($_POST['lain_lain'] ?? 0);
 
+    $total_op = $sewa + $gaji + $listrik + $air + $sampah + $keamanan + $internet + $gas + $mingguan_karyawan + $es_batu + $bensin + $lain;
+
+    // FIX 2: HITUNG VARIABEL YANG KURANG
     $total_pengeluaran = $total_rutin + $total_op;
     $sisa = $tunai - $total_pengeluaran;
     $net = $total_omset - $total_pengeluaran;
-    $persen = $total_omset > 0? ($net / $total_omset) * 100 : 0;
-    $ket = $_POST['keterangan'];
+    $persen = $total_omset > 0? round(($net / $total_omset) * 100, 2) : 0;
 
     // 4. UPLOAD AMAN: Validasi tipe, ukuran, rename
     $foto = [];
     $upload_dir = "../uploads/nota/";
     if(!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
     for($i=1; $i<=4; $i++){
-        $foto[$i] = '';
+        $foto[$i] = ''; // kosongkan kalau gak upload
         if(!empty($_FILES["foto_nota$i"]['name'])){
             $cek = getimagesize($_FILES["foto_nota$i"]["tmp_name"]);
             if($cek!== false && $_FILES["foto_nota$i"]["size"] < 2000000){ // max 2MB
@@ -90,44 +96,47 @@ if(isset($_POST['simpan'])){
         }
     }
 
- // 5. UPSERT: INSERT BARU ATAU UPDATE KALAU TANGGAL+CABANG SAMA
-$sql = "INSERT INTO laporan_cabang
-(id_cabang,nama_pengelola,tanggal,tunai,qris,grab_food,go_food,total_omset,belanja_pasar,belanja_sembako,belanja_beras,belanja_toko,total_rutin,sewa,gaji,listrik,air,sampah,keamanan,internet,lain_lain,total_operasional,total_pengeluaran,sisa_tunai,net_profit,persentase,keterangan,foto_nota1,foto_nota2,foto_nota3,foto_nota4)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-ON DUPLICATE KEY UPDATE
-nama_pengelola=VALUES(nama_pengelola),
-tunai=VALUES(tunai), qris=VALUES(qris), grab_food=VALUES(grab_food), go_food=VALUES(go_food), total_omset=VALUES(total_omset),
-belanja_pasar=VALUES(belanja_pasar), belanja_sembako=VALUES(belanja_sembako), belanja_beras=VALUES(belanja_beras), belanja_toko=VALUES(belanja_toko), total_rutin=VALUES(total_rutin),
-sewa=VALUES(sewa), gaji=VALUES(gaji), listrik=VALUES(listrik), air=VALUES(air), sampah=VALUES(sampah), keamanan=VALUES(keamanan), internet=VALUES(internet), lain_lain=VALUES(lain_lain), total_operasional=VALUES(total_operasional),
-total_pengeluaran=VALUES(total_pengeluaran), sisa_tunai=VALUES(sisa_tunai), net_profit=VALUES(net_profit), persentase=VALUES(persentase), keterangan=VALUES(keterangan),
-foto_nota1=IF(VALUES(foto_nota1)='', foto_nota1, VALUES(foto_nota1)),
-foto_nota2=IF(VALUES(foto_nota2)='', foto_nota2, VALUES(foto_nota2)),
-foto_nota3=IF(VALUES(foto_nota3)='', foto_nota3, VALUES(foto_nota3)),
-foto_nota4=IF(VALUES(foto_nota4)='', foto_nota4, VALUES(foto_nota4))";
+    // 5. UPSERT: INSERT BARU ATAU UPDATE KALAU TANGGAL+CABANG SAMA
+    // PERBAIKAN: Tanda tanya (?) Disesuaikan menjadi persis 35 pasang dengan nama kolom
+    $sql = "INSERT INTO laporan_cabang
+    (id_cabang,nama_pengelola,tanggal,tunai,qris,grab_food,go_food,total_omset,belanja_pasar,belanja_sembako,belanja_beras,belanja_toko,total_rutin,sewa,gaji,listrik,air,sampah,keamanan,internet,gas,mingguan_karyawan,es_batu,bensin,lain_lain,total_operasional,total_pengeluaran,sisa_tunai,net_profit,persentase,keterangan,foto_nota1,foto_nota2,foto_nota3,foto_nota4)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON DUPLICATE KEY UPDATE
+    nama_pengelola=VALUES(nama_pengelola),
+    tunai=VALUES(tunai), qris=VALUES(qris), grab_food=VALUES(grab_food), go_food=VALUES(go_food), total_omset=VALUES(total_omset),
+    belanja_pasar=VALUES(belanja_pasar), belanja_sembako=VALUES(belanja_sembako), belanja_beras=VALUES(belanja_beras), belanja_toko=VALUES(belanja_toko), total_rutin=VALUES(total_rutin),
+    sewa=VALUES(sewa), gaji=VALUES(gaji), listrik=VALUES(listrik), air=VALUES(air), sampah=VALUES(sampah), keamanan=VALUES(keamanan), internet=VALUES(internet), gas=VALUES(gas), mingguan_karyawan=VALUES(mingguan_karyawan), es_batu=VALUES(es_batu), bensin=VALUES(bensin), lain_lain=VALUES(lain_lain), total_operasional=VALUES(total_operasional),
+    total_pengeluaran=VALUES(total_pengeluaran), sisa_tunai=VALUES(sisa_tunai), net_profit=VALUES(net_profit), persentase=VALUES(persentase), keterangan=VALUES(keterangan),
+    foto_nota1=IF(VALUES(foto_nota1)='', foto_nota1, VALUES(foto_nota1)),
+    foto_nota2=IF(VALUES(foto_nota2)='', foto_nota2, VALUES(foto_nota2)),
+    foto_nota3=IF(VALUES(foto_nota3)='', foto_nota3, VALUES(foto_nota3)),
+    foto_nota4=IF(VALUES(foto_nota4)='', foto_nota4, VALUES(foto_nota4))";
 
-$stmt = $conn->prepare($sql);
-// 31 parameter: i=1, s=7, d=23
-$stmt->bind_param("issdddddddddddddddddddddddsssss",
-    $id_cabang, $nama_pengelola, $tgl,
-    $tunai, $qris, $grab, $go, $total_omset,
-    $pasar, $sembako, $beras, $toko, $total_rutin,
-    $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $lain, $total_op,
-    $total_pengeluaran, $sisa, $net, $persen,
-    $ket, $foto[1], $foto[2], $foto[3], $foto[4]
-);
+    $stmt = $conn->prepare($sql);
 
-if($stmt->execute()){
-    echo "<script>alert('Data berhasil disimpan!'); window.location='input_data.php';</script>";
-} else {
-    echo "<script>alert('Gagal simpan: ".$stmt->error."'); history.back();</script>";
+    // PERBAIKAN: Format data bind_param disesuaikan persis dengan 35 parameter
+    // Type string: i (1) + s (2) + d (27) + s (5) = total 35 parameter
+    $stmt->bind_param("issdddddddddddddddddddddddddddsssss",
+        $id_cabang, $nama_pengelola, $tgl,
+        $tunai, $qris, $grab, $go, $total_omset,
+        $pasar, $sembako, $beras, $toko, $total_rutin,
+        $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $gas, $mingguan_karyawan, $es_batu, $bensin, $lain, $total_op,
+        $total_pengeluaran, $sisa, $net, $persen,
+        $ket, $foto[1], $foto[2], $foto[3], $foto[4]
+    );
+
+    if($stmt->execute()){
+        echo "<script>alert('Data berhasil disimpan!'); window.location='input_data.php';</script>";
+    } else {
+        echo "<script>alert('Gagal simpan: ".$stmt->error."'); history.back();</script>";
+    }
+    $stmt->close();
 }
-$stmt->close();
-} // <- INI TADI YG KETINGGALAN
 ?>
 
 <style>
     body { background-color: #f6f8fa; }
- .card-custom {
+.card-custom {
         background: #ffffff;
         border: none;
         border-radius: 16px;
@@ -135,7 +144,7 @@ $stmt->close();
         margin-bottom: 24px;
         overflow: hidden;
     }
- .card-custom-header {
+.card-custom-header {
         padding: 16px 24px;
         font-weight: 600;
         font-size: 1.05rem;
@@ -144,37 +153,37 @@ $stmt->close();
         align-items: center;
         gap: 10px;
     }
- .form-label {
+.form-label {
         font-weight: 500;
         font-size: 0.85rem;
         color: #4A5568;
         margin-bottom: 6px;
     }
- .input-group-text-custom {
+.input-group-text-custom {
         background-color: #EDF2F7;
         border-color: #E2E8F0;
         color: #4A5568;
         font-weight: 600;
         font-size: 0.9rem;
     }
- .form-control-custom {
+.form-control-custom {
         border-color: #E2E8F0;
         font-size: 0.95rem;
         padding: 10px 14px;
         border-radius: 8px;
     }
- .form-control-custom:focus {
+.form-control-custom:focus {
         border-color: #4A5568;
         box-shadow: 0 0 0 3px rgba(74, 85, 104, 0.1);
     }
- .bg-header-success { background: #E6FFFA; color: #00875A; }
- .bg-header-warning { background: #FEF3C7; color: #B45309; }
- .bg-header-info { background: #EBF8FF; color: #2B6CB0; }
- .bg-header-danger { background: #FFF5F5; color: #C53030; }
- .bg-header-secondary { background: #F7FAFC; color: #4A5568; }
+.bg-header-success { background: #E6FFFA; color: #00875A; }
+.bg-header-warning { background: #FEF3C7; color: #B45309; }
+.bg-header-info { background: #EBF8FF; color: #2B6CB0; }
+.bg-header-danger { background: #FFF5F5; color: #C53030; }
+.bg-header-secondary { background: #F7FAFC; color: #4A5568; }
 
     /* Responsive Badge Info */
- .badge-info-cabang {
+.badge-info-cabang {
         background: linear-gradient(135deg, #2D3748 0%, #1A202C 100%);
         border-radius: 12px;
         padding: 16px 20px;
@@ -184,8 +193,8 @@ $stmt->close();
 
     /* Preview Grid for Form inputs on mobile */
     @media (max-width: 576px) {
-     .card-custom-header { padding: 12px 16px; }
-     .p-mobile-custom { padding: 16px!important; }
+    .card-custom-header { padding: 12px 16px; }
+    .p-mobile-custom { padding: 16px!important; }
     }
 </style>
 
@@ -205,7 +214,7 @@ $stmt->close();
     </div>
 
     <form method="POST" enctype="multipart/form-data" onsubmit="prepareSubmitForm()">
-        <input type="hidden" name="csrf" value="<?=csrf_token()?>"> <!-- 6. TAMBAH CSRF TOKEN -->
+        <input type="hidden" name="csrf" value="<?=csrf_token()?>">
 
         <div class="card card-custom">
             <div class="card-body p-4 p-mobile-custom">
@@ -284,7 +293,20 @@ $stmt->close();
             </div>
             <div class="card-body p-4 p-mobile-custom">
                 <div class="row g-3">
-                    <?php foreach(['sewa' => 'Sewa', 'gaji' => 'Gaji', 'listrik' => 'Listrik', 'air' => 'Air PAM', 'sampah' => 'Sampah', 'keamanan' => 'Keamanan', 'internet' => 'Internet', 'lain_lain' => 'Lain-lain'] as $k => $v):?>
+                    <?php foreach([
+                        'sewa' => 'Sewa Ruko',
+                        'gaji' => 'Gaji Karyawan',
+                        'listrik' => 'Listrik',
+                        'air' => 'Air PAM',
+                        'sampah' => 'Sampah',
+                        'keamanan' => 'Keamanan',
+                        'internet' => 'Internet',
+                        'gas' => 'Gas',
+                        'mingguan_karyawan' => 'Mingguan Karyawan',
+                        'es_batu' => 'Es Batu - Air Galon',
+                        'bensin' => 'Bensin',
+                        'lain_lain' => 'Operasional Lain'
+                    ] as $k => $v):?>
                     <div class="col-6 col-md-3">
                         <label class="form-label"><?= $v?></label>
                         <div class="input-group">
@@ -379,11 +401,8 @@ $stmt->close();
 // Fungsi memformat string mentah menjadi ribuan tanpa batas digit (Mendukung ratusan, ribuan, jutaan, dst)
 function formatRupiahMask(angka) {
     if (!angka) return '0';
-    // Hanya ambil karakter angka murni
     let cleanNumber = angka.toString().replace(/[^0-9]/g, '');
     if (cleanNumber === '') return '0';
-
-    // Mengubah string angka menjadi format pemisah koma internasional untuk ribuan secara dinamis
     return parseInt(cleanNumber, 10).toLocaleString('en-US');
 }
 
@@ -401,7 +420,6 @@ function hitung(){
     let qris = getPureNumber('[name=qris]');
     let grab = getPureNumber('[name=grab_food]');
     let go = getPureNumber('[name=go_food]');
-
     let omset = tunai + qris + grab + go;
     document.getElementById('total_omset').value = formatRupiahMask(omset);
 
@@ -427,17 +445,12 @@ function hitung(){
 // Pasang Event Listener Masking otomatis saat user mengetikkan nominal angka
 document.querySelectorAll('.mask-money').forEach(el => {
     el.addEventListener('input', function(e) {
-        // Simpan posisi kursor saat mengetik agar tidak melompat ke belakang
         let cursorPosition = this.selectionStart;
         let oldLength = this.value.length;
-
         this.value = formatRupiahMask(this.value);
-
         let newLength = this.value.length;
         cursorPosition = cursorPosition + (newLength - oldLength);
         this.setSelectionRange(cursorPosition, cursorPosition);
-
-        // Panggil fungsi hitung otomatis
         hitung();
     });
 });

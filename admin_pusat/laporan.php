@@ -20,20 +20,53 @@ if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
 }
 
 // 1. Pindahkan inisialisasi filter ke atas agar bisa dipakai di proses POST maupun GET
-$tgl_awal = $_GET['tgl_awal'] ?? date('Y-m-01');
-$tgl_akhir = $_GET['tgl_akhir'] ?? date('Y-m-d');
-$id_cabang = $_GET['id_cabang'] ?? '';
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$page = $page < 1 ? 1 : $page;
+$filter = $_GET['filter']?? 'harian';
+$tgl_awal = $_GET['tgl_awal']?? date('Y-m-01');
+$tgl_akhir = $_GET['tgl_akhir']?? date('Y-m-d');
+$id_cabang = $_GET['id_cabang']?? '';
+$page = isset($_GET['page'])? (int)$_GET['page'] : 1;
+$page = $page < 1? 1 : $page;
 $limit = 10;
 $offset = ($page - 1) * $limit;
+
+// BARU: Proses Hapus Laporan
+if(isset($_POST['hapus_laporan'])){
+    if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
+
+    $id = (int)$_POST['id'];
+
+    // Ambil data dulu buat hapus foto
+    $q = $conn->prepare("SELECT foto_nota1, foto_nota2, foto_nota3, foto_nota4 FROM laporan_cabang WHERE id=?");
+    $q->bind_param("i", $id);
+    $q->execute();
+    $res = $q->get_result();
+    if($res->num_rows > 0){
+        $foto = $res->fetch_assoc();
+        for($i=1; $i<=4; $i++){
+            if(!empty($foto["foto_nota$i"]) && file_exists('../uploads/nota/'.$foto["foto_nota$i"])){
+                @unlink('../uploads/nota/'.$foto["foto_nota$i"]);
+            }
+        }
+    }
+    $q->close();
+
+    $del = $conn->prepare("DELETE FROM laporan_cabang WHERE id=?");
+    $del->bind_param("i", $id);
+    if($del->execute()){
+        $param = http_build_query(['filter'=>$filter, 'tgl_awal'=>$tgl_awal, 'tgl_akhir'=>$tgl_akhir, 'id_cabang'=>$id_cabang, 'page'=>$page]);
+        echo "<script>alert('Data laporan berhasil dihapus'); window.location='laporan?$param';</script>";
+        exit;
+    } else {
+        echo "<script>alert('Gagal hapus: ".$del->error."');</script>";
+    }
+}
 
 // Proses update
 if(isset($_POST['update_laporan'])){
     if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
-    
+
     $id = (int)$_POST['id'];
-    
+
     $tunai = (int)($_POST['tunai']?? 0);
     $qris = (int)($_POST['qris']?? 0);
     $grab_food = (int)($_POST['grab_food']?? 0);
@@ -49,39 +82,40 @@ if(isset($_POST['update_laporan'])){
     $sampah = (int)($_POST['sampah']?? 0);
     $keamanan = (int)($_POST['keamanan']?? 0);
     $internet = (int)($_POST['internet']?? 0);
+    $gas = (int)($_POST['gas']?? 0);
+    $mingguan_karyawan = (int)($_POST['mingguan_karyawan']?? 0);
+    $es_batu = (int)($_POST['es_batu']?? 0);
+    $bensin = (int)($_POST['bensin']?? 0);
     $lain_lain = (int)($_POST['lain_lain']?? 0);
     $keterangan = $_POST['keterangan']?? '';
-    
+
     $total_omset = $tunai + $qris + $grab_food + $go_food;
     $total_rutin = $belanja_pasar + $belanja_sembako + $belanja_beras + $belanja_toko;
-    $total_operasional = $sewa + $gaji + $listrik + $air + $sampah + $keamanan + $internet + $lain_lain;
+    $total_operasional = $sewa + $gaji + $listrik + $air + $sampah + $keamanan + $internet + $gas + $mingguan_karyawan + $es_batu + $bensin + $lain_lain;
     $total_pengeluaran = $total_rutin + $total_operasional;
     $net_profit = $total_omset - $total_pengeluaran;
     $persentase = $total_omset > 0? round(($net_profit / $total_omset) * 100, 2) : 0;
     $sisa_tunai = $tunai - $total_pengeluaran;
-    
-    $sql = "UPDATE laporan_cabang SET 
+
+    $sql = "UPDATE laporan_cabang SET
             tunai=?, qris=?, grab_food=?, go_food=?, total_omset=?,
             belanja_pasar=?, belanja_sembako=?, belanja_beras=?, belanja_toko=?, total_rutin=?,
-            sewa=?, gaji=?, listrik=?, air=?, sampah=?, keamanan=?, internet=?, lain_lain=?, total_operasional=?,
+            sewa=?, gaji=?, listrik=?, air=?, sampah=?, keamanan=?, internet=?, gas=?, mingguan_karyawan=?, es_batu=?, bensin=?, lain_lain=?, total_operasional=?,
             total_pengeluaran=?, sisa_tunai=?, net_profit=?, persentase=?, keterangan=?
             WHERE id=?";
-    
+
     $stmt = $conn->prepare($sql);
-    
-    // 24 huruf: 22x i + 1x d + 1x s + 1x i
-     $types = "iiiiiiiiiiiiiiiiiiiiiidsi"; 
-    
+    $types = "iiiiiiiiiiiiiiiiiiiiiiiiiidsi";
     $stmt->bind_param(
         $types,
         $tunai, $qris, $grab_food, $go_food, $total_omset,
         $belanja_pasar, $belanja_sembako, $belanja_beras, $belanja_toko, $total_rutin,
-        $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $lain_lain, $total_operasional,
+        $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $gas, $mingguan_karyawan, $es_batu, $bensin, $lain_lain, $total_operasional,
         $total_pengeluaran, $sisa_tunai, $net_profit, $persentase, $keterangan, $id
     );
-    
+
     if($stmt->execute()){
-        $param = http_build_query(['tgl_awal'=>$tgl_awal, 'tgl_akhir'=>$tgl_akhir, 'id_cabang'=>$id_cabang, 'page'=>$page]);
+        $param = http_build_query(['filter'=>$filter, 'tgl_awal'=>$tgl_awal, 'tgl_akhir'=>$tgl_akhir, 'id_cabang'=>$id_cabang, 'page'=>$page]);
         echo "<script>alert('Data berhasil diupdate'); window.location='laporan?$param';</script>";
         exit;
     } else {
@@ -90,43 +124,43 @@ if(isset($_POST['update_laporan'])){
 }
 
 // 2. Query Data Otomatis PAKAI PREPARED
-$where_sql = "WHERE l.tanggal BETWEEN ? AND ?";
+$where_sql = "WHERE l.tanggal BETWEEN? AND?";
 $params = [$tgl_awal, $tgl_akhir];
 $types = "ss";
 if($id_cabang!= '') {
-    $where_sql .= " AND l.id_cabang = ?";
+    $where_sql.= " AND l.id_cabang =?";
     $params[] = (int)$id_cabang;
-    $types .= "i";
+    $types.= "i";
 }
 
 // Hitung total data untuk pagination
 $sql_count = "SELECT COUNT(*) as total FROM laporan_cabang l $where_sql";
 $stmt_count = $conn->prepare($sql_count);
-$stmt_count->bind_param($types, ...$params);
+$stmt_count->bind_param($types,...$params);
 $stmt_count->execute();
 $total_data = $stmt_count->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_data / $limit);
 
 // Query utama + LIMIT
-$query = "SELECT l.*, c.nama_cabang FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang $where_sql ORDER BY l.tanggal DESC LIMIT ? OFFSET ?";
+$query = "SELECT l.*, c.nama_cabang FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang $where_sql ORDER BY l.tanggal DESC LIMIT? OFFSET?";
 $stmt = $conn->prepare($query);
 $types_limit = $types."ii";
 $params_limit = array_merge($params, [$limit, $offset]);
-$stmt->bind_param($types_limit, ...$params_limit);
+$stmt->bind_param($types_limit,...$params_limit);
 $stmt->execute();
 $data = $stmt->get_result();
 
 // Total Omzet
 $sql_omset = "SELECT SUM(total_omset) as total FROM laporan_cabang l $where_sql";
 $stmt = $conn->prepare($sql_omset);
-$stmt->bind_param($types, ...$params);
+$stmt->bind_param($types,...$params);
 $stmt->execute();
 $total_omset = $stmt->get_result()->fetch_assoc()['total']?? 0;
 
 // Total Laba
 $sql_laba = "SELECT SUM(net_profit) as total FROM laporan_cabang l $where_sql";
 $stmt = $conn->prepare($sql_laba);
-$stmt->bind_param($types, ...$params);
+$stmt->bind_param($types,...$params);
 $stmt->execute();
 $total_laba = $stmt->get_result()->fetch_assoc()['total']?? 0;
 
@@ -135,30 +169,55 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
-.pagination .page-link {border-radius: 10px!important; margin: 0 3px; border: 1px solid #dee2e6; color: #0d6efd; font-weight: 600;}
-.pagination .page-item.active .page-link {background-color: #0d6efd; border-color: #0d6efd; color: #fff;}
-.pagination .page-link:hover {background-color: #e7f1ff;}
+.pagination.page-link {border-radius: 10px!important; margin: 0 3px; border: 1px solid #dee2e6; color: #0d6efd; font-weight: 600;}
+.pagination.page-item.active.page-link {background-color: #0d6efd; border-color: #0d6efd; color: #fff;}
+.pagination.page-link:hover {background-color: #e7f1ff;}
+.btn-action-delete {background-color: #fde8e8; color: #ef4444; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;}
+.btn-action-delete:hover {background-color: #fbd5d5;}
 </style>
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h3 class="fw-bold mb-1 text-dark">Laporan Harian Semua Cabang</h3>
+            <h3 class="fw-bold mb-1 text-dark">Laporan Semua Cabang</h3>
             <p class="text-muted small mb-0">Pantau perkembangan omzet, pengeluaran, dan net profit secara berkala.</p>
         </div>
     </div>
 
     <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
         <div class="card-body p-4">
-            <form method="GET" class="row g-3 align-items-end">
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label fw-semibold text-secondary small">Tanggal Awal</label>
-                    <input type="date" name="tgl_awal" value="<?= h($tgl_awal)?>" class="form-control form-control-md border-2 bg-light">
+            <form method="GET" class="row g-3 align-items-end" id="filterForm">
+                <div class="col-lg-2 col-md-4">
+                    <label class="form-label fw-semibold text-secondary small">Mode Filter</label>
+                    <select name="filter" id="filterMode" class="form-select form-select-md border-2 bg-light">
+                        <option value="harian" <?= $filter=='harian'?'selected':''?>>Harian</option>
+                        <option value="mingguan" <?= $filter=='mingguan'?'selected':''?>>Mingguan</option>
+                        <option value="bulanan" <?= $filter=='bulanan'?'selected':''?>>Bulanan</option>
+                    </select>
                 </div>
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label fw-semibold text-secondary small">Tanggal Akhir</label>
-                    <input type="date" name="tgl_akhir" value="<?= h($tgl_akhir)?>" class="form-control form-control-md border-2 bg-light">
+
+                <!-- INPUT HARIAN -->
+                <div class="col-lg-3 col-md-6 filter-input" id="input-harian">
+                    <label class="form-label fw-semibold text-secondary small">Pilih Tanggal</label>
+                    <input type="date" name="tgl" value="<?= h($_GET['tgl']??date('Y-m-d'))?>" class="form-control form-control-md border-2 bg-light">
                 </div>
+
+                <!-- INPUT MINGGUAN -->
+                <div class="col-lg-3 col-md-6 filter-input d-none" id="input-mingguan">
+                    <label class="form-label fw-semibold text-secondary small">Pilih Minggu</label>
+                    <input type="week" name="minggu" value="<?= h($_GET['minggu']??date('Y-\WW'))?>" class="form-control form-control-md border-2 bg-light">
+                </div>
+
+                <!-- INPUT BULAN -->
+                <div class="col-lg-3 col-md-6 filter-input d-none" id="input-bulanan">
+                    <label class="form-label fw-semibold text-secondary small">Pilih Bulan</label>
+                    <input type="month" name="bulan" value="<?= h($_GET['bulan']??date('Y-m'))?>" class="form-control form-control-md border-2 bg-light">
+                </div>
+
+                <!-- Hidden untuk kirim tgl_awal & tgl_akhir ke PHP -->
+                <input type="hidden" name="tgl_awal" id="tgl_awal" value="<?= h($tgl_awal)?>">
+                <input type="hidden" name="tgl_akhir" id="tgl_akhir" value="<?= h($tgl_akhir)?>">
+
                 <div class="col-lg-4 col-md-8">
                     <label class="form-label fw-semibold text-secondary small">Pilih Cabang</label>
                     <select name="id_cabang" class="form-select form-select-md border-2 bg-light">
@@ -223,17 +282,17 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                             <th class="py-3">Laba Bersih</th>
                             <th class="py-3">Margin</th>
                             <th class="py-3 text-center">Foto Nota</th>
-                            <th class="py-3 text-center" width="10%">Aksi</th>
+                            <th class="py-3 text-center" width="15%">Aksi</th> <!-- LEBAR DITAMBAH -->
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if($data->num_rows==0): ?>
+                        <?php if($data->num_rows==0):?>
                         <tr><td colspan="10" class="text-center py-5 text-muted">Belum ada data laporan pada periode ini</td></tr>
-                        <?php endif; ?>
-                        <?php $no=$offset+1; while($row=$data->fetch_assoc()): 
+                        <?php endif;?>
+                        <?php $no=$offset+1; while($row=$data->fetch_assoc()):
                         $margin = $row['persentase']?? 0;
                         $id = $row['id'];
-                        ?>
+                       ?>
                         <tr>
                             <td class="text-center px-4 text-muted fw-bold"><?= $no++?></td>
                             <td><span class="badge bg-light text-dark border p-2"><i class="bi bi-calendar3 me-1 text-muted"></i> <?= date('d/m/Y', strtotime($row['tanggal']))?></span></td>
@@ -253,18 +312,29 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                             </td>
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-1">
-                                    <?php for($i=1; $i<=4; $i++): 
+                                    <?php for($i=1; $i<=4; $i++):
                                     if(!empty($row["foto_nota$i"])):?>
                                     <a href="../uploads/nota/<?= h($row["foto_nota$i"])?>" target="_blank" class="d-inline-block">
-                                        <img src="../uploads/nota/<?= h($row["foto_nota$i"])?>" width="38" height="38" class="img-thumbnail rounded-2 shadow-sm object-fit-cover" style="transition: transform .2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                                        <img src="../uploads/nota/<?= h($row["foto_nota$i"])?>" width="38" height="38" class="img-thumbnail rounded-2 shadow-sm object-fit-cover" style="transition: transform.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
                                     </a>
                                     <?php endif; endfor;?>
                                 </div>
                             </td>
                             <td class="text-center px-4">
-                                <button class="btn btn-sm btn-outline-primary px-3 rounded-pill fw-medium" data-bs-toggle="modal" data-bs-target="#detailModal<?= $id?>">
-                                    <i class="bi bi-pencil-square me-1"></i> Detail / Edit
-                                </button>
+                                <div class="d-inline-flex gap-2 justify-content-center">
+                                    <button class="btn btn-sm btn-outline-primary px-3 rounded-pill fw-medium" data-bs-toggle="modal" data-bs-target="#detailModal<?= $id?>">
+                                        <i class="bi bi-pencil-square me-1"></i> Edit
+                                    </button>
+
+                                    <!-- TOMBOL HAPUS BARU -->
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus laporan tanggal <?= date('d/m/Y', strtotime($row['tanggal']))?> cabang <?= h($row['nama_cabang'])?>?')">
+                                        <input type="hidden" name="csrf" value="<?=csrf_token()?>">
+                                        <input type="hidden" name="id" value="<?= $id?>">
+                                        <button type="submit" name="hapus_laporan" class="btn btn-sm btn-action-delete">
+                                            <i class="bi bi-trash-fill me-1"></i> Hapus
+                                        </button>
+                                    </form>
+                                </div>
 
                                 <div class="modal fade text-start" id="detailModal<?= $id?>" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered m-2 m-sm-auto">
@@ -272,13 +342,13 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                             <input type="hidden" name="csrf" value="<?=csrf_token()?>">
                                             <input type="hidden" name="id" value="<?= $id?>">
                                             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
-                                                
+
                                                 <div class="modal-header bg-dark text-white p-3 p-sm-4">
                                                     <div>
                                                         <h5 class="modal-title fw-bold mb-1 fs-6 fs-sm-5">Detail & Koreksi Laporan</h5>
                                                         <small class="text-white-50 d-block" style="font-size: 0.75rem;">
-                                                            <i class="bi bi-shop me-1"></i> <?= h($row['nama_cabang'])?> 
-                                                            <span class="mx-1">|</span> 
+                                                            <i class="bi bi-shop me-1"></i> <?= h($row['nama_cabang'])?>
+                                                            <span class="mx-1">|</span>
                                                             <i class="bi bi-calendar3 me-1"></i> <?= date('d/m/Y', strtotime($row['tanggal']))?>
                                                         </small>
                                                     </div>
@@ -287,7 +357,7 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
 
                                                 <div class="modal-body p-3 p-sm-4 bg-light">
                                                     <div class="row g-3">
-                                                        
+
                                                         <div class="col-lg-6">
                                                             <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
                                                                 <div class="card-header bg-primary bg-opacity-10 text-primary border-0 py-2.5 px-3 fw-bold small">
@@ -372,18 +442,36 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                                                             <input type="number" name="air" class="form-control form-control-sm border-2" value="<?= $row['air']?? 0?>">
                                                                         </div>
                                                                         <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Sampah / Keamanan</label>
-                                                                            <div class="input-group input-group-sm">
-                                                                                <input type="number" name="sampah" class="form-control border-2" value="<?= $row['sampah']?? 0?>" placeholder="Sampah">
-                                                                                <input type="number" name="keamanan" class="form-control border-2" value="<?= $row['keamanan']?? 0?>" placeholder="Keamanan">
-                                                                            </div>
+                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Sampah</label>
+                                                                            <input type="number" name="sampah" class="form-control form-control-sm border-2" value="<?= $row['sampah']?? 0?>">
                                                                         </div>
                                                                         <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Internet / Lain</label>
-                                                                            <div class="input-group input-group-sm">
-                                                                                <input type="number" name="internet" class="form-control border-2" value="<?= $row['internet']?? 0?>" placeholder="Net">
-                                                                                <input type="number" name="lain_lain" class="form-control border-2" value="<?= $row['lain_lain']?? 0?>" placeholder="Lain">
-                                                                            </div>
+                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Keamanan</label>
+                                                                            <input type="number" name="keamanan" class="form-control form-control-sm border-2" value="<?= $row['keamanan']?? 0?>">
+                                                                        </div>
+                                                                        <div class="col-6">
+                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Internet</label>
+                                                                            <input type="number" name="internet" class="form-control form-control-sm border-2" value="<?= $row['internet']?? 0?>">
+                                                                        </div>
+                                                                        <div class="col-6">
+                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Gas</label>
+                                                                            <input type="number" name="gas" class="form-control form-control-sm border-2" value="<?= $row['gas']?? 0?>">
+                                                                        </div>
+                                                                        <div class="col-6">
+                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Mingguan Karyawan</label>
+                                                                            <input type="number" name="mingguan_karyawan" class="form-control form-control-sm border-2" value="<?= $row['mingguan_karyawan']?? 0?>">
+                                                                        </div>
+                                                                        <div class="col-6">
+                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Es Batu</label>
+                                                                            <input type="number" name="es_batu" class="form-control form-control-sm border-2" value="<?= $row['es_batu']?? 0?>">
+                                                                        </div>
+                                                                        <div class="col-6">
+                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Bensin</label>
+                                                                            <input type="number" name="bensin" class="form-control form-control-sm border-2" value="<?= $row['bensin']?? 0?>">
+                                                                        </div>
+                                                                        <div class="col-6">
+                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Lain-lain</label>
+                                                                            <input type="number" name="lain_lain" class="form-control form-control-sm border-2" value="<?= $row['lain_lain']?? 0?>">
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -406,9 +494,9 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                                             </div>
                                                         </div>
 
-                                                    </div> 
+                                                    </div>
                                                 </div>
-                                                
+
                                                 <div class="modal-footer bg-white border-top p-3 justify-content-end gap-2">
                                                     <button type="button" class="btn btn-sm btn-light border fw-semibold px-3" data-bs-dismiss="modal">Batal</button>
                                                     <button type="submit" name="update_laporan" class="btn btn-sm btn-primary fw-semibold px-3">
@@ -428,37 +516,78 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
             </div>
 
             <!-- PAGINATION -->
-            <?php if($total_pages > 1): ?>
+            <?php if($total_pages > 1):?>
             <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
-                <small class="text-muted">Menampilkan <?= $offset+1 ?> - <?= min($offset+$limit, $total_data) ?> dari <?= $total_data ?> data</small>
+                <small class="text-muted">Menampilkan <?= $offset+1?> - <?= min($offset+$limit, $total_data)?> dari <?= $total_data?> data</small>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <?php 
-                        $base_url = "?tgl_awal=".urlencode($tgl_awal)."&tgl_akhir=".urlencode($tgl_akhir)."&id_cabang=".urlencode($id_cabang);
-                        ?>
-                        <?php if($page > 1): ?>
+                        <?php
+                        $base_url = "?filter=".urlencode($filter)."&tgl_awal=".urlencode($tgl_awal)."&tgl_akhir=".urlencode($tgl_akhir)."&id_cabang=".urlencode($id_cabang);
+                       ?>
+                        <?php if($page > 1):?>
                         <li class="page-item">
-                            <a class="page-link" href="<?= $base_url ?>&page=<?= $page-1 ?>">Prev</a>
+                            <a class="page-link" href="<?= $base_url?>&page=<?= $page-1?>">Prev</a>
                         </li>
-                        <?php endif; ?>
+                        <?php endif;?>
 
-                        <?php for($i=1; $i<=$total_pages; $i++): ?>
-                        <li class="page-item <?= $i==$page ? 'active' : '' ?>">
-                            <a class="page-link" href="<?= $base_url ?>&page=<?= $i ?>"><?= $i ?></a>
+                        <?php for($i=1; $i<=$total_pages; $i++):?>
+                        <li class="page-item <?= $i==$page? 'active' : ''?>">
+                            <a class="page-link" href="<?= $base_url?>&page=<?= $i?>"><?= $i?></a>
                         </li>
-                        <?php endfor; ?>
+                        <?php endfor;?>
 
-                        <?php if($page < $total_pages): ?>
+                        <?php if($page < $total_pages):?>
                         <li class="page-item">
-                            <a class="page-link" href="<?= $base_url ?>&page=<?= $page+1 ?>">Next</a>
+                            <a class="page-link" href="<?= $base_url?>&page=<?= $page+1?>">Next</a>
                         </li>
-                        <?php endif; ?>
+                        <?php endif;?>
                     </ul>
                 </nav>
             </div>
-            <?php endif; ?>
+            <?php endif;?>
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const mode = document.getElementById('filterMode');
+    const form = document.getElementById('filterForm');
+    
+    function toggleInput(){
+        document.querySelectorAll('.filter-input').forEach(el => el.classList.add('d-none'));
+        document.getElementById('input-'+mode.value).classList.remove('d-none');
+    }
+    toggleInput();
+    mode.addEventListener('change', toggleInput);
+
+    // Sebelum submit, convert ke tgl_awal & tgl_akhir
+    form.addEventListener('submit', function(e){
+        const val = mode.value;
+        let awal = '', akhir = '';
+
+        if(val == 'harian'){
+            awal = akhir = document.querySelector('input[name="tgl"]').value;
+        }
+        if(val == 'mingguan'){
+            const valWeek = document.querySelector('input[name="minggu"]').value;
+            const [year, week] = valWeek.split('-W');
+            const d = new Date(year, 0, 1 + (week-1)*7);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day == 0 ? -6:1); // Senin
+            d.setDate(diff);
+            awal = d.toISOString().split('T')[0];
+            d.setDate(d.getDate() + 6); // Minggu
+            akhir = d.toISOString().split('T')[0];
+        }
+        if(val == 'bulanan'){
+            const [year, month] = document.querySelector('input[name="bulan"]').value.split('-');
+            awal = `${year}-${month}-01`;
+            akhir = new Date(year, month, 0).toISOString().split('T')[0]; // hari terakhir
+        }
+        document.getElementById('tgl_awal').value = awal;
+        document.getElementById('tgl_akhir').value = akhir;
+    });
+});
+</script>
