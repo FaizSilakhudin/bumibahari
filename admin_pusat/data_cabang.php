@@ -324,6 +324,174 @@ $no = $offset + 1;
     }
 </style>
 
+<!-- Styling Tambahan untuk Menyempurnakan Tampilan Premium SaaS -->
+<style>
+    :root {
+        --primary-color: #4f46e5;
+        --primary-hover: #4338ca;
+        --bg-glass: rgba(255, 255, 255, 0.9);
+    }
+
+    body {
+        background-color: #f8fafc;
+        color: #1e293b;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    /* Title Styling */
+    .title-mark {
+        width: 4px;
+        height: 24px;
+        background: var(--primary-color);
+        border-radius: 4px;
+        margin-right: 12px;
+        display: inline-block;
+    }
+
+    /* Stat Card Modern */
+    .stat-card {
+        background: #ffffff;
+        padding: 1.25rem 1.5rem;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    }
+    .stat-card .icon {
+        width: 48px;
+        height: 48px;
+        background: #e0e7ff;
+        color: var(--primary-color);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    /* Custom Form Control & Buttons */
+    .form-control-premium {
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        padding: 0.6rem 1rem;
+        transition: all 0.2s;
+    }
+    .form-control-premium:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+    }
+
+    .btn-premium {
+        background-color: var(--primary-color);
+        color: #fff;
+        border-radius: 10px;
+        padding: 0.6rem 1.25rem;
+        font-weight: 500;
+        border: none;
+        transition: all 0.2s;
+    }
+    .btn-premium:hover {
+        background-color: var(--primary-hover);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+
+    .btn-premium-outline {
+        background-color: #fff;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 0.6rem 1.25rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .btn-premium-outline:hover {
+        background-color: #f1f5f9;
+        color: #0f172a;
+    }
+
+    /* Table SaaS Card Styling */
+    .saas-card {
+        border-radius: 16px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        background: #ffffff;
+    }
+
+    .table-saas thead th {
+        background-color: #f8fafc;
+        color: #64748b;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 700;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .table-saas tbody td {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+    }
+
+    .table-saas tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .table-saas tbody tr:hover {
+        background-color: #f8fafc;
+    }
+
+    /* Action Buttons */
+    .btn-action-edit {
+        background-color: #f1f5f9;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .btn-action-edit:hover {
+        background-color: #e2e8f0;
+    }
+
+    .btn-action-delete {
+        background-color: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .btn-action-delete:hover {
+        background-color: #fee2e2;
+    }
+
+    /* Modals Styling */
+    .modal-premium .modal-content {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    .modal-premium .modal-header {
+        border-bottom: 1px solid #f1f5f9;
+        padding: 1.5rem;
+    }
+    .modal-premium .modal-body {
+        padding: 1.5rem;
+    }
+    .modal-premium .modal-footer {
+        border-top: 1px solid #f1f5f9;
+        padding: 1.25rem 1.5rem;
+    }
+</style>
+
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -379,7 +547,7 @@ $no = $offset + 1;
                         </tr>
                     <?php endif; ?>
                     <?php while ($row = $data->fetch_assoc()): ?>
-                        <?php $rowCabang =  Cabang::find($row['id_cabang']); ?>
+                        <?php $rowCabang = Cabang::find($row['id_cabang']); ?>
                         <tr>
                             <td data-label="No" class="text-center text-muted fw-semibold"><?= $no++ ?></td>
                             <td data-label="Nama Cabang"><span class="fw-bold"><?= h($row['nama_cabang']) ?></span></td>

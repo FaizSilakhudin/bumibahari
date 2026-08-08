@@ -52,7 +52,6 @@ if(isset($_POST['login'])){
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            /* Background gradasi modern bernuansa bisnis kuliner/maritim hangat */
             background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
             display: flex;
             align-items: center;
@@ -122,6 +121,7 @@ if(isset($_POST['login'])){
 
         .input-group-custom .form-control {
             padding-left: 42px;
+            padding-right: 42px; /* BARU: kasih ruang buat icon mata */
             height: 48px;
             border-radius: 10px;
             border: 1px solid #cbd5e1;
@@ -133,7 +133,7 @@ if(isset($_POST['login'])){
 
         .input-group-custom .form-control:focus {
             background-color: #ffffff;
-            border-color: #343a40; /* Menyelaraskan dengan warna utama navbar/tabel */
+            border-color: #343a40;
             box-shadow: 0 0 0 4px rgba(52, 58, 64, 0.1);
         }
 
@@ -147,9 +147,25 @@ if(isset($_POST['login'])){
             align-items: center;
         }
 
+        .input-group-custom .toggle-password {
+            position: absolute;
+            right: 15px;
+            left: auto;
+            color: #94a3b8;
+            font-size: 1.1rem;
+            z-index: 4;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .input-group-custom .toggle-password:hover {
+            color: #343a40;
+        }
+
         .btn-login {
             height: 48px;
-            background-color: #343a40; /* Menyamakan tema gelap headStyles tabel */
+            background-color: #343a40;
             border-color: #343a40;
             color: #ffffff;
             font-weight: 600;
@@ -222,7 +238,10 @@ if(isset($_POST['login'])){
                     <label class="form-label">Password</label>
                     <div class="input-group-custom">
                         <span class="input-icon"><i class="bi bi-lock"></i></span>
-                        <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                        <input type="password" name="password" id="password" class="form-control" placeholder="••••" required>
+                        <span class="toggle-password" onclick="togglePassword()">
+                            <i class="bi bi-eye" id="toggleIcon"></i>
+                        </span>
                     </div>
                 </div>
                 
@@ -240,5 +259,22 @@ if(isset($_POST['login'])){
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function togglePassword() {
+    const passInput = document.getElementById('password');
+    const icon = document.getElementById('toggleIcon');
+    
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        passInput.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+}
+</script>
 </body>
 </html>

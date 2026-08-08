@@ -30,8 +30,10 @@ $prev_tahun = date('Y', $prev_time);
 $next_bulan = date('m', $next_time);
 $next_tahun = date('Y', $next_time);
 
-// 2. AMBIL DATA LAPORAN 1 BULAN
-$stmt = $conn->prepare("SELECT * FROM laporan_cabang WHERE id_cabang=? AND tanggal BETWEEN ? AND ? ORDER BY tanggal DESC");
+// 2. AMBIL DATA LAPORAN 1 BULAN - SUDAH TAMBAH 4 KOLOM BO BARU
+$stmt = $conn->prepare("SELECT tanggal, total_omset, total_pengeluaran, net_profit, persentase, total_operasional,
+                        foto_nota1, foto_nota2, foto_nota3, foto_nota4 
+                        FROM laporan_cabang WHERE id_cabang=? AND tanggal BETWEEN ? AND ? ORDER BY tanggal DESC");
 $stmt->bind_param("iss", $id_cabang, $tgl_awal, $tgl_akhir);
 $stmt->execute();
 $data = $stmt->get_result();
@@ -79,12 +81,14 @@ $no = 1;
         font-size: 0.75rem;
         letter-spacing: 0.5px;
         border-bottom: 2px solid #bbf7d0;
+        white-space: nowrap;
     }
     .table-custom td {
         font-size: 0.9rem;
         color: #1f2937;
         border-bottom: 1px solid #f0fdf4;
         padding: 14px 12px;
+        white-space: nowrap;
     }
     .badge-modern {
         padding: 0.5em 0.85em;
@@ -109,10 +113,43 @@ $no = 1;
         font-weight: 600;
         border-radius: 10px;
         padding: 8px 16px;
+        white-space: nowrap;
     }
     .btn-nav-bulan:hover {
         background: #dcfce7;
         color: #047857;
+    }
+
+    /* Penyesuaian Responsif Layar Kecil (HP) */
+    @media (max-width: 576px) {
+        .container-fluid {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+        }
+        .header-banner {
+            padding: 1rem;
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        .header-banner h4 {
+            font-size: 1.25rem;
+        }
+        .header-banner p {
+            font-size: 0.85rem;
+        }
+        .nav-bulan-wrapper {
+            gap: 8px;
+        }
+        .btn-nav-bulan {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+        }
+        .nav-bulan-title {
+            font-size: 0.95rem !important;
+        }
+        .btn-nav-text {
+            display: none; /* Sembunyikan teks panjang tombol di HP, menyisakan ikon & teks singkat */
+        }
     }
 </style>
 
@@ -122,26 +159,26 @@ $no = 1;
     <div class="header-banner d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
             <h4 class="mb-1 fw-bold"><i class="bi bi-clock-history me-2"></i> Riwayat Input Data</h4>
-            <p class="mb-0 opacity-90"><i class="bi bi-shop me-1"></i> <strong><?= h($cabang) ?></strong> &nbsp;|&nbsp; Pengelola: <?= h($nama_pengelola) ?></p>
+            <p class="mb-0 opacity-90"><i class="bi bi-shop me-1"></i> <strong><?= h($cabang) ?></strong> <span class="d-none d-sm-inline">&nbsp;|&nbsp;</span><br class="d-block d-sm-none"> Pengelola: <?= h($nama_pengelola) ?></p>
         </div>
-        <div class="bg-white bg-opacity-20 rounded-pill px-4 py-2 text-white border-white border-opacity-25">
+        <div class="bg-white bg-opacity-20 rounded-pill px-3 py-1 px-sm-4 py-sm-2 text-white border-white border-opacity-25">
             <span class="small fw-semibold"><i class="bi bi-circle-fill me-1 text-warning small"></i> Sistem Cabang Aktif</span>
         </div>
     </div>
 
     <!-- Navigasi Bulan -->
     <div class="card custom-card mb-4">
-        <div class="card-body p-3 d-flex justify-content-between align-items-center">
+        <div class="card-body p-3 d-flex justify-content-between align-items-center nav-bulan-wrapper">
             <a href="?bulan=<?= $prev_bulan ?>&tahun=<?= $prev_tahun ?>" class="btn btn-nav-bulan">
-                <i class="bi bi-chevron-left"></i> Bulan Sebelumnya
+                <i class="bi bi-chevron-left"></i> <span class="btn-nav-text">Bulan </span>Sebelumnya
             </a>
             
-            <h5 class="fw-bold mb-0 text-center" style="color:#059669">
-                <i class="bi bi-calendar3 me-2"></i> <?= date('F Y', strtotime($tgl_awal)) ?>
+            <h5 class="fw-bold mb-0 text-center nav-bulan-title" style="color:#059669">
+                <i class="bi bi-calendar3 me-1 me-sm-2"></i> <?= date('F Y', strtotime($tgl_awal)) ?>
             </h5>
 
             <a href="?bulan=<?= $next_bulan ?>&tahun=<?= $next_tahun ?>" class="btn btn-nav-bulan">
-                Bulan Berikutnya <i class="bi bi-chevron-right"></i>
+                <span class="btn-nav-text">Bulan </span>Berikutnya <i class="bi bi-chevron-right"></i>
             </a>
         </div>
     </div>
@@ -157,6 +194,7 @@ $no = 1;
                             <th>Tanggal</th>
                             <th>Omzet</th>
                             <th>Pengeluaran</th>
+                            <th>Operasional</th>
                             <th>Net Profit</th>
                             <th>Margin</th>
                             <th class="text-center pe-4" style="width: 150px;">Nota Transaksi</th>
@@ -165,7 +203,7 @@ $no = 1;
                     <tbody>
                     <?php if($data->num_rows == 0): ?>
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="bi bi-folder-x fs-1 d-block mb-2 text-success opacity-50"></i>
                                 Belum ada data pada bulan <?= date('F Y', strtotime($tgl_awal)) ?>
                             </td>
@@ -177,6 +215,7 @@ $no = 1;
                             <td class="fw-bold text-secondary"><?= date("d M Y", strtotime($row['tanggal'])) ?></td>
                             <td><span class="text-success fw-bold">Rp <?= number_format($row['total_omset'],0,',','.') ?></span></td>
                             <td class="text-muted">Rp <?= number_format($row['total_pengeluaran'],0,',','.') ?></td>
+                            <td class="fw-semibold text-primary">Rp <?= number_format($row['total_operasional'],0,',','.') ?></td>
                             <td><span class="fw-bold" style="color: #047857 !important;">Rp <?= number_format($row['net_profit'],0,',','.') ?></span></td>
                             <td>
                                 <span class="badge badge-modern bg-success-subtle text-success border-success-subtle">

@@ -153,39 +153,70 @@ if(isset($_GET['edit'])){
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
 <style>
-    body {background-color: #f4f7fe!important; font-family: 'Plus Jakarta Sans', sans-serif!important; color: #1b2559;}
-    .saas-card {background: #ffffff; border: none!important; border-radius: 20px!important; box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.06)!important; padding: 24px;}
-    .title-mark {width: 12px; height: 12px; background-color: #4318ff; border-radius: 4px; display: inline-block; margin-right: 10px;}
-    .btn-premium {background-color: #4318ff!important; color: #ffffff!important; border: none!important; padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 14px;}
-    .btn-premium:hover {background-color: #3310cc!important;}
-    .btn-premium-outline {background-color: #f4f7fe!important; color: #4318ff!important; border: 1px solid #e0e7ff!important; padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 14px;}
-    .form-control-premium {border-radius: 12px!important; border: 1px solid #e0e7ff!important; padding: 10px 16px;}
-    .btn-action-edit {background-color: #fff3cd; color: #856404; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;}
-    .btn-action-delete {background-color: #fde8e8; color: #ef4444; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;}
-    .btn-action-info {background-color: #dbeafe; color: #2563eb; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;} 
-    .table-saas thead th {background-color: #f8f9fc!important; color: #8f9bba!important; font-weight: 600; font-size: 12px; text-transform: uppercase;}
-    .modal-premium .modal-content {border-radius: 24px!important; border: none!important;}
-    .pagination .page-link {color: #4318ff; border: 1px solid #e0e7ff; font-weight: 600;}
-    .pagination .page-link:hover {background-color: #f4f7fe; color: #3310cc;}
-    .pagination .page-item.active .page-link {background-color: #4318ff; border-color: #4318ff; color: #fff;}
-    .pagination .page-item.disabled .page-link {color: #a3aed0;}
-    .stat-card {border-radius: 16px; padding: 20px; background: #fff; border: 1px solid #e0e7ff;}
-    .stat-card .icon {width: 48px; height: 48px; background: #f4f7fe; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #4318ff;}
+    body { background-color: #f4f7fe !important; font-family: 'Plus Jakarta Sans', sans-serif !important; color: #1b2559; }
+    .saas-card { background: #ffffff; border: none !important; border-radius: 20px !important; box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.06) !important; padding: 24px; }
+    .title-mark { width: 12px; height: 12px; background-color: #4318ff; border-radius: 4px; display: inline-block; margin-right: 10px; }
+    .btn-premium { background-color: #4318ff !important; color: #ffffff !important; border: none !important; padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; transition: all 0.2s ease; }
+    .btn-premium:hover { background-color: #3310cc !important; transform: translateY(-1px); box-shadow: 0px 8px 20px rgba(67, 24, 255, 0.15); }
+    .btn-premium-outline { background-color: #f4f7fe !important; color: #4318ff !important; border: 1px solid #e0e7ff !important; padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; }
+    .btn-premium-outline:hover { background-color: #e0e7ff !important; }
+    .form-control-premium, .form-select-premium { border-radius: 12px !important; border: 1px solid #e0e7ff !important; padding: 10px 16px; color: #1b2559; font-size: 14px; background-color: #ffffff; }
+    .form-control-premium:focus, .form-select-premium:focus { border-color: #4318ff !important; box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1) !important; }
+    
+    .btn-action-info { background-color: #dbeafe; color: #2563eb; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+    .btn-action-info:hover { background-color: #bfdbfe; }
+    .btn-action-edit { background-color: #fff3cd; color: #856404; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+    .btn-action-edit:hover { background-color: #ffe8a1; }
+    .btn-action-delete { background-color: #fde8e8; color: #ef4444; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+    .btn-action-delete:hover { background-color: #fbd5d5; }
+    
+    .pagination .page-link { border-radius: 10px !important; margin: 0 3px; border: 1px solid #e0e7ff; color: #4318ff; font-weight: 600; }
+    .pagination .page-item.active .page-link { background-color: #4318ff; border-color: #4318ff; color: #fff; }
+    .pagination .page-link:hover { background-color: #e0e7ff; }
+    .pagination .page-item.disabled .page-link { color: #a3aed0; }
+    
+    .stat-card { border-radius: 16px; padding: 20px; background: #fff; border: 1px solid #e0e7ff; }
+    .stat-card .icon { width: 48px; height: 48px; background: #f4f7fe; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #4318ff; }
+    
+    .table-saas { margin-bottom: 0; width: 100% !important; }
+    .table-saas thead th { background-color: #f8f9fc !important; color: #8f9bba !important; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eef2f9 !important; padding: 16px 12px; border-top: none !important; }
+    .table-saas tbody td { padding: 16px 12px; border-bottom: 1px solid #f4f7fe !important; color: #1b2559; font-size: 14px; vertical-align: middle; }
+    .table-saas tbody tr:hover { background-color: rgba(244, 247, 254, 0.5); }
+    
+    .modal-premium .modal-content { border-radius: 24px !important; border: none !important; box-shadow: 0px 24px 48px rgba(112, 144, 176, 0.15) !important; }
+    .modal-premium .modal-header { border-bottom: 1px solid #f4f7fe !important; padding: 20px 24px !important; }
+    .modal-premium .modal-body { padding: 24px !important; }
+    .modal-premium .modal-footer { border-top: 1px solid #f4f7fe !important; padding: 16px 24px !important; }
+
+    @media (max-width: 767.98px) {
+        .saas-card { padding: 16px !important; }
+        .header-container { flex-direction: column; align-items: flex-start !important; gap: 12px; }
+        .action-container { flex-direction: column; align-items: stretch !important; gap: 16px; }
+        .action-container form { flex-direction: column; width: 100%; }
+        .action-container input { width: 100% !important; }
+        .action-container button, .action-container a { flex: 1; justify-content: center; }
+        
+        .table-saas thead { display: none; }
+        .table-saas tbody tr { display: block; border: 1px solid #e0e7ff; border-radius: 16px; margin-bottom: 16px; padding: 16px; background: #ffffff; box-shadow: 0px 4px 12px rgba(112, 144, 176, 0.03); }
+        .table-saas tbody td { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 !important; border-bottom: 1px dashed #f4f7fe !important; text-align: right; }
+        .table-saas tbody td:last-child { border-bottom: none !important; padding-top: 14px !important; }
+        .table-saas tbody td::before { content: attr(data-label); font-weight: 600; color: #8f9bba; font-size: 13px; text-transform: uppercase; text-align: left; margin-right: 15px; }
+        .table-saas tbody td .d-inline-flex { width: 100%; }
+        .table-saas tbody td .btn-action-info, .table-saas tbody td .btn-action-edit, .table-saas tbody td .btn-action-delete { flex: 1; }
+    }
 </style>
 
 <div class="container-fluid py-4">
-    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center header-container mb-4">
+    <div class="d-flex justify-content-between align-items-center header-container mb-4">
         <div>
             <div class="d-flex align-items-center">
                 <span class="title-mark"></span>
-                <h3 class="fw-bold mb-0">Data Investor</h3>
+                <h3 class="fw-bold mb-0" style="color: #1b2559; font-size: calc(1.3rem + 0.6vw);">Data Investor</h3>
             </div>
-            <span class="text-muted small ms-sm-4">Manajemen data investor Warteg Bumi Bahari</span>
+            <span class="text-muted small ms-sm-4 d-block mt-1 mt-sm-0">Manajemen data investor Warteg Bumi Bahari</span>
         </div>
-        <button class="btn btn-premium" data-bs-toggle="modal" data-bs-target="#modalInvestor" onclick="resetForm()">
-            <i class="bi bi-plus-circle-fill me-2"></i> Tambah Investor Baru
-        </button>
     </div>
 
     <div class="row mb-4">
@@ -200,10 +231,25 @@ if(isset($_GET['edit'])){
         </div>
     </div>
 
-    <div class="d-flex justify-content-end gap-2 mb-3">
+    <div class="d-flex justify-content-between align-items-center action-container gap-3 mb-4">
+        <div>
+            <button class="btn btn-premium d-flex align-items-center gap-2 w-100 justify-content-center" data-bs-toggle="modal" data-bs-target="#modalInvestor" onclick="resetForm()">
+                <i class="bi bi-plus-circle-fill"></i> Tambah Investor Baru
+            </button>
+        </div>
+        
         <form method="GET" class="d-flex gap-2">
             <input type="text" name="search" class="form-control form-control-premium" placeholder="Cari nama, no HP, bank..." value="<?= h($search)?>" style="width: 280px;">
-            <button type="submit" class="btn btn-premium-outline"><i class="bi bi-search"></i> Cari</button>
+            <div class="d-flex gap-2 w-100">
+                <button type="submit" class="btn btn-premium-outline d-flex align-items-center gap-2 justify-content-center">
+                    <i class="bi bi-search"></i> Cari
+                </button>
+                <?php if ($search): ?>
+                    <a href="data_investor" class="btn btn-premium-outline bg-white text-secondary d-flex align-items-center justify-content-center">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                <?php endif; ?>
+            </div>
         </form>
     </div>
 
@@ -218,49 +264,60 @@ if(isset($_GET['edit'])){
                         <th width="15%">Alamat</th>
                         <th width="11%">Rekening</th>
                         <th width="8%">Bank</th>
-                        <th width="12%">Atas Nama Rekening</th> <!-- BARU -->
-                       <th width="12%">Periode Investasi</th> <!-- BARU -->
+                        <th width="12%">Atas Nama Rekening</th>
+                        <th width="12%">Periode Investasi</th>
                         <th width="6%">Surat</th>
                         <th width="7%" class="text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if($investor->num_rows==0):?>
-                    <tr><td colspan="10" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i>Belum ada data investor</td></tr> <!-- colspan 10 -->
+                    <tr>
+                        <td colspan="10" class="text-center py-5 text-muted fw-semibold">
+                            <i class="bi bi-inbox fs-2 d-block mb-2"></i> Belum ada data investor
+                        </td>
+                    </tr>
                     <?php else: $no=$offset+1; while($d=$investor->fetch_assoc()):?>
                     <tr>
-                        <td class="text-center text-muted fw-semibold"><?= $no++?></td>
-                        <td><span class="fw-bold"><?= h($d['nama_investor'])?></span></td>
-                        <td class="text-secondary"><?= h($d['no_hp'])?></td>
-                        <td class="text-secondary"><?= substr(h($d['alamat']),0,30)?><?= strlen($d['alamat'])>30?'...':''?></td>
-                        <td class="font-monospace text-secondary" style="font-size: 13px;"><?= h($d['no_rekening'])?></td>
-                        <td><?php if($d['nama_bank']):?><span class="badge bg-light text-dark"><?= h($d['nama_bank'])?></span><?php endif;?></td>
-                        
-                        <td class="fw-semibold"><?= !empty($d['atas_nama_rekening']) ? h($d['atas_nama_rekening']) : '<span class="text-muted">-</span>' ?></td> <!-- BARU -->
-                        
-                        <td> <!-- BARU -->
+                        <td data-label="No" class="text-center text-muted fw-semibold"><?= $no++?></td>
+                        <td data-label="Nama Investor"><span class="fw-bold" style="color: #1b2559;"><?= h($d['nama_investor'])?></span></td>
+                        <td data-label="Telephone" class="text-secondary"><?= h($d['no_hp'])?></td>
+                        <td data-label="Alamat" class="text-secondary"><?= substr(h($d['alamat']),0,30)?><?= strlen($d['alamat'])>30?'...':''?></td>
+                        <td data-label="Rekening" class="font-monospace text-secondary" style="font-size: 13px;"><?= h($d['no_rekening'])?></td>
+                        <td data-label="Bank">
+                            <?php if($d['nama_bank']):?>
+                                <span class="badge bg-light text-dark px-2 py-1 border text-uppercase" style="font-size: 10px; letter-spacing: 0.5px;"><?= h($d['nama_bank'])?></span>
+                            <?php else: ?>
+                                <span class="text-muted">-</span>
+                            <?php endif;?>
+                        </td>
+                        <td data-label="Atas Nama Rekening" class="fw-semibold"><?= !empty($d['atas_nama_rekening']) ? h($d['atas_nama_rekening']) : '<span class="text-muted">-</span>' ?></td>
+                        <td data-label="Periode Investasi">
                             <small>
                                 <?= $d['tgl_mulai_investasi'] ? date('d M Y', strtotime($d['tgl_mulai_investasi'])) : '-' ?> 
                                 <i class="bi bi-arrow-right"></i> 
                                 <?= $d['tgl_selesai_investasi'] ? date('d M Y', strtotime($d['tgl_selesai_investasi'])) : '<span class="text-success fw-bold">Aktif</span>' ?>
                             </small>
                         </td>
-
-                        <td>
+                        <td data-label="Surat Perjanjian">
                             <?php if($d['surat_perjanjian']):?>
                                 <a href="../uploads/surat_perjanjian/<?= h($d['surat_perjanjian'])?>" target="_blank" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-pdf"></i> Lihat</a>
-                            <?php else:?>-<?php endif;?>
+                            <?php else:?><span class="text-muted">-</span><?php endif;?>
                         </td>
-                        <td class="text-center">
-                            <div class="d-inline-flex gap-2">
+                        <td data-label="Aksi" class="text-center">
+                            <div class="d-inline-flex gap-2 w-100 justify-content-end justify-content-md-center">
                                 <button class="btn btn-action-info" data-bs-toggle="modal" data-bs-target="#modalDetail<?= $d['id_investor']?>" title="Riwayat Cabang">
-                                    <i class="bi bi-eye"></i> Riwayat
+                                    <i class="bi bi-eye me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-eye"></i></span> Riwayat
                                 </button>
-                                <button class="btn btn-action-edit" data-bs-toggle="modal" data-bs-target="#modalInvestor" onclick="editInvestor(<?= $d['id_investor']?>, '<?= addslashes(h($d['nama_investor']))?>', '<?= addslashes(h($d['no_hp']))?>', '<?= addslashes(h($d['alamat']))?>', '<?= addslashes(h($d['no_rekening']))?>', '<?= addslashes(h($d['nama_bank']))?>', '<?= addslashes(h($d['atas_nama_rekening']))?>', '<?= $d['tgl_mulai_investasi']?>', '<?= $d['tgl_selesai_investasi']?>', '<?= h($d['surat_perjanjian'])?>')">Edit</button> <!-- BARU -->
+                                <button class="btn btn-action-edit" data-bs-toggle="modal" data-bs-target="#modalInvestor" onclick="editInvestor(<?= $d['id_investor']?>, '<?= addslashes(h($d['nama_investor']))?>', '<?= addslashes(h($d['no_hp']))?>', '<?= addslashes(h($d['alamat']))?>', '<?= addslashes(h($d['no_rekening']))?>', '<?= addslashes(h($d['nama_bank']))?>', '<?= addslashes(h($d['atas_nama_rekening']))?>', '<?= $d['tgl_mulai_investasi']?>', '<?= $d['tgl_selesai_investasi']?>', '<?= h($d['surat_perjanjian'])?>')" title="Edit">
+                                    <i class="bi bi-pencil-square me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-pencil-square"></i></span> Edit
+                                </button>
                                 <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus investor <?= addslashes(h($d['nama_investor']))?>?')">
                                     <input type="hidden" name="csrf" value="<?=csrf_token()?>">
                                     <input type="hidden" name="id_investor" value="<?= $d['id_investor']?>">
-                                    <button type="submit" name="hapus" class="btn btn-action-delete">Hapus</button>
+                                    <button type="submit" name="hapus" class="btn btn-action-delete" title="Hapus">
+                                        <i class="bi bi-trash-fill me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-trash-fill"></i></span> Hapus
+                                    </button>
                                 </form>
                             </div>
                         </td>
@@ -272,14 +329,14 @@ if(isset($_GET['edit'])){
 
         <!-- PAGINATION BARU -->
         <?php if($total_pages > 1): ?>
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center p-4 border-top">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center p-3 border-top">
             <div class="text-muted small mb-3 mb-md-0">
                 Menampilkan <?= $offset + 1?> - <?= min($offset + $limit, $total_data)?> dari <?= $total_data?> data
             </div>
             <nav>
-                <ul class="pagination pagination-sm mb-0" style="--bs-pagination-border-radius: 10px;">
+                <ul class="pagination pagination-sm mb-0">
                     <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=<?= $page-1 ?>&search=<?= urlencode($search)?>" style="border-radius: 10px 0 0 10px;">
+                        <a class="page-link" href="?page=<?= $page-1 ?>&search=<?= urlencode($search)?>">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     </li>
@@ -306,7 +363,7 @@ if(isset($_GET['edit'])){
                     }
                     ?>
                     <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=<?= $page+1 ?>&search=<?= urlencode($search)?>" style="border-radius: 0 10px 10px 0;">
+                        <a class="page-link" href="?page=<?= $page+1 ?>&search=<?= urlencode($search)?>">
                             <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>
@@ -334,7 +391,7 @@ if(isset($_GET['edit'])){
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <h5 class="modal-title fw-bold">Riwayat Investasi: <?= h($d['nama_investor'])?></h5>
+                        <h5 class="modal-title fw-bold" style="color: #1b2559;">Riwayat Investasi: <?= h($d['nama_investor'])?></h5>
                         <small class="text-muted">Daftar cabang yang pernah/sedang diinvestasikan</small>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -368,7 +425,7 @@ if(isset($_GET['edit'])){
                     <div class="text-center py-4 text-muted"><i class="bi bi-building-x fs-2 d-block mb-2"></i>Investor ini belum memiliki riwayat cabang</div>
                     <?php endif; $stmt->close();?>
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-premium-outline" data-bs-dismiss="modal">Tutup</button></div>
+                <div class="modal-footer"><button type="button" class="btn btn-premium-outline text-secondary" data-bs-dismiss="modal">Tutup</button></div>
             </div>
         </div>
     </div>
@@ -377,46 +434,73 @@ if(isset($_GET['edit'])){
 
 <!-- Modal Tambah/Edit Investor -->
 <div class="modal fade modal-premium" id="modalInvestor" tabindex="-1">
-<div class="modal-dialog modal-dialog-centered modal-lg">
-<form method="POST" enctype="multipart/form-data">
-<input type="hidden" name="csrf" value="<?=csrf_token()?>">
-<div class="modal-content">
-    <div class="modal-header">
-        <h5 class="modal-title fw-bold" id="modalTitle"><?= $edit? 'Modifikasi Data Investor' : 'Registrasi Investor Baru'?></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf" value="<?=csrf_token()?>">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="modalTitle" style="color: #1b2559;"><?= $edit? 'Modifikasi Data Investor' : 'Registrasi Investor Baru'?></h5>
+                        <small class="text-muted">Kelola kredensial dan informasi profil investor</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id_investor" id="id_investor" value="<?= $edit['id_investor']?? ''?>">
+                    <input type="hidden" name="file_lama" id="file_lama" value="<?= $edit['surat_perjanjian']?? ''?>">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Nama Investor</label>
+                            <input type="text" name="nama_investor" id="nama_investor" class="form-control form-control-premium" value="<?= h($edit['nama_investor']?? '')?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Telephone</label>
+                            <input type="text" name="no_hp" id="no_hp" class="form-control form-control-premium" value="<?= h($edit['no_hp']?? '')?>">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label small fw-bold text-muted mb-1">Alamat</label>
+                        <textarea name="alamat" id="alamat" class="form-control form-control-premium" rows="2"><?= h($edit['alamat']?? '')?></textarea>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Rekening</label>
+                            <input type="text" name="no_rekening" id="no_rekening" class="form-control form-control-premium" value="<?= h($edit['no_rekening']?? '')?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Bank</label>
+                            <input type="text" name="nama_bank" id="nama_bank" class="form-control form-control-premium" value="<?= h($edit['nama_bank']?? '')?>">
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-12">
+                            <label class="form-label small fw-bold text-muted mb-1">Atas Nama Rekening</label>
+                            <input type="text" name="atas_nama_rekening" id="atas_nama_rekening" class="form-control form-control-premium" value="<?= h($edit['atas_nama_rekening']?? '')?>" placeholder="PT. BUMI BAHARI SEJAHTERA">
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Tgl Mulai Investasi</label>
+                            <input type="date" name="tgl_mulai_investasi" id="tgl_mulai_investasi" class="form-control form-control-premium" value="<?= h($edit['tgl_mulai_investasi']?? '')?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Tgl Selesai Investasi</label>
+                            <input type="date" name="tgl_selesai_investasi" id="tgl_selesai_investasi" class="form-control form-control-premium" value="<?= h($edit['tgl_selesai_investasi']?? '')?>">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label small fw-bold text-muted mb-1">Surat Perjanjian</label>
+                        <input type="file" name="surat_perjanjian" class="form-control form-control-premium" accept=".pdf,.jpg,.jpeg,.png">
+                        <small class="text-muted" id="file_info"><?= $edit && $edit['surat_perjanjian'] ? 'File saat ini: '.h($edit['surat_perjanjian']) : ''?></small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-premium-outline text-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" name="simpan" class="btn btn-premium">Simpan Data</button>
+                </div>
+            </div>
+        </form>
     </div>
-    <div class="modal-body">
-        <input type="hidden" name="id_investor" id="id_investor" value="<?= $edit['id_investor']?? ''?>">
-        <input type="hidden" name="file_lama" id="file_lama" value="<?= $edit['surat_perjanjian']?? ''?>">
-        <div class="row g-3">
-            <div class="col-md-6"><label class="form-label">Nama Investor</label><input type="text" name="nama_investor" id="nama_investor" class="form-control form-control-premium" value="<?= h($edit['nama_investor']?? '')?>" required></div>
-            <div class="col-md-6"><label class="form-label">Telephone</label><input type="text" name="no_hp" id="no_hp" class="form-control form-control-premium" value="<?= h($edit['no_hp']?? '')?>"></div>
-        </div>
-        <div class="mt-3"><label class="form-label">Alamat</label><textarea name="alamat" id="alamat" class="form-control form-control-premium" rows="2"><?= h($edit['alamat']?? '')?></textarea></div>
-        <div class="row g-3 mt-1">
-            <div class="col-md-6"><label class="form-label">Rekening</label><input type="text" name="no_rekening" id="no_rekening" class="form-control form-control-premium" value="<?= h($edit['no_rekening']?? '')?>"></div>
-            <div class="col-md-6"><label class="form-label">Bank</label><input type="text" name="nama_bank" id="nama_bank" class="form-control form-control-premium" value="<?= h($edit['nama_bank']?? '')?>"></div>
-        </div>
-        <div class="row g-3 mt-1"> <!-- BARU -->
-            <div class="col-md-12"><label class="form-label">Atas Nama Rekening</label><input type="text" name="atas_nama_rekening" id="atas_nama_rekening" class="form-control form-control-premium" value="<?= h($edit['atas_nama_rekening']?? '')?>" placeholder="PT. BUMI BAHARI SEJAHTERA"></div>
-        </div>
-        <div class="row g-3 mt-1"> <!-- BARU -->
-            <div class="col-md-6"><label class="form-label">Tgl Mulai Investasi</label><input type="date" name="tgl_mulai_investasi" id="tgl_mulai_investasi" class="form-control form-control-premium" value="<?= h($edit['tgl_mulai_investasi']?? '')?>"></div>
-            <div class="col-md-6"><label class="form-label">Tgl Selesai Investasi</label><input type="date" name="tgl_selesai_investasi" id="tgl_selesai_investasi" class="form-control form-control-premium" value="<?= h($edit['tgl_selesai_investasi']?? '')?>"></div>
-        </div>
-        <div class="mt-3">
-            <label class="form-label">Surat Perjanjian</label>
-            <input type="file" name="surat_perjanjian" class="form-control form-control-premium" accept=".pdf,.jpg,.jpeg,.png">
-            <small class="text-muted" id="file_info"><?= $edit && $edit['surat_perjanjian'] ? 'File saat ini: '.h($edit['surat_perjanjian']) : ''?></small>
-        </div>
-    </div>
-    <div class="modal-footer">
-        <button type="button" class="btn btn-premium-outline" data-bs-dismiss="modal">Batal</button>
-        <button type="submit" name="simpan" class="btn btn-premium">Simpan Data</button>
-    </div>
-</div>
-</form>
-</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -429,13 +513,13 @@ function resetForm(){
     document.getElementById('alamat').value = '';
     document.getElementById('no_rekening').value = '';
     document.getElementById('nama_bank').value = '';
-    document.getElementById('atas_nama_rekening').value = ''; // BARU
-    document.getElementById('tgl_mulai_investasi').value = ''; // BARU
-    document.getElementById('tgl_selesai_investasi').value = ''; // BARU
+    document.getElementById('atas_nama_rekening').value = '';
+    document.getElementById('tgl_mulai_investasi').value = '';
+    document.getElementById('tgl_selesai_investasi').value = '';
     document.getElementById('modalTitle').innerText = 'Registrasi Investor Baru';
     document.getElementById('file_info').innerText = '';
 }
-function editInvestor(id, nama, hp, alamat, no_rek, bank, atas_nama, tgl_mulai, tgl_selesai, file){ // BARU
+function editInvestor(id, nama, hp, alamat, no_rek, bank, atas_nama, tgl_mulai, tgl_selesai, file){
     document.getElementById('id_investor').value = id;
     document.getElementById('file_lama').value = file;
     document.getElementById('nama_investor').value = nama;
@@ -443,9 +527,9 @@ function editInvestor(id, nama, hp, alamat, no_rek, bank, atas_nama, tgl_mulai, 
     document.getElementById('alamat').value = alamat;
     document.getElementById('no_rekening').value = no_rek;
     document.getElementById('nama_bank').value = bank;
-    document.getElementById('atas_nama_rekening').value = atas_nama; // BARU
-    document.getElementById('tgl_mulai_investasi').value = tgl_mulai; // BARU
-    document.getElementById('tgl_selesai_investasi').value = tgl_selesai; // BARU
+    document.getElementById('atas_nama_rekening').value = atas_nama;
+    document.getElementById('tgl_mulai_investasi').value = tgl_mulai;
+    document.getElementById('tgl_selesai_investasi').value = tgl_selesai;
     document.getElementById('modalTitle').innerText = 'Modifikasi Data Investor';
     document.getElementById('file_info').innerText = file? 'File saat ini: ' + file : '';
 }

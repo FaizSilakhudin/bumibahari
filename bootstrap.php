@@ -6,4 +6,4 @@ use Core\Database;
 
 Database::boot();
 
-echo "Database berhasil terhubung!";
+echo "";

@@ -77,24 +77,46 @@ if(isset($_POST['simpan'])){
     $net = $total_omset - $total_pengeluaran;
     $persen = $total_omset > 0? round(($net / $total_omset) * 100, 2) : 0;
 
-    // 4. UPLOAD AMAN: Validasi tipe, ukuran, rename
-    $foto = [];
-    $upload_dir = "../uploads/nota/";
-    if(!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-    for($i=1; $i<=4; $i++){
-        $foto[$i] = ''; // kosongkan kalau gak upload
-        if(!empty($_FILES["foto_nota$i"]['name'])){
-            $cek = getimagesize($_FILES["foto_nota$i"]["tmp_name"]);
-            if($cek!== false && $_FILES["foto_nota$i"]["size"] < 2000000){ // max 2MB
-                $ext = strtolower(pathinfo($_FILES["foto_nota$i"]['name'], PATHINFO_EXTENSION));
-                if(in_array($ext, ['jpg','jpeg','png'])){
-                    $nama_file = uniqid()."_$i.".$ext; // rename biar aman
-                    move_uploaded_file($_FILES["foto_nota$i"]['tmp_name'], $upload_dir.$nama_file);
-                    $foto[$i] = $nama_file;
+    /// 4. UPLOAD AMAN: Validasi tipe, ukuran, rename + cek error
+$foto = ['','','','']; // default kosong
+$upload_dir = "../uploads/nota/";
+
+// Buat folder kalau belum ada
+if(!is_dir($upload_dir)) {
+    mkdir($upload_dir, 0755, true);
+}
+
+for($i=1; $i<=4; $i++){
+    if(isset($_FILES["foto_nota$i"]) && $_FILES["foto_nota$i"]['error'] == 0){
+
+        $tmp_name = $_FILES["foto_nota$i"]["tmp_name"];
+        $file_name = $_FILES["foto_nota$i"]['name'];
+        $file_size = $_FILES["foto_nota$i"]["size"];
+
+        // 1. Cek apakah benar gambar
+        $cek = getimagesize($tmp_name);
+        $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+
+        if($cek!== false && in_array($ext, ['jpg','jpeg','png'])){
+
+            // 2. Cek ukuran max 2MB
+            if($file_size < 2000000){
+                // 3. Rename biar aman + ada tanggal + id cabang
+                $nama_file = date('Ymd')."_".$id_cabang."_".uniqid()."_$i.".$ext;
+
+                if(move_uploaded_file($tmp_name, $upload_dir.$nama_file)){
+                    $foto[$i-1] = $nama_file; // index 0-3
+                } else {
+                    echo "<script>alert('Gagal upload foto nota $i');</script>";
                 }
+            } else {
+                echo "<script>alert('Foto nota $i terlalu besar. Max 2MB');</script>";
             }
+        } else {
+            echo "<script>alert('Format foto nota $i salah. Harus JPG/PNG');</script>";
         }
     }
+}
 
     // 5. UPSERT: INSERT BARU ATAU UPDATE KALAU TANGGAL+CABANG SAMA
     // PERBAIKAN: Tanda tanya (?) Disesuaikan menjadi persis 35 pasang dengan nama kolom
@@ -117,13 +139,13 @@ if(isset($_POST['simpan'])){
     // PERBAIKAN: Format data bind_param disesuaikan persis dengan 35 parameter
     // Type string: i (1) + s (2) + d (27) + s (5) = total 35 parameter
     $stmt->bind_param("issdddddddddddddddddddddddddddsssss",
-        $id_cabang, $nama_pengelola, $tgl,
-        $tunai, $qris, $grab, $go, $total_omset,
-        $pasar, $sembako, $beras, $toko, $total_rutin,
-        $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $gas, $mingguan_karyawan, $es_batu, $bensin, $lain, $total_op,
-        $total_pengeluaran, $sisa, $net, $persen,
-        $ket, $foto[1], $foto[2], $foto[3], $foto[4]
-    );
+    $id_cabang, $nama_pengelola, $tgl,
+    $tunai, $qris, $grab, $go, $total_omset,
+    $pasar, $sembako, $beras, $toko, $total_rutin,
+    $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $gas, $mingguan_karyawan, $es_batu, $bensin, $lain, $total_op,
+    $total_pengeluaran, $sisa, $net, $persen,
+    $ket, $foto[1], $foto[2], $foto[3], $foto[4] // INI YANG DIGANTI
+);
 
     if($stmt->execute()){
         echo "<script>alert('Data berhasil disimpan!'); window.location='input_data.php';</script>";

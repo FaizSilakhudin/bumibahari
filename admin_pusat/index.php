@@ -663,11 +663,218 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
 </body>
 </html>
 
+<!-- Impor Font Modern & Icon (Bisa diletakkan di <head> utama Anda) -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+<style>
+  :root {
+    --primary-color: #4318ff;
+    --primary-hover: #3311db;
+    --bg-body: #f8fafc;
+    --text-dark: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-body);
+    color: var(--text-dark);
+  }
+
+  /* Card Base Styling */
+  .saas-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s ease-in-out;
+  }
+
+  /* KPI Card Custom */
+  .kpi-premium-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.03);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .kpi-premium-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0px 10px 25px rgba(0, 0, 0, 0.06);
+  }
+  .kpi-meta {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .kpi-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-dark);
+    margin-top: 6px;
+    margin-bottom: 2px;
+  }
+  .kpi-subvalue {
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+  .kpi-badge-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--badge-bg);
+    color: var(--badge-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  /* Custom Badges */
+  .badge-modern-success {
+    background: #ecfdf5;
+    color: #10b981;
+    border: 1px solid #a7f3d0;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+  }
+  .badge-modern-danger {
+    background: #fef2f2;
+    color: #ef4444;
+    border: 1px solid #fecaca;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+  }
+  .badge-modern-warning {
+    background: #fffbeb;
+    color: #f59e0b;
+    border: 1px solid #fde68a;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Filter Select */
+  .form-select-filter {
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+    background-color: #fff;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.02);
+  }
+  .form-select-filter:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.15);
+  }
+
+  /* Rank Box */
+  .rank-box {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #e0e7ff;
+    color: var(--primary-color);
+    font-weight: 700;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Table Custom */
+  .table-saas-container {
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .table-saas {
+    margin-bottom: 0;
+  }
+  .table-saas thead th {
+    background: #f8fafc;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .table-saas tbody td {
+    padding: 16px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 14px;
+  }
+
+  /* Responsive Mobile Table Styles */
+  @media (max-width: 767.98px) {
+    .table-saas thead {
+      display: none;
+    }
+    .table-saas, .table-saas tbody, .table-saas tr, .table-saas td {
+      display: block;
+      width: 100%;
+    }
+    .table-saas tr {
+      margin-bottom: 12px;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 8px 12px;
+    }
+    .table-saas td {
+      text-align: right;
+      padding: 8px 10px;
+      position: relative;
+      border-bottom: 1px solid #f8fafc;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-saas td:last-child {
+      border-bottom: none;
+    }
+    .table-saas td::before {
+      content: attr(data-label);
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      text-align: left;
+    }
+    .kpi-value {
+      font-size: 20px;
+    }
+  }
+</style>
+
 <div class="container-fluid py-4 px-3 px-md-4">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
         <div>
-            <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 10px; letter-spacing: 1px; color:#94a3b8!important;">Main Administration</span>
-            <h3 class="fw-bold mb-0 mt-1" style="color: #0f172a!important; font-size: 24px; letter-spacing: -0.5px;">
+            <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 11px; letter-spacing: 1px; color:#94a3b8!important;">RINGKASAN BISNIS</span>
+            <h3 class="fw-extrabold mb-0 mt-1" style="color: #0f172a!important; font-size: 24px; letter-spacing: -0.5px; font-weight: 800;">
                 Dashboard Pusat <?= $nama_filter? "<span style='color: #4318ff;'>• ".h($nama_filter)."</span>" : ""?>
             </h3>
         </div>
@@ -683,17 +890,18 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                     <?php endforeach;?>
                 </select>
                 <?php if($filter_investor):?>
-                <a href="index" class="btn btn-light" style="border-radius: 12px; padding: 10px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter">
+                <a href="index" class="btn btn-light d-flex align-items-center justify-content-center" style="border-radius: 12px; padding: 9px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter">
                     <i class="bi bi-x-lg text-danger"></i>
                 </a>
                 <?php endif;?>
             </form>
-            <div class="bg-white px-3 py-2 rounded-3 border d-flex align-items-center justify-content-center" style="border-radius: 12px!important; font-weight: 600; color: #475569!important; font-size: 14px; border-color: #e2e8f0!important;">
+            <div class="bg-white px-3 py-2 rounded-3 border d-flex align-items-center justify-content-center shadow-sm" style="border-radius: 12px!important; font-weight: 600; color: #475569!important; font-size: 14px; border-color: #e2e8f0!important;">
                 <i class="bi bi-calendar4-event me-2 text-primary" style="color: #4318ff!important;"></i><?= date('F Y')?>
             </div>
         </div>
     </div>
 
+    <!-- ROW KPI CARDS -->
     <div class="row g-3 mb-4">
         <div class="col-lg-3 col-md-6 col-12">
             <div class="kpi-premium-card" style="--kpi-glow: #4318ff; border-top: 3px solid #4318ff;">
@@ -703,16 +911,16 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                         <h4 class="kpi-value">Rp <?= number_format($kpi['omzet']?? 0,0,',','.')?></h4>
                         <span class="kpi-subvalue">Hari ini: <span class="fw-semibold text-dark">Rp <?= number_format($kpi_hari_ini['omzet']?? 0,0,',','.')?></span></span>
                     </div>
-                    <div class="kpi-badge-icon" style="--badge-bg: rgba(67, 24, 255, 0.06); --badge-color: #4318ff;">
-                        <i class="bi bi-graph-up"></i>
+                    <div class="kpi-badge-icon" style="--badge-bg: rgba(67, 24, 255, 0.08); --badge-color: #4318ff;">
+                        <i class="bi bi-graph-up-arrow"></i>
                     </div>
                 </div>
-                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9!important;">
+                <div class="pt-3 mt-2 border-top d-flex align-items-center justify-content-between" style="border-color: #f1f5f9!important;">
                     <span class="<?= $naik_turun >= 0? 'badge-modern-success' : 'badge-modern-danger'?>">
-                        <i class="bi bi-<?= $naik_turun >= 0? 'arrow-up-short' : 'arrow-down-short'?> fs-6"></i> 
+                        <i class="bi bi-<?= $naik_turun >= 0? 'arrow-up-short' : 'arrow-down-short'?> fs-6 me-1"></i> 
                         <?= number_format(abs($naik_turun),1)?>%
                     </span>
-                    <span class="text-muted small ms-1" style="font-size: 12px;">vs bulan lalu</span>
+                    <span class="text-muted small" style="font-size: 12px;">vs bulan lalu</span>
                 </div>
             </div>
         </div>
@@ -725,11 +933,11 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                         <h4 class="kpi-value">Rp <?= number_format($kpi['laba']?? 0,0,',','.')?></h4>
                         <span class="kpi-subvalue">Hari ini: <span class="fw-semibold text-dark">Rp <?= number_format($kpi_hari_ini['laba']?? 0,0,',','.')?></span></span>
                     </div>
-                    <div class="kpi-badge-icon" style="--badge-bg: rgba(14, 165, 233, 0.06); --badge-color: #0ea5e9;">
+                    <div class="kpi-badge-icon" style="--badge-bg: rgba(14, 165, 233, 0.08); --badge-color: #0ea5e9;">
                         <i class="bi bi-wallet2"></i>
                     </div>
                 </div>
-                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9!important;">
+                <div class="pt-3 mt-2 border-top" style="border-color: #f1f5f9!important;">
                     <span class="badge-modern-success" style="background-color: #f0f9ff; color: #0ea5e9; border-color: #e0f2fe;">
                         <i class="bi bi-pie-chart-fill me-1"></i> Margin <?= number_format($kpi['margin']?? 0,2)?>%
                     </span>
@@ -744,11 +952,11 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                         <span class="kpi-meta">Cabang Aktif</span>
                         <h4 class="kpi-value"><?= $cabang_aktif?> <span style="font-size: 14px; color:#94a3b8; font-weight: 500;">/ <?= $total_cabang?> Unit</span></h4>
                     </div>
-                    <div class="kpi-badge-icon" style="--badge-bg: rgba(16, 185, 129, 0.06); --badge-color: #10b981;">
+                    <div class="kpi-badge-icon" style="--badge-bg: rgba(16, 185, 129, 0.08); --badge-color: #10b981;">
                         <i class="bi bi-building-check"></i>
                     </div>
                 </div>
-                <div class="pt-2">
+                <div class="pt-3 mt-2">
                     <div class="progress" style="height: 6px; border-radius: 10px; background-color: #f1f5f9;">
                         <div class="progress-bar" style="width:<?= $total_cabang>0? ($cabang_aktif/$total_cabang)*100 : 0?>%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 10px;"></div>
                     </div>
@@ -763,33 +971,37 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                         <span class="kpi-meta">Admin Fee (3%)</span>
                         <h4 class="kpi-value" style="color: #0f172a;">Rp <?= number_format($admin_fee,0,',','.')?></h4>
                     </div>
-                    <div class="kpi-badge-icon" style="--badge-bg: rgba(245, 158, 11, 0.06); --badge-color: #f59e0b;">
+                    <div class="kpi-badge-icon" style="--badge-bg: rgba(245, 158, 11, 0.08); --badge-color: #f59e0b;">
                         <i class="bi bi-shield-check"></i>
                     </div>
                 </div>
-                <div class="pt-2 mt-2 border-top" style="border-color: #f1f5f9!important; font-size: 12px; color: #64748b; font-weight: 500;">
+                <div class="pt-3 mt-2 border-top" style="border-color: #f1f5f9!important; font-size: 12px; color: #64748b; font-weight: 500;">
                     <i class="bi bi-info-circle me-1 text-warning"></i> Estimasi bagi hasil pusat
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- ROW GRAFIK & TOP 5 -->
     <div class="row g-3 mb-4">
         <div class="col-lg-8 col-12">
-            <div class="card saas-card h-100">
-                <div class="d-flex align-items-center mb-4">
-                    <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 15px;">Trend Performa 6 Bulan Terakhir</h6>
+            <div class="saas-card h-100">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div>
+                        <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">Trend Performa 6 Bulan Terakhir</h6>
+                        <span class="text-muted small">Perbandingan Grafik Omzet vs Laba</span>
+                    </div>
                 </div>
-                <div style="position: relative; height: 280px; width: 100%;">
+                <div style="position: relative; height: 300px; width: 100%;">
                     <canvas id="grafikTrend"></canvas>
                 </div>
             </div>
         </div>
 
         <div class="col-lg-4 col-12">
-            <div class="card saas-card h-100">
+            <div class="saas-card h-100">
                 <div class="d-flex align-items-center mb-4">
-                    <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 15px;">Top 5 Cabang Terlaris</h6>
+                    <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">Top 5 Cabang Terlaris</h6>
                 </div>
                 <div class="d-flex flex-column gap-2">
                     <?php $no=1; while($t=$top_cabang->fetch_assoc()):?>
@@ -812,13 +1024,14 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
         </div>
     </div>
 
-    <div class="card saas-card p-0 overflow-hidden mb-4" style="border: 1px solid #e2e8f0!important;">
-        <div class="px-4 pt-4 pb-3">
-            <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 15px;">🚨 Peringatan Dini Operasional</h6>
+    <!-- TABEL PERINGATAN -->
+    <div class="saas-card p-0 overflow-hidden mb-4">
+        <div class="px-4 pt-4 pb-3 border-bottom" style="border-color: #f1f5f9!important;">
+            <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">🚨 Peringatan Dini Operasional</h6>
             <p class="text-muted small mb-0 mt-1">Daftar cabang terdeteksi yang belum mengirimkan data transaksi hari ini.</p>
         </div>
 
-        <div class="px-4 pb-4">
+        <div class="px-md-4 px-3 pb-4 pt-3">
             <div class="table-saas-container">
                 <table class="table table-saas align-middle">
                     <thead>
@@ -843,11 +1056,11 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                             $hari_telat = $p['selisih_hari']?? 0;
                             
                             if ($hari_telat == 0 || $p['input_terakhir'] == NULL) {
-                                $status_badge = '<span class="badge-modern-danger"><i class="bi bi-exclamation-circle-fill"></i> Terlambat</span>';
+                                $status_badge = '<span class="badge-modern-danger"><i class="bi bi-exclamation-circle-fill me-1"></i> Terlambat</span>';
                                 $masalah_text = '<span class="text-danger fw-semibold">Belum mengirim laporan hari ini</span>';
                                 $txt_terakhir = '<span class="badge bg-light text-secondary border fw-bold" style="font-size:11px; padding:4px 8px; border-radius:6px;">Belum Pernah</span>';
                             } else {
-                                $status_badge = '<span class="badge-modern-warning"><i class="bi bi-clock-history"></i> Peringatan</span>';
+                                $status_badge = '<span class="badge-modern-warning"><i class="bi bi-clock-history me-1"></i> Peringatan</span>';
                                 $masalah_text = '<span class="fw-semibold" style="color: #d97706;">Menunggak laporan selama ' . $hari_telat . ' hari</span>';
                                 $txt_terakhir = '<span class="fw-semibold text-secondary">' . date('d M Y', strtotime($p['input_terakhir'])) . '</span>';
                             }
@@ -908,12 +1121,12 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
 <script>
 const ctx = document.getElementById('grafikTrend').getContext('2d');
 
-const gradOmzet = ctx.createLinearGradient(0, 0, 0, 250);
-gradOmzet.addColorStop(0, 'rgba(67, 24, 255, 0.12)');
+const gradOmzet = ctx.createLinearGradient(0, 0, 0, 280);
+gradOmzet.addColorStop(0, 'rgba(67, 24, 255, 0.15)');
 gradOmzet.addColorStop(1, 'rgba(67, 24, 255, 0.0)');
 
-const gradLaba = ctx.createLinearGradient(0, 0, 0, 250);
-gradLaba.addColorStop(0, 'rgba(14, 165, 233, 0.12)');
+const gradLaba = ctx.createLinearGradient(0, 0, 0, 280);
+gradLaba.addColorStop(0, 'rgba(14, 165, 233, 0.15)');
 gradLaba.addColorStop(1, 'rgba(14, 165, 233, 0.0)');
 
 new Chart(ctx, {
@@ -925,11 +1138,11 @@ new Chart(ctx, {
             data: <?= json_encode($data_omzet)?>,
             borderColor: '#4318ff',
             backgroundColor: gradOmzet,
-            borderWidth: 2.5,
-            tension: 0.3,
+            borderWidth: 3,
+            tension: 0.4,
             fill: true,
-            pointRadius: 0,
-            pointHoverRadius: 5,
+            pointRadius: 2,
+            pointHoverRadius: 6,
             pointHoverBackgroundColor: '#4318ff',
             pointHoverBorderColor: '#fff',
             pointHoverBorderWidth: 2
@@ -938,11 +1151,11 @@ new Chart(ctx, {
             data: <?= json_encode($data_laba)?>,
             borderColor: '#0ea5e9',
             backgroundColor: gradLaba,
-            borderWidth: 2.5,
-            tension: 0.3,
+            borderWidth: 3,
+            tension: 0.4,
             fill: true,
-            pointRadius: 0,
-            pointHoverRadius: 5,
+            pointRadius: 2,
+            pointHoverRadius: 6,
             pointHoverBackgroundColor: '#0ea5e9',
             pointHoverBorderColor: '#fff',
             pointHoverBorderWidth: 2
@@ -960,8 +1173,8 @@ new Chart(ctx, {
                 position: 'top',
                 align: 'end',
                 labels: {
-                    boxWidth: 6,
-                    boxHeight: 6,
+                    boxWidth: 8,
+                    boxHeight: 8,
                     usePointStyle: true,
                     font: { family: 'Plus Jakarta Sans', weight: '600', size: 12 },
                     padding: 15
@@ -980,7 +1193,7 @@ new Chart(ctx, {
                         if (label) {
                             label += ': ';
                         }
-                        if (context.parsed.y!== null) {
+                        if (context.parsed.y !== null) {
                             label += 'Rp ' + context.parsed.y.toLocaleString('id-ID');
                         }
                         return label;
