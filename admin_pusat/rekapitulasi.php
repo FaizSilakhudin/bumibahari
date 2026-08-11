@@ -136,22 +136,82 @@ $bo_db = [
 // Revenue sharing
 $persen_investor = 50;
 $persen_pengelola = 50;
-$persen_admin = 3; // 3% dari bagian pengelola
+$persen_admin = 3; // Admin Fee Pusat: 3% dari Net Profit keseluruhan
 
-$share_investor  = $laba_bersih * $persen_investor / 100;
-$share_pengelola = $laba_bersih * $persen_pengelola / 100;
-$share_admin     = $share_pengelola * $persen_admin / 100;
 
-// Pengelola bersih setelah kena admin
-$share_pengelola_bersih = $share_pengelola - $share_admin;
+// =====================================================
+// TAHAP 1
+// POTONG ADMIN FEE PUSAT DARI NET PROFIT KESELURUHAN
+// =====================================================
+
+$share_admin = $laba_bersih * $persen_admin / 100;
+
+
+// Laba setelah dipotong Admin Fee Pusat
+$laba_setelah_admin = $laba_bersih - $share_admin;
+
+
+// =====================================================
+// TAHAP 2
+// BAGI 50% INVESTOR : 50% PENGELOLA
+// =====================================================
+
+$share_investor =
+    $laba_setelah_admin * $persen_investor / 100;
+
+$share_pengelola =
+    $laba_setelah_admin * $persen_pengelola / 100;
+
+
+// =====================================================
+// TAHAP 3
+// POTONGAN TAMBAHAN PENGELOLA
+// DEFAULT 3%
+// =====================================================
+
+$persen_admin_pengelola = 3;
+
+$share_admin_pengelola =
+    $share_pengelola * $persen_admin_pengelola / 100;
+
+
+// Pengelola bersih setelah potongan tambahan
+$share_pengelola_bersih =
+    $share_pengelola - $share_admin_pengelola;
+
 
 // Data pengelola aman
-$pengelola = ['nama_pengelola' => '-', 'no_rekening' => '-', 'nama_bank' => '-', 'atas_nama_rekening' => '-'];
+$pengelola = [
+    'nama_pengelola' => '-',
+    'no_rekening' => '-',
+    'nama_bank' => '-',
+    'atas_nama_rekening' => '-'
+];
+
 if ($id_cabang != '') {
-    $stmt = $conn->prepare("SELECT nama_pengelola, no_rekening, nama_bank, atas_nama_rekening FROM users WHERE id_cabang=? AND role='cabang' LIMIT 1");
-    $stmt->bind_param("i", $id_cabang);
+
+    $stmt = $conn->prepare("
+        SELECT
+            nama_pengelola,
+            no_rekening,
+            nama_bank,
+            atas_nama_rekening
+        FROM users
+        WHERE id_cabang=?
+        AND role='cabang'
+        LIMIT 1
+    ");
+
+    $stmt->bind_param(
+        "i",
+        $id_cabang
+    );
+
     $stmt->execute();
-    $pengelola = $stmt->get_result()->fetch_assoc() ?? $pengelola;
+
+    $pengelola =
+        $stmt->get_result()->fetch_assoc()
+        ?? $pengelola;
 }
 
 // Format nama file export
@@ -408,7 +468,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                                 <th class="text-end">Toko</th>
                                 <th class="text-end">Sewa Ruko</th> <!-- NAMA DIUBAH -->
                                 <th class="text-end">Gaji Karyawan</th> <!-- NAMA DIUBAH -->
-                                <th class="text-end">Lain-lain</th> <!-- GABUNG SEMUA -->
+                                <th class="text-end">Total Pencairan QRIS</th>
                                 <th></th>
                                 <th></th>
                                 <th></th>
@@ -683,136 +743,564 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                 </div>
 
                 <!-- 5. Revenue Sharing Reference -->
-                <div class="col-lg-6">
-                    <div class="card border-0 h-100" style="overflow: hidden;">
-                        <div class="card-header bg-light border-bottom py-3">
-                            <span class="fw-bold text-dark"><i class="bi bi-share me-2 text-muted"></i>5. Kontrak Pembagian Hasil (Revenue Sharing)</span>
-                        </div>
-                        <div class="card-body p-0">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead>
-                                    <tr class="table-light">
-                                        <th class="px-3">Entitas Mitra</th>
-                                        <th class="text-center" width="20%">Porsi Rasio</th>
-                                        <th class="text-end px-3" width="35%">Nilai Estimasi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="px-3 fw-medium text-dark"><i class="bi bi-person text-primary me-2"></i>Investor Utama</td>
-                                        <td class="text-center"><span class="badge bg-primary-subtle text-primary px-2.5 py-1.5 fw-bold" style="font-size: 0.8rem;"><?= $persen_investor ?>%</span></td>
-                                        <td class="text-end fw-bold text-primary px-3">Rp <?= number_format($share_investor, 0, ',', '.') ?></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-3 fw-medium text-dark"><i class="bi bi-person-gear text-success me-2"></i>Pengelola Lapangan</td>
-                                        <td class="text-center"><span class="badge bg-success-subtle text-success px-2.5 py-1.5 fw-bold" style="font-size: 0.8rem;"><?= $persen_pengelola ?>%</span></td>
-                                        <td class="text-end fw-bold text-success px-3" id="pgl_share_kotor">Rp <?= number_format($share_pengelola, 0, ',', '.') ?></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-3 fw-medium text-dark"><i class="bi bi-shield-check text-danger me-2"></i>Management Pusat</td>
-                                        <td class="text-center"><span class="badge bg-danger-subtle text-danger px-2.5 py-1.5 fw-bold" style="font-size: 0.8rem;"><?= $persen_admin ?>%</span></td>
-                                        <td class="text-end fw-bold text-danger px-3">Rp <?= number_format($share_admin, 0, ',', '.') ?></td>
-                                    </tr>
-                                    <tr class="table-success">
-                                        <td class="px-3 fw-bold text-dark">Pengelola Bersih</td>
-                                        <td class="text-center"><span class="badge bg-dark-subtle text-dark px-2.5 py-1.5 fw-bold" style="font-size: 0.8rem;">47%</span></td>
-                                        <td class="text-end fw-bold text-dark px-3" id="pgl_share_bersih">Rp <?= number_format($share_pengelola_bersih, 0, ',', '.') ?></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <div class="p-3 bg-light text-muted border-top" style="font-size: 0.8rem; line-height: 1.4;">
-                                <i class="bi bi-info-circle me-1 text-primary"></i> Admin Fee 3% dipotong dari bagian Pengelola. Investor tetap 50%.
-                            </div>
-                        </div>
-                    </div>
+<div class="col-lg-6">
+    <div class="card border-0 h-100" style="overflow: hidden;">
+
+        <div class="card-header bg-light border-bottom py-3">
+            <span class="fw-bold text-dark">
+                <i class="bi bi-share me-2 text-muted"></i>
+                5. Kontrak Pembagian Hasil (Revenue Sharing)
+            </span>
+        </div>
+
+        <div class="card-body p-0">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead>
+                    <tr class="table-light">
+
+                        <th class="px-3">
+                            Komponen Pembagian
+                        </th>
+
+                        <th class="text-center" width="20%">
+                            Porsi
+                        </th>
+
+                        <th class="text-end px-3" width="35%">
+                            Nilai
+                        </th>
+
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    <!-- NET PROFIT -->
+                    <tr>
+
+                        <td class="px-3 fw-medium text-dark">
+
+                            <i class="bi bi-graph-up-arrow text-dark me-2"></i>
+
+                            Net Profit
+
+                        </td>
+
+                        <td class="text-center">
+
+                            <span
+                                class="badge bg-dark-subtle text-dark px-2.5 py-1.5 fw-bold"
+                                style="font-size: 0.8rem;"
+                            >
+                                100%
+                            </span>
+
+                        </td>
+
+                        <td class="text-end fw-bold text-dark px-3">
+
+                            Rp <?= number_format($laba_bersih, 0, ',', '.') ?>
+
+                        </td>
+
+                    </tr>
+
+
+                    <!-- ADMIN FEE -->
+                    <tr>
+
+                        <td class="px-3 fw-medium text-dark">
+
+                            <i class="bi bi-shield-check text-danger me-2"></i>
+
+                            Management Pusat
+
+                        </td>
+
+                        <td class="text-center">
+
+                            <span
+                                class="badge bg-danger-subtle text-danger px-2.5 py-1.5 fw-bold"
+                                style="font-size: 0.8rem;"
+                            >
+                                <?= $persen_admin ?>%
+                            </span>
+
+                        </td>
+
+                        <td class="text-end fw-bold text-danger px-3">
+
+                            Rp <?= number_format($share_admin, 0, ',', '.') ?>
+
+                        </td>
+
+                    </tr>
+
+
+                    <!-- LABA SETELAH ADMIN -->
+                    <tr class="table-warning">
+
+                        <td class="px-3 fw-bold text-dark">
+
+                            <i class="bi bi-calculator text-warning me-2"></i>
+
+                            Laba Setelah Admin Fee
+
+                        </td>
+
+                        <td class="text-center">
+
+                            <span
+                                class="badge bg-warning-subtle text-warning px-2.5 py-1.5 fw-bold"
+                                style="font-size: 0.8rem;"
+                            >
+                                97%
+                            </span>
+
+                        </td>
+
+                        <td class="text-end fw-bold text-warning px-3">
+
+                            Rp <?= number_format($laba_setelah_admin, 0, ',', '.') ?>
+
+                        </td>
+
+                    </tr>
+
+
+                    <!-- INVESTOR -->
+                    <tr>
+
+                        <td class="px-3 fw-medium text-dark">
+
+                            <i class="bi bi-person text-primary me-2"></i>
+
+                            Investor Utama
+
+                        </td>
+
+                        <td class="text-center">
+
+                            <span
+                                class="badge bg-primary-subtle text-primary px-2.5 py-1.5 fw-bold"
+                                style="font-size: 0.8rem;"
+                            >
+                                <?= $persen_investor ?>%
+                            </span>
+
+                        </td>
+
+                        <td class="text-end fw-bold text-primary px-3">
+
+                            Rp <?= number_format($share_investor, 0, ',', '.') ?>
+
+                        </td>
+
+                    </tr>
+
+
+                    <!-- PENGELOLA -->
+                    <tr>
+
+                        <td class="px-3 fw-medium text-dark">
+
+                            <i class="bi bi-person-gear text-success me-2"></i>
+
+                            Pengelola Lapangan
+
+                        </td>
+
+                        <td class="text-center">
+
+                            <span
+                                class="badge bg-success-subtle text-success px-2.5 py-1.5 fw-bold"
+                                style="font-size: 0.8rem;"
+                            >
+                                <?= $persen_pengelola ?>%
+                            </span>
+
+                        </td>
+
+                        <td
+                            class="text-end fw-bold text-success px-3"
+                            id="pgl_share_kotor"
+                        >
+
+                            Rp <?= number_format($share_pengelola, 0, ',', '.') ?>
+
+                        </td>
+
+                    </tr>
+
+
+                    <!-- TOTAL -->
+                    <tr class="table-success">
+
+                        <td class="px-3 fw-bold text-dark">
+
+                            Total Pembagian
+
+                        </td>
+
+                        <td class="text-center">
+
+                            <span
+                                class="badge bg-success-subtle text-success px-2.5 py-1.5 fw-bold"
+                                style="font-size: 0.8rem;"
+                            >
+                                100%
+                            </span>
+
+                        </td>
+
+                        <td class="text-end fw-bold text-dark px-3">
+
+                            Rp <?= number_format(($share_investor + $share_pengelola), 0, ',', '.') ?>
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+
+            <!-- KETERANGAN -->
+            <div
+                class="p-3 bg-light text-muted border-top"
+                style="font-size: 0.8rem; line-height: 1.5;"
+            >
+
+                <div class="mb-1">
+
+                    <i class="bi bi-info-circle me-1 text-primary"></i>
+
+                    <strong>Skema Pembagian:</strong>
+
                 </div>
 
-            </div> <!-- TUTUP ROW -->
+                <div class="ms-3">
 
-            <!-- 5. Profit Investor & Pengelola Manual Panel -->
-            <div class="row g-4 mb-4">
-                <!-- Investor Form Card -->
-                <div class="col-lg-6">
-                    <div class="card border-0 border-top border-3 border-primary">
-                        <div class="card-header bg-white border-bottom py-3">
-                            <span class="fw-bold text-primary"><i class="bi bi-pencil-square me-2"></i>Koreksi Dividen: Sisi Investor</span>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3">
-                                <div class="col-sm-6">
-                                    <label class="form-label text-muted small fw-semibold">Profit Investor</label>
-                                    <input type="number" id="inv_profit" class="form-control border-2 bg-light" style="border-radius: 6px;" value="<?= $share_investor ?>" readonly>
-                                </div>
-                                <div class="col-sm-6">
-                                    <label class="form-label text-muted small fw-semibold">Potongan Sewa Ruko</label>
-                                    <input type="number" id="inv_sewa" class="form-control border-2 bg-light" style="border-radius: 6px;" value="<?= $bo_db['sewa'] ?? 0 ?>" readonly>
-                                </div>
-                                <div class="col-sm-4">
-                                    <label class="form-label text-muted small fw-semibold">Kembalian Modal</label>
-                                    <input type="number" id="inv_modal" class="form-control border-2" style="border-radius: 6px;" value="0" oninput="hitungInvestor()">
-                                </div>
-                                <div class="col-sm-4">
-                                    <label class="form-label text-muted small fw-semibold">Kasbon Pengelola</label>
-                                    <input type="number" id="inv_kasbon" class="form-control border-2" style="border-radius: 6px;" value="0" oninput="hitungInvestor()">
-                                </div>
-                                <div class="col-sm-4">
-                                    <label class="form-label text-muted small fw-semibold">Potongan Admin</label>
-                                    <input type="number" id="inv_admin" class="form-control border-2" style="border-radius: 6px;" value="0" oninput="hitungInvestor()">
-                                </div>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 p-3 rounded-3 mt-4 border-primary border-opacity-10">
-                                <span class="fw-bold text-primary small">TOTAL BERSIH INVESTOR:</span>
-                                <h4 class="fw-bold text-primary mb-0" id="inv_total">Rp 0</h4>
-                            </div>
-                        </div>
-                    </div>
+                    Net Profit dipotong terlebih dahulu dengan
+                    <strong>Admin Fee <?= $persen_admin ?>%</strong>.
+
+                    Setelah Admin Fee dipotong,
+                    sisa laba dibagi secara
+
+                    <strong>50% untuk Investor</strong>
+                    dan
+                    <strong>50% untuk Pengelola</strong>.
+
                 </div>
 
-                <!-- Pengelola Form Card -->
-                <div class="col-lg-6">
-                    <div class="card border-0 border-top border-3 border-success">
-                        <div class="card-header bg-white border-bottom py-3">
-                            <span class="fw-bold text-success"><i class="bi bi-pencil-square me-2"></i>Koreksi Dividen: Sisi Pengelola</span>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3 mb-3">
-                                <div class="col-sm-6">
-                                    <label class="form-label text-muted small fw-semibold">Profit Pengelola</label>
-                                    <input type="number" id="pgl_profit" class="form-control form-control-sm border-2 bg-light" style="border-radius: 6px;" value="<?= $share_pengelola ?>" readonly> <!-- AMBIL DARI SHARE KOTOR -->
-                                </div>
-                                <div class="col-sm-6">
-                                    <label class="form-label text-muted small fw-semibold">Admin Fee Cabang</label>
-                                    <input type="number" id="pgl_admin" class="form-control form-control-sm border-2 bg-light" style="border-radius: 6px;" value="<?= $share_admin ?>" readonly> <!-- AMBIL DARI SHARE ADMIN -->
-                                </div>
-                                <div class="col-sm-12">
-                                    <label class="form-label text-muted small fw-semibold">Service Fee + BPJS</label>
-                                    <input type="number" id="pgl_service" class="form-control form-control-sm border-2" style="border-radius: 6px;" value="0" oninput="hitungPengelola()">
-                                </div>
-                                <!-- BEBAN KERTAS NASI DIHAPUS -->
-                            </div>
-
-                            <div class="table-responsive bg-light p-2 rounded-3 border mb-0" style="overflow: hidden;">
-                                <table class="table table-sm table-borderless align-middle mb-0 text-center text-nowrap" style="font-size: 0.8rem;">
-                                    <thead>
-                                        <tr class="text-secondary border-bottom">
-                                            <th class="pb-1 fw-semibold">Net Profit</th>
-                                            <th class="pb-1 fw-semibold">Net Admin</th>
-                                            <th class="pb-1 fw-semibold">Net Service</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr class="fw-bold text-dark pt-2">
-                                            <td><span id="pgl_total_profit" class="text-success">Rp 0</span></td>
-                                            <td><span id="pgl_total_admin">Rp 0</span></td>
-                                            <td><span id="pgl_total_service">Rp 0</span></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
+
+        </div>
+
+    </div>
+</div>
+
+
+</div> <!-- TUTUP ROW -->
+
+
+<!-- 5. Profit Investor & Pengelola Manual Panel -->
+<!-- Investor Form Card -->
+<div class="col-lg-6">
+
+    <div class="card border-0 border-top border-3 border-primary">
+
+        <div class="card-header bg-white border-bottom py-3">
+
+            <span class="fw-bold text-primary">
+
+                <i class="bi bi-pencil-square me-2"></i>
+
+                Koreksi Dividen: Sisi Investor
+
+            </span>
+
+        </div>
+
+
+        <div class="card-body p-4">
+
+            <div class="row g-3">
+
+
+                <div class="col-sm-6">
+
+                    <label class="form-label text-muted small fw-semibold">
+                        Profit Investor
+                    </label>
+
+                    <input
+                        type="number"
+                        id="inv_profit"
+                        class="form-control border-2 bg-light"
+                        style="border-radius: 6px;"
+                        value="<?= $share_investor ?>"
+                        readonly
+                    >
+
+                </div>
+
+
+                <div class="col-sm-6">
+
+                    <label class="form-label text-muted small fw-semibold">
+                        Sewa Ruko
+                    </label>
+
+                    <div class="input-group">
+
+                        <select
+                            id="inv_sewa_operator"
+                            class="form-select border-2"
+                            style="max-width: 75px; border-radius: 6px 0 0 6px;"
+                            onchange="hitungInvestor()"
+                        >
+
+                            <option value="minus" selected>
+                                −
+                            </option>
+
+                            <option value="plus">
+                                +
+                            </option>
+
+                        </select>
+
+                        <input
+                            type="number"
+                            id="inv_sewa"
+                            class="form-control border-2 bg-light"
+                            style="border-radius: 0 6px 6px 0;"
+                            value="<?= $bo_db['sewa'] ?? 0 ?>"
+                            readonly
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="col-sm-4">
+
+                    <label class="form-label text-muted small fw-semibold">
+                        Pengembalian Dana Talangan
+                    </label>
+
+                    <input
+                        type="number"
+                        id="inv_modal"
+                        class="form-control border-2"
+                        style="border-radius: 6px;"
+                        value="0"
+                        oninput="hitungInvestor()"
+                    >
+
+                </div>
+
+
+                <div class="col-sm-4">
+
+                    <label class="form-label text-muted small fw-semibold">
+                        Kasbon Pengelola
+                    </label>
+
+                    <input
+                        type="number"
+                        id="inv_kasbon"
+                        class="form-control border-2"
+                        style="border-radius: 6px;"
+                        value="0"
+                        oninput="hitungInvestor()"
+                    >
+
+                </div>
+
+
+
+
+            </div>
+
+
+            <div
+                class="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 p-3 rounded-3 mt-4 border-primary border-opacity-10"
+            >
+
+                <span class="fw-bold text-primary small">
+
+                    TOTAL BERSIH INVESTOR:
+
+                </span>
+
+                <h4
+                    class="fw-bold text-primary mb-0"
+                    id="inv_total"
+                >
+
+                    Rp 0
+
+                </h4>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- Pengelola Form Card -->
+<div class="col-lg-6">
+
+    <div class="card border-0 border-top border-3 border-success">
+
+        <div class="card-header bg-white border-bottom py-3">
+
+            <span class="fw-bold text-success">
+
+                <i class="bi bi-pencil-square me-2"></i>
+
+                Koreksi Dividen: Sisi Pengelola
+
+            </span>
+
+        </div>
+
+
+        <div class="card-body p-4">
+
+            <div class="row g-3 mb-3">
+
+
+                <div class="col-sm-6">
+
+                    <label class="form-label text-muted small fw-semibold">
+
+                        Profit Pengelola
+
+                    </label>
+
+                    <input
+                        type="number"
+                        id="pgl_profit"
+                        class="form-control form-control-sm border-2 bg-light"
+                        style="border-radius: 6px;"
+                        value="<?= $share_pengelola ?>"
+                        readonly
+                    >
+
+                </div>
+
+
+                <div class="col-sm-6">
+
+                    <label class="form-label text-muted small fw-semibold">
+
+                        Service Fee
+
+                    </label>
+
+                    <select
+                        id="pgl_admin_persen"
+                        class="form-select form-select-sm border-2"
+                        style="border-radius: 6px;"
+                        onchange="hitungPengelola()"
+                    >
+
+                        <option value="7.5">
+                            7,5%
+                        </option>
+
+                        <option value="5">
+                            5%
+                        </option>
+
+                        <option value="3" selected>
+                            3%
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- BEBAN KERTAS NASI DIHAPUS -->
+
+            </div>
+
+
+            <div
+                class="table-responsive bg-light p-2 rounded-3 border mb-0"
+                style="overflow: hidden;"
+            >
+
+                <table
+                    class="table table-sm table-borderless align-middle mb-0 text-center text-nowrap"
+                    style="font-size: 0.8rem;"
+                >
+
+                    <thead>
+
+                        <tr class="text-secondary border-bottom">
+
+                            <th class="pb-1 fw-semibold">
+                                Net Profit
+                            </th>
+
+                            <th class="pb-1 fw-semibold">
+                                Service Fee
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        <tr class="fw-bold text-dark pt-2">
+
+                            <td>
+
+                                <span
+                                    id="pgl_total_profit"
+                                    class="text-success"
+                                >
+                                    Rp 0
+                                </span>
+
+                            </td>
+
+
+                            <td>
+
+                                <span id="pgl_total_admin">
+                                    Rp 0
+                                </span>
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
 
             <!-- 6. Rekapan Hasil Keseluruhan Keuntungan Final -->
             <div class="card border-0 mb-5" style="overflow: hidden;">
@@ -1000,27 +1488,116 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
 
             // Panggil di akhir setiap fungsi hitung
             function hitungInvestor() {
-                let profit = parseFloat(document.getElementById('inv_profit').value) || 0;
-                let sewa = parseFloat(document.getElementById('inv_sewa').value) || 0;
-                let modal = parseFloat(document.getElementById('inv_modal').value) || 0;
-                let kasbon = parseFloat(document.getElementById('inv_kasbon').value) || 0;
-                let admin = parseFloat(document.getElementById('inv_admin').value) || 0;
-                let total = profit - sewa - modal - kasbon - admin;
-                document.getElementById('inv_total').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(total);
-                updateFinalRekap(); // PANGGIL
+
+                let profit = parseFloat(
+                    document.getElementById('inv_profit').value
+                ) || 0;
+
+                let sewa = parseFloat(
+                    document.getElementById('inv_sewa').value
+                ) || 0;
+
+                let modal = parseFloat(
+                    document.getElementById('inv_modal').value
+                ) || 0;
+
+                let kasbon = parseFloat(
+                    document.getElementById('inv_kasbon').value
+                ) || 0;
+
+                let admin = parseFloat(
+                    document.getElementById('inv_admin').value
+                ) || 0;
+
+
+                // Ambil pilihan + atau -
+                let operatorSewa =
+                    document.getElementById('inv_sewa_operator').value;
+
+
+                // =================================================
+                // PERHITUNGAN INVESTOR
+                // =================================================
+
+                let total = profit;
+
+
+                // Sewa Ruko
+                if (operatorSewa === 'plus') {
+
+                    total += sewa;
+
+                } else {
+
+                    total -= sewa;
+
+                }
+
+
+                // Pengembalian Dana Talangan
+                total += modal;
+
+
+                // Kasbon Pengelola
+                total += kasbon;
+
+
+                // Potongan Admin
+                total -= admin;
+
+
+                // Jangan biarkan hasil negatif
+                // Jika memang ingin boleh minus, hapus bagian ini.
+                total = Math.max(0, total);
+
+
+                document.getElementById('inv_total').innerText =
+                    'Rp ' + total.toLocaleString('id-ID');
             }
 
             function hitungPengelola() {
-                let profit = parseFloat(document.getElementById('pgl_profit').value) || 0;
-                let admin = parseFloat(document.getElementById('pgl_admin').value) || 0;
-                let service = parseFloat(document.getElementById('pgl_service').value) || 0;
 
-                let net_profit = profit - admin - service;
+                let profit = parseFloat(
+                    document.getElementById('pgl_profit').value
+                ) || 0;
 
-                document.getElementById('pgl_total_profit').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(net_profit);
-                document.getElementById('pgl_total_admin').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(admin);
-                document.getElementById('pgl_total_service').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(service);
-                updateFinalRekap(); // PANGGIL
+                let adminPersen = parseFloat(
+                    document.getElementById('pgl_admin_persen').value
+                ) || 0;
+
+                let service = parseFloat(
+                    document.getElementById('pgl_service').value
+                ) || 0;
+
+
+                // =================================================
+                // POTONG ADMIN FEE DARI BAGIAN PENGELOLA
+                // =================================================
+
+                let admin =
+                    profit * adminPersen / 100;
+
+
+                // =================================================
+                // PROFIT PENGELOLA SETELAH ADMIN
+                // =================================================
+
+                let profitBersih =
+                    profit - admin;
+
+
+                // =================================================
+                // TAMPILKAN HASIL
+                // =================================================
+
+                document.getElementById('pgl_total_profit').innerText =
+                    'Rp ' + profitBersih.toLocaleString('id-ID');
+
+                document.getElementById('pgl_total_admin').innerText =
+                    'Rp ' + admin.toLocaleString('id-ID');
+
+                document.getElementById('pgl_total_service').innerText =
+                    'Rp ' + service.toLocaleString('id-ID');
             }
 
             // panggil saat load pertama
@@ -1234,7 +1811,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     ['Keterangan Komponen', 'Nilai'],
                     ['Profit Dasar Share', inv_profit],
                     ['Potongan Sewa Ruko', inv_sewa],
-                    ['Kembalian Modal', inv_modal],
+                    ['Pengembalian Dana Talangan', inv_modal],
                     ['Kasbon Pengelola', inv_kasbon],
                     ['Potongan Admin', inv_admin],
                     ['TOTAL BERSIH INVESTOR', inv_total],
@@ -1509,7 +2086,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                 let dataInvestor = [
                     ['Profit Investor  (50%)', formatRupiahPDF(document.getElementById('inv_profit')?.value || <?= $share_investor ?>)],
                     ['Potongan Sewa Ruko', formatRupiahPDF(document.getElementById('inv_sewa')?.value || <?= $bo_db['sewa'] ?? 0 ?>)],
-                    ['Kembalian Modal', formatRupiahPDF(document.getElementById('inv_modal')?.value || 0)],
+                    ['Pengembalian Dana Talangan,', formatRupiahPDF(document.getElementById('inv_modal')?.value || 0)],
                     ['Kasbon Pengelola', formatRupiahPDF(document.getElementById('inv_kasbon')?.value || 0)],
                     ['Potongan Admin', formatRupiahPDF(document.getElementById('inv_admin')?.value || 0)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahPDF(document.getElementById('inv_total')?.innerText || 0)],
@@ -1535,7 +2112,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     ['Admin Fee Cabang  (3%)', formatRupiahPDF(document.getElementById('pgl_admin')?.value || <?= $share_admin ?>)],
                     ['Service Fee + BPJS', formatRupiahPDF(document.getElementById('pgl_service')?.value || 0)],
                     ['TOTAL BERSIH PENGELOLA', formatRupiahPDF(document.getElementById('pgl_total_profit')?.innerText || 0)]
-                ];
+                ];  
 
                 doc.autoTable({
                     head: [

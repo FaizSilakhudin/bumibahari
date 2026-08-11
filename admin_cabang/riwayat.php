@@ -195,6 +195,7 @@ $no = 1;
                             <th>Omzet</th>
                             <th>Pengeluaran</th>
                             <th>Operasional</th>
+                            <th>Sisa QRIS</th>
                             <th>Net Profit</th>
                             <th>Margin</th>
                             <th class="text-center pe-4" style="width: 150px;">Nota Transaksi</th>
@@ -215,6 +216,7 @@ $no = 1;
                             <td class="fw-bold text-secondary"><?= date("d M Y", strtotime($row['tanggal'])) ?></td>
                             <td><span class="text-success fw-bold">Rp <?= number_format($row['total_omset'],0,',','.') ?></span></td>
                             <td class="text-muted">Rp <?= number_format($row['total_pengeluaran'],0,',','.') ?></td>
+                            <td class="fw-semibold text-primary">Rp <?= number_format($row['total_operasional'],0,',','.') ?></td>
                             <td class="fw-semibold text-primary">Rp <?= number_format($row['total_operasional'],0,',','.') ?></td>
                             <td><span class="fw-bold" style="color: #047857 !important;">Rp <?= number_format($row['net_profit'],0,',','.') ?></span></td>
                             <td>
