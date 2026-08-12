@@ -63,6 +63,8 @@ $stmt->close();
 // =====================================================
 // PROSES SIMPAN
 // =====================================================
+
+// FIX: WAJIB ADA { SETELAH IF
 if(isset($_POST['simpan'])){
 
     // =================================================
@@ -100,9 +102,9 @@ if(isset($_POST['simpan'])){
     // PENDAPATAN / OMZET
     // =================================================
     $tunai = cleanNumber($_POST['tunai'] ?? 0);
-    $qris   = cleanNumber($_POST['qris'] ?? 0);
-    $grab   = cleanNumber($_POST['grab_food'] ?? 0);
-    $go     = cleanNumber($_POST['go_food'] ?? 0);
+    $qris  = cleanNumber($_POST['qris'] ?? 0);
+    $grab  = cleanNumber($_POST['grab_food'] ?? 0);
+    $go    = cleanNumber($_POST['go_food'] ?? 0);
 
     $total_omset =
         $tunai +
@@ -188,79 +190,96 @@ if(isset($_POST['simpan'])){
         $lain;
 
 
-    // =================================================
     // TOTAL PENGELUARAN
     // =================================================
     $total_pengeluaran =
-        $total_rutin +
-        $total_op;
-
+    $total_rutin +
+    $total_op;
 
     // =================================================
     // LOGIKA TUNAI → QRIS
-    //
-    // PENTING:
-    // Sisa tunai BOLEH MINUS.
-    //
-    // Jika:
-    // Tunai 1.000.000
-    // Pengeluaran 1.200.000
-    //
-    // Sisa tunai = -200.000
-    //
-    // Artinya kekurangan 200.000 diambil dari QRIS.
+    // =================================================
+    // Pengeluaran terlebih dahulu diambil dari TUNAI.
+    // Jika tunai tidak cukup, kekurangannya
+    // akan diambil dari QRIS.
     // =================================================
 
     $sisa_tunai =
-        $tunai - $total_pengeluaran;
-
+    $tunai - $total_pengeluaran;
 
     // =================================================
     // HITUNG KEKURANGAN UNTUK QRIS
     // =================================================
-    $kekurangan =
-        max(
-            0,
-            $total_pengeluaran - $tunai
-        );
+    // Jika total pengeluaran lebih besar
+    // dari uang tunai, maka selisihnya
+    // diambil dari QRIS.
+    // =================================================
 
+    $kekurangan =
+    max(
+    0,
+    $total_pengeluaran - $tunai
+    );
+
+    // =================================================
+    // PENCAIRAN QRIS
+    // =================================================
+    // Pencairan QRIS diinput secara manual.
+    // =================================================
+
+    $pencairan_qris =
+    cleanNumber(
+    $_POST['pencairan_qris'] ?? 0
+    );
 
     // =================================================
     // HITUNG SISA QRIS
-    //
-    // Belum disimpan ke database karena struktur
-    // tabel Anda saat ini hanya mempunyai sisa_tunai.
     // =================================================
-    $sisa_qris =
-        $qris - $kekurangan;
+    // QRIS berkurang karena:
+    // 1. Kekurangan pembayaran dari Tunai
+    // 2. Pencairan QRIS
+    // =================================================
 
+    $sisa_qris =
+    $qris -
+    $kekurangan -
+    $pencairan_qris;
 
     // =================================================
     // TOTAL SISA UANG
     // =================================================
+
     $sisa =
-        $sisa_tunai + $sisa_qris;
-
+    $sisa_tunai +
+    $sisa_qris;
 
     // =================================================
-    // NET PROFIT
+    // NET PROFIT BERSIH
     // =================================================
+    // Net Profit =
+    // + Sisa QRIS
+    // + Go Food
+    // + Grab Food
+    // =================================================
+
     $net =
-        $total_omset - $total_pengeluaran;
-
+    $sisa_qris +
+    $go +
+    $grab;
 
     // =================================================
-    // PERSENTASE
+    // PERSENTASE / MARGIN KEUNTUNGAN
     // =================================================
+    // Margin = Net Profit : Total Omzet × 100%
+    // =================================================
+
     $persen =
-        $total_omset > 0
-            ? round(
-                ($net / $total_omset) * 100,
-                2
-            )
-            : 0;
-
-
+    $total_omset > 0
+    ? round(
+    ($net / $total_omset) * 100,
+    2
+    )
+    : 0;
     // =================================================
     // 4. UPLOAD AMAN
     // =================================================
@@ -410,179 +429,124 @@ if(isset($_POST['simpan'])){
     // INSERT BARU ATAU UPDATE
     // KALAU TANGGAL + CABANG SAMA
     // =================================================
+
     $sql = "
-        INSERT INTO laporan_cabang
-        (
-            id_cabang,
-            nama_pengelola,
-            tanggal,
+    INSERT INTO laporan_cabang
+    (
+        id_cabang,
+        nama_pengelola,
+        tanggal,
 
-            tunai,
-            qris,
-            grab_food,
-            go_food,
-            total_omset,
+        tunai,
+        qris,
+        grab_food,
+        go_food,
+        total_omset,
 
-            belanja_pasar,
-            belanja_sembako,
-            belanja_beras,
-            belanja_toko,
-            total_rutin,
+        belanja_pasar,
+        belanja_sembako,
+        belanja_beras,
+        belanja_toko,
+        total_rutin,
 
-            sewa,
-            gaji,
-            listrik,
-            air,
-            sampah,
-            keamanan,
-            internet,
-            gas,
-            mingguan_karyawan,
-            es_batu,
-            bensin,
-            lain_lain,
+        sewa,
+        gaji,
+        listrik,
+        air,
+        sampah,
+        keamanan,
+        internet,
+        gas,
+        mingguan_karyawan,
+        es_batu,
+        bensin,
+        lain_lain,
 
-            total_operasional,
-            total_pengeluaran,
-            sisa_tunai,
+        total_operasional,
+        total_pengeluaran,
+        sisa_tunai,
+        pencairan_qris,
+        sisa_qris,
 
-            net_profit,
-            persentase,
+        net_profit,
+        persentase,
 
-            keterangan,
+        keterangan,
 
+        foto_nota1,
+        foto_nota2,
+        foto_nota3,
+        foto_nota4
+    )
+
+    VALUES
+    (
+        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+    )
+
+    ON DUPLICATE KEY UPDATE
+
+        nama_pengelola = VALUES(nama_pengelola),
+
+        tunai = VALUES(tunai),
+        qris = VALUES(qris),
+        grab_food = VALUES(grab_food),
+        go_food = VALUES(go_food),
+        total_omset = VALUES(total_omset),
+
+        belanja_pasar = VALUES(belanja_pasar),
+        belanja_sembako = VALUES(belanja_sembako),
+        belanja_beras = VALUES(belanja_beras),
+        belanja_toko = VALUES(belanja_toko),
+        total_rutin = VALUES(total_rutin),
+
+        sewa = VALUES(sewa),
+        gaji = VALUES(gaji),
+        listrik = VALUES(listrik),
+        air = VALUES(air),
+        sampah = VALUES(sampah),
+        keamanan = VALUES(keamanan),
+        internet = VALUES(internet),
+        gas = VALUES(gas),
+        mingguan_karyawan = VALUES(mingguan_karyawan),
+        es_batu = VALUES(es_batu),
+        bensin = VALUES(bensin),
+        lain_lain = VALUES(lain_lain),
+
+        total_operasional = VALUES(total_operasional),
+        total_pengeluaran = VALUES(total_pengeluaran),
+        sisa_tunai = VALUES(sisa_tunai),
+        pencairan_qris = VALUES(pencairan_qris),
+        sisa_qris = VALUES(sisa_qris),
+
+        net_profit = VALUES(net_profit),
+        persentase = VALUES(persentase),
+
+        keterangan = VALUES(keterangan),
+
+        foto_nota1 = IF(
+            VALUES(foto_nota1) = '',
             foto_nota1,
+            VALUES(foto_nota1)
+        ),
+
+        foto_nota2 = IF(
+            VALUES(foto_nota2) = '',
             foto_nota2,
+            VALUES(foto_nota2)
+        ),
+
+        foto_nota3 = IF(
+            VALUES(foto_nota3) = '',
             foto_nota3,
-            foto_nota4
+            VALUES(foto_nota3)
+        ),
+
+        foto_nota4 = IF(
+            VALUES(foto_nota4) = '',
+            foto_nota4,
+            VALUES(foto_nota4)
         )
-
-        VALUES
-        (
-            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-        )
-
-        ON DUPLICATE KEY UPDATE
-
-            nama_pengelola =
-                VALUES(nama_pengelola),
-
-            tunai =
-                VALUES(tunai),
-
-            qris =
-                VALUES(qris),
-
-            grab_food =
-                VALUES(grab_food),
-
-            go_food =
-                VALUES(go_food),
-
-            total_omset =
-                VALUES(total_omset),
-
-
-            belanja_pasar =
-                VALUES(belanja_pasar),
-
-            belanja_sembako =
-                VALUES(belanja_sembako),
-
-            belanja_beras =
-                VALUES(belanja_beras),
-
-            belanja_toko =
-                VALUES(belanja_toko),
-
-            total_rutin =
-                VALUES(total_rutin),
-
-
-            sewa =
-                VALUES(sewa),
-
-            gaji =
-                VALUES(gaji),
-
-            listrik =
-                VALUES(listrik),
-
-            air =
-                VALUES(air),
-
-            sampah =
-                VALUES(sampah),
-
-            keamanan =
-                VALUES(keamanan),
-
-            internet =
-                VALUES(internet),
-
-            gas =
-                VALUES(gas),
-
-            mingguan_karyawan =
-                VALUES(mingguan_karyawan),
-
-            es_batu =
-                VALUES(es_batu),
-
-            bensin =
-                VALUES(bensin),
-
-            lain_lain =
-                VALUES(lain_lain),
-
-
-            total_operasional =
-                VALUES(total_operasional),
-
-            total_pengeluaran =
-                VALUES(total_pengeluaran),
-
-            sisa_tunai =
-                VALUES(sisa_tunai),
-
-
-            net_profit =
-                VALUES(net_profit),
-
-            persentase =
-                VALUES(persentase),
-
-            keterangan =
-                VALUES(keterangan),
-
-
-            foto_nota1 =
-                IF(
-                    VALUES(foto_nota1) = '',
-                    foto_nota1,
-                    VALUES(foto_nota1)
-                ),
-
-            foto_nota2 =
-                IF(
-                    VALUES(foto_nota2) = '',
-                    foto_nota2,
-                    VALUES(foto_nota2)
-                ),
-
-            foto_nota3 =
-                IF(
-                    VALUES(foto_nota3) = '',
-                    foto_nota3,
-                    VALUES(foto_nota3)
-                ),
-
-            foto_nota4 =
-                IF(
-                    VALUES(foto_nota4) = '',
-                    foto_nota4,
-                    VALUES(foto_nota4)
-                )
     ";
 
 
@@ -601,10 +565,23 @@ if(isset($_POST['simpan'])){
 
 
     // =================================================
-    // BIND PARAMETER
+    // PASTIKAN NILAI TIDAK NULL
+    // =================================================
+    $pencairan_qris =
+        $pencairan_qris ?? 0;
+
+    $sisa_tunai =
+        $sisa_tunai ?? 0;
+
+    $sisa_qris =
+        $sisa_qris ?? 0;
+
+
+    // =================================================
+    // BIND PARAM
     // =================================================
     $stmt->bind_param(
-        "issdddddddddddddddddddddddddddsssss",
+        "issdddddddddddddddddddddddddddddsssss",
 
         $id_cabang,
         $nama_pengelola,
@@ -638,12 +615,9 @@ if(isset($_POST['simpan'])){
         $total_op,
         $total_pengeluaran,
 
-        // =============================================
-        // PENTING:
-        // SIMPAN SISA TUNAI APA ADANYA,
-        // TERMASUK JIKA MINUS
-        // =============================================
         $sisa_tunai,
+        $pencairan_qris,
+        $sisa_qris,
 
         $net,
         $persen,
@@ -664,34 +638,29 @@ if(isset($_POST['simpan'])){
 
         echo "
             <script>
-                alert(
-                    'Data berhasil disimpan!'
-                );
-
-                window.location='input_data.php';
+                alert('Data berhasil disimpan!');
+                window.location.replace('input_data.php');
             </script>
         ";
+
+        exit;
 
     }else{
 
         echo "
             <script>
-                alert(
-                    'Gagal simpan: " .
-                    addslashes($stmt->error) .
-                    "'
-                );
-
+                alert('Gagal simpan: " .
+                addslashes($stmt->error) .
+                "');
                 history.back();
             </script>
         ";
 
+        exit;
+
     }
 
-
-    $stmt->close();
-
-}
+} // FIX: PENUTUP IF isset($_POST['simpan'])
 
 ?>
 
@@ -832,7 +801,7 @@ body {
     </div>
 
     <!-- =================================================
-         FORM
+         FORM 
     ================================================== -->
     <form method="POST" enctype="multipart/form-data" onsubmit="prepareSubmitForm()">
         <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
@@ -987,15 +956,34 @@ body {
                     </div>
                 </div>
 
-                <!-- PENCAIRAN QRIS -->
+               <!-- PENCAIRAN QRIS -->
+
                 <div class="row">
+
                     <div class="col-12 col-md-3">
-                        <label class="form-label fw-bold">Pencairan QRIS</label>
+
+                        <label class="form-label fw-bold">
+                            Pencairan QRIS
+                        </label>
+
                         <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-warning text-dark border-warning">Rp</span>
-                            <input type="text" id="pencairan_qris" class="form-control form-control-custom bg-light fw-bold text-dark" value="0" oninput="hitungSemua()">
+
+                            <span class="input-group-text input-group-text-custom bg-warning text-dark border-warning">
+                                Rp
+                            </span>
+
+                            <input
+                                type="text"
+                                id="pencairan_qris"
+                                class="form-control form-control-custom bg-light fw-bold text-dark"
+                                value="0"
+                                oninput="formatPencairanQRIS(this); hitung()"
+                            >
+
                         </div>
+
                     </div>
+
                 </div>
             </div>
         </div>
@@ -1174,12 +1162,32 @@ function getPureNumber(selectorOrEl) {
     ) || 0;
 }
 
+function formatPencairanQRIS(input) {
+
+    // Ambil hanya angka
+    let angka = input.value.replace(/\D/g, '');
+
+    // Jika kosong
+    if (angka === '') {
+        input.value = '0';
+        return;
+    }
+
+    // Hapus angka 0 di depan
+    angka = angka.replace(/^0+(?=\d)/, '');
+
+    // Format titik ribuan
+    input.value = angka.replace(
+        /\B(?=(\d{3})+(?!\d))/g,
+        '.'
+    );
+}
 
 // =====================================================
 // FUNGSI UTAMA PERHITUNGAN
 // =====================================================
 
-function hitung(){
+function hitung() {
 
     // =================================================
     // PENDAPATAN
@@ -1287,31 +1295,31 @@ function hitung(){
     // =================================================
 
     /*
-     * PENTING:
+     * Pengeluaran terlebih dahulu diambil dari TUNAI.
      *
-     * Sisa Tunai TIDAK lagi menggunakan Math.max(0,...)
+     * Jika Tunai mencukupi:
      *
-     * Jadi:
+     * Tunai       = 1.000.000
+     * Pengeluaran =   700.000
      *
-     * Tunai 1.000.000
-     * Pengeluaran 700.000
-     *
-     * Sisa = 300.000
+     * Sisa Tunai  =   300.000
+     * Kekurangan  =         0
      *
      *
-     * Tunai 1.000.000
-     * Pengeluaran 1.200.000
+     * Jika Tunai tidak mencukupi:
      *
-     * Sisa = -200.000
+     * Tunai       = 1.000.000
+     * Pengeluaran = 1.200.000
      *
-     * Artinya kekurangan 200.000
-     * diambil dari QRIS.
+     * Sisa Tunai  = -200.000
+     * Kekurangan  = 200.000
+     *
+     * Kekurangan tersebut diambil dari QRIS.
      */
 
 
     // =================================================
     // SISA TUNAI
-    // BOLEH MINUS
     // =================================================
 
     let sisa_tunai =
@@ -1320,46 +1328,75 @@ function hitung(){
 
 
     // =================================================
-    // KEKURANGAN
+    // KEKURANGAN YANG DIAMBIL DARI QRIS
     // =================================================
+
+    let kekurangan =
+        Math.max(
+            0,
+            total_pengeluaran - tunai
+        );
+
 
     // =================================================
     // PENCAIRAN QRIS
     // =================================================
 
-    let pencairan_qris =
-        parseFloat(
-            document.getElementById('pencairan_qris')?.value
+    /*
+     * Nominal diisi MANUAL oleh pengguna.
+     *
+     * Contoh:
+     *
+     * QRIS             = 2.000.000
+     * Kekurangan Tunai =   200.000
+     * Pencairan QRIS   =   500.000
+     *
+     * Sisa QRIS:
+     *
+     * 2.000.000
+     * - 200.000
+     * - 500.000
+     * = 1.300.000
+     */
+
+    let pencairan_qris = 0;
+
+    const elPencairanQRIS =
+        document.getElementById(
+            'pencairan_qris'
+        );
+
+    if (elPencairanQRIS) {
+
+        pencairan_qris =
+            parseFloat(
+                String(
+                    elPencairanQRIS.value || 0
+                )
                 .replace(/\./g, '')
                 .replace(/[^0-9-]/g, '')
-        ) || 0;
+            ) || 0;
 
-
-        // =================================================
-        // KEKURANGAN DARI TUNAI
-        // =================================================
-
-        let kekurangan =
-            Math.max(
-                0,
-                total_pengeluaran - tunai
-            );
+    }
 
 
     // =================================================
     // SISA QRIS
     // =================================================
-    //
-    // QRIS berkurang karena:
-    // 1. Kekurangan pembayaran dari Tunai
-    // 2. Pencairan QRIS
-    //
+
+    /*
+     * QRIS berkurang karena:
+     *
+     * 1. Kekurangan pembayaran dari Tunai
+     * 2. Pencairan QRIS manual
+     */
 
     let sisa_qris =
         qris -
         kekurangan -
         pencairan_qris;
-        
+
+
     // =================================================
     // TAMPILKAN SISA TUNAI
     // =================================================
@@ -1373,18 +1410,41 @@ function hitung(){
 
 
     // =================================================
+    // TAMPILKAN SISA QRIS
+    // =================================================
+
+    if (
+        document.getElementById(
+            'sisa_qris'
+        )
+    ) {
+
+        document.getElementById(
+            'sisa_qris'
+        ).value =
+            formatRupiahWithMinus(
+                sisa_qris
+            );
+
+    }
+
+
+    // =================================================
     // NET PROFIT
     // =================================================
 
     let net =
-        omset -
-        total_pengeluaran;
-
-
+        sisa_tunai +
+        sisa_qris +
+        go +
+        grab;
+        
     document.getElementById(
         'net_profit'
     ).value =
-        formatRupiahMask(net);
+        formatRupiahMask(
+            net
+        );
 
 
     // =================================================
@@ -1406,7 +1466,6 @@ function hitung(){
     ).value =
         persen;
 }
-
 
 // =====================================================
 // EVENT LISTENER MASKING
@@ -1504,5 +1563,4 @@ window.addEventListener(
 
     }
 );
-
 </script>

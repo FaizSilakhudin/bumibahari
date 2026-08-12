@@ -1118,7 +1118,8 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                         class="form-control border-2"
                         style="border-radius: 6px;"
                         value="0"
-                        oninput="hitungInvestor()"
+                        min="0"
+                        oninput="hitungInvestor(); hitungPengelola();"
                     >
 
                 </div>
@@ -1487,37 +1488,46 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
             }
 
             // Panggil di akhir setiap fungsi hitung
-            function hitungInvestor() {
+             function hitungInvestor() {
 
-                let profit = parseFloat(
-                    document.getElementById('inv_profit').value
-                ) || 0;
-
-                let sewa = parseFloat(
-                    document.getElementById('inv_sewa').value
-                ) || 0;
-
-                let modal = parseFloat(
-                    document.getElementById('inv_modal').value
-                ) || 0;
-
-                let kasbon = parseFloat(
-                    document.getElementById('inv_kasbon').value
-                ) || 0;
-
-                let admin = parseFloat(
-                    document.getElementById('inv_admin').value
-                ) || 0;
+                // Profit dasar investor
+                let profit =
+                    parseFloat(
+                        document.getElementById('inv_profit')?.value
+                    ) || 0;
 
 
-                // Ambil pilihan + atau -
+                // Sewa ruko
+                let sewa =
+                    parseFloat(
+                        document.getElementById('inv_sewa')?.value
+                    ) || 0;
+
+
+                // Pengembalian dana talangan
+                let modal =
+                    parseFloat(
+                        document.getElementById('inv_modal')?.value
+                    ) || 0;
+
+
+                // Kasbon pengelola
+                let kasbon =
+                    parseFloat(
+                        document.getElementById('inv_kasbon')?.value
+                    ) || 0;
+
+
+                // Operator sewa
                 let operatorSewa =
-                    document.getElementById('inv_sewa_operator').value;
+                    document.getElementById(
+                        'inv_sewa_operator'
+                    )?.value || 'minus';
 
 
-                // =================================================
-                // PERHITUNGAN INVESTOR
-                // =================================================
+                // =====================================================
+                // HITUNG TOTAL BERSIH INVESTOR
+                // =====================================================
 
                 let total = profit;
 
@@ -1539,72 +1549,147 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
 
 
                 // Kasbon Pengelola
+                // Ditambahkan ke hak investor
                 total += kasbon;
 
 
-                // Potongan Admin
-                total -= admin;
-
-
-                // Jangan biarkan hasil negatif
-                // Jika memang ingin boleh minus, hapus bagian ini.
+                // Jangan sampai negatif
                 total = Math.max(0, total);
 
 
-                document.getElementById('inv_total').innerText =
-                    'Rp ' + total.toLocaleString('id-ID');
+                // =====================================================
+                // TAMPILKAN TOTAL BERSIH INVESTOR
+                // =====================================================
+
+                const invTotal =
+                    document.getElementById('inv_total');
+
+                if (invTotal) {
+
+                    invTotal.innerText =
+                        'Rp ' +
+                        total.toLocaleString('id-ID');
+
+                }
+
+
+                // Setelah investor berubah,
+                // pengelola juga harus dihitung ulang
+                hitungPengelola();
+
             }
+
+
+
+            // =========================================================
+            // KOREKSI DIVIDEN - PENGELOLA
+            // =========================================================
 
             function hitungPengelola() {
 
-                let profit = parseFloat(
-                    document.getElementById('pgl_profit').value
-                ) || 0;
-
-                let adminPersen = parseFloat(
-                    document.getElementById('pgl_admin_persen').value
-                ) || 0;
-
-                let service = parseFloat(
-                    document.getElementById('pgl_service').value
-                ) || 0;
+                // Profit dasar pengelola
+                let profit =
+                    parseFloat(
+                        document.getElementById('pgl_profit')?.value
+                    ) || 0;
 
 
-                // =================================================
-                // POTONG ADMIN FEE DARI BAGIAN PENGELOLA
-                // =================================================
+                // Persentase Service Fee
+                let adminPersen =
+                    parseFloat(
+                        document.getElementById('pgl_admin_persen')?.value
+                    ) || 0;
 
-                let admin =
-                    profit * adminPersen / 100;
+
+                // =====================================================
+                // AMBIL KASBON DARI SISI INVESTOR
+                // =====================================================
+
+                let kasbon =
+                    parseFloat(
+                        document.getElementById('inv_kasbon')?.value
+                    ) || 0;
 
 
-                // =================================================
-                // PROFIT PENGELOLA SETELAH ADMIN
-                // =================================================
+                // =====================================================
+                // SERVICE FEE
+                // =====================================================
+
+                let serviceFee =
+                    profit *
+                    adminPersen /
+                    100;
+
+
+                // =====================================================
+                // NET PROFIT SETELAH SERVICE FEE
+                // DAN KASBON
+                // =====================================================
 
                 let profitBersih =
-                    profit - admin;
+                    profit -
+                    serviceFee -
+                    kasbon;
 
 
-                // =================================================
-                // TAMPILKAN HASIL
-                // =================================================
+                // Jangan sampai negatif
+                profitBersih =
+                    Math.max(0, profitBersih);
 
-                document.getElementById('pgl_total_profit').innerText =
-                    'Rp ' + profitBersih.toLocaleString('id-ID');
 
-                document.getElementById('pgl_total_admin').innerText =
-                    'Rp ' + admin.toLocaleString('id-ID');
+                // =====================================================
+                // TAMPILKAN NET PROFIT PENGELOLA
+                // =====================================================
 
-                document.getElementById('pgl_total_service').innerText =
-                    'Rp ' + service.toLocaleString('id-ID');
+                const totalProfit =
+                    document.getElementById(
+                        'pgl_total_profit'
+                    );
+
+                if (totalProfit) {
+
+                    totalProfit.innerText =
+                        'Rp ' +
+                        profitBersih.toLocaleString('id-ID');
+
+                }
+
+
+                // =====================================================
+                // TAMPILKAN SERVICE FEE
+                // =====================================================
+
+                const totalAdmin =
+                    document.getElementById(
+                        'pgl_total_admin'
+                    );
+
+                if (totalAdmin) {
+
+                    totalAdmin.innerText =
+                        'Rp ' +
+                        serviceFee.toLocaleString('id-ID');
+
+                }
+
             }
 
-            // panggil saat load pertama
-            document.addEventListener('DOMContentLoaded', function() {
-                hitungInvestor();
-                hitungPengelola();
-            });
+
+
+            // =========================================================
+            // JALANKAN SAAT HALAMAN SELESAI DIMUAT
+            // =========================================================
+
+            document.addEventListener(
+                'DOMContentLoaded',
+                function() {
+
+                    hitungInvestor();
+
+                    hitungPengelola();
+
+                }
+            );
         </script>
 
         <script>

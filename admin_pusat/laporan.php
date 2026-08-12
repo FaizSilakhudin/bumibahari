@@ -267,21 +267,6 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
         </div>
     </div>
 
-    <div class="col-md-6">
-            <div class="card border-0 shadow-sm border-start border-4 border-success h-100" style="border-radius: 8px;">
-                <div class="card-body d-flex align-items-center justify-content-between p-4">
-                    <div>
-                        <span class="text-muted small text-uppercase fw-bold tracking-wider">Total Laba Bersih</span>
-                        <h3 class="text-success fw-bold mb-0 mt-1">Rp <?= number_format($total_laba,0,',','.')?></h3>
-                    </div>
-                    <div class="bg-success bg-opacity-10 text-success p-3 rounded-3">
-                        <i class="bi bi-graph-up-arrow fs-3"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
         <div class="card-body p-0">
             <div class="table-responsive">

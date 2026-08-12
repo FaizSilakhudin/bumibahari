@@ -31,9 +31,24 @@ $next_bulan = date('m', $next_time);
 $next_tahun = date('Y', $next_time);
 
 // 2. AMBIL DATA LAPORAN 1 BULAN - SUDAH TAMBAH 4 KOLOM BO BARU
-$stmt = $conn->prepare("SELECT tanggal, total_omset, total_pengeluaran, net_profit, persentase, total_operasional,
-                        foto_nota1, foto_nota2, foto_nota3, foto_nota4 
-                        FROM laporan_cabang WHERE id_cabang=? AND tanggal BETWEEN ? AND ? ORDER BY tanggal DESC");
+$stmt = $conn->prepare("SELECT 
+                        tanggal,
+                        total_omset,
+                        total_pengeluaran,
+                        net_profit,
+                        persentase,
+                        total_operasional,
+                        sisa_tunai,
+                        sisa_qris,
+                        pencairan_qris,
+                        foto_nota1,
+                        foto_nota2,
+                        foto_nota3,
+                        foto_nota4
+                        FROM laporan_cabang
+                        WHERE id_cabang=?
+                        AND tanggal BETWEEN ? AND ?
+                        ORDER BY tanggal DESC");
 $stmt->bind_param("iss", $id_cabang, $tgl_awal, $tgl_akhir);
 $stmt->execute();
 $data = $stmt->get_result();
@@ -195,6 +210,7 @@ $no = 1;
                             <th>Omzet</th>
                             <th>Pengeluaran</th>
                             <th>Operasional</th>
+                            <th>Sisa Tunai</th>
                             <th>Sisa QRIS</th>
                             <th>Net Profit</th>
                             <th>Margin</th>
@@ -204,7 +220,7 @@ $no = 1;
                     <tbody>
                     <?php if($data->num_rows == 0): ?>
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
+                            <td colspan="10" class="text-center py-5 text-muted">
                                 <i class="bi bi-folder-x fs-1 d-block mb-2 text-success opacity-50"></i>
                                 Belum ada data pada bulan <?= date('F Y', strtotime($tgl_awal)) ?>
                             </td>
@@ -214,11 +230,35 @@ $no = 1;
                         <tr>
                             <td class="ps-4 fw-semibold text-muted"><?= $no++ ?></td>
                             <td class="fw-bold text-secondary"><?= date("d M Y", strtotime($row['tanggal'])) ?></td>
-                            <td><span class="text-success fw-bold">Rp <?= number_format($row['total_omset'],0,',','.') ?></span></td>
-                            <td class="text-muted">Rp <?= number_format($row['total_pengeluaran'],0,',','.') ?></td>
-                            <td class="fw-semibold text-primary">Rp <?= number_format($row['total_operasional'],0,',','.') ?></td>
-                            <td class="fw-semibold text-primary">Rp <?= number_format($row['total_operasional'],0,',','.') ?></td>
-                            <td><span class="fw-bold" style="color: #047857 !important;">Rp <?= number_format($row['net_profit'],0,',','.') ?></span></td>
+                            <td>
+    <span class="text-success fw-bold">
+        Rp <?= number_format($row['total_omset'], 0, ',', '.') ?>
+    </span>
+</td>
+
+<td class="text-muted">
+    Rp <?= number_format($row['total_pengeluaran'], 0, ',', '.') ?>
+</td>
+
+<td class="fw-semibold text-primary">
+                                Rp <?= number_format($row['total_operasional'], 0, ',', '.') ?>
+                            </td>
+
+                            <!-- SISA TUNAI -->
+                            <td class="fw-semibold <?= $row['sisa_tunai'] < 0 ? 'text-danger' : 'text-primary' ?>">
+                                Rp <?= number_format($row['sisa_tunai'], 0, ',', '.') ?>
+                            </td>
+
+                            <!-- SISA QRIS -->
+                            <td class="fw-semibold <?= $row['sisa_qris'] < 0 ? 'text-danger' : 'text-warning' ?>">
+                                Rp <?= number_format($row['sisa_qris'], 0, ',', '.') ?>
+                            </td>
+
+                            <td>
+                                <span class="fw-bold" style="color: #047857 !important;">
+                                    Rp <?= number_format($row['net_profit'], 0, ',', '.') ?>
+                                </span>
+                            </td>
                             <td>
                                 <span class="badge badge-modern bg-success-subtle text-success border-success-subtle">
                                     <i class="bi bi-graph-up-arrow me-1"></i> <?= number_format($row['persentase'],2) ?>%
