@@ -98,188 +98,163 @@ if(isset($_POST['simpan'])){
     }
 
 
-    // =================================================
-    // PENDAPATAN / OMZET
-    // =================================================
-    $tunai = cleanNumber($_POST['tunai'] ?? 0);
-    $qris  = cleanNumber($_POST['qris'] ?? 0);
-    $grab  = cleanNumber($_POST['grab_food'] ?? 0);
-    $go    = cleanNumber($_POST['go_food'] ?? 0);
+ // =================================================
+// PENDAPATAN / OMZET
+// =================================================
+$tunai = cleanNumber($_POST['tunai'] ?? 0);
+$qris  = cleanNumber($_POST['qris'] ?? 0);
+$grab  = cleanNumber($_POST['grab_food'] ?? 0);
+$go    = cleanNumber($_POST['go_food'] ?? 0);
 
-    $total_omset =
-        $tunai +
-        $qris +
-        $grab +
-        $go;
-
-
-    // =================================================
-    // BELANJA RUTIN
-    // =================================================
-    $pasar =
-        cleanNumber($_POST['belanja_pasar'] ?? 0);
-
-    $sembako =
-        cleanNumber($_POST['belanja_sembako'] ?? 0);
-
-    $beras =
-        cleanNumber($_POST['belanja_beras'] ?? 0);
-
-    $toko =
-        cleanNumber($_POST['belanja_toko'] ?? 0);
-
-    $total_rutin =
-        $pasar +
-        $sembako +
-        $beras +
-        $toko;
+$total_omset =
+    $tunai +
+    $qris +
+    $grab +
+    $go;
 
 
-    // =================================================
-    // BEBAN OPERASIONAL
-    // =================================================
-    $sewa =
-        cleanNumber($_POST['sewa'] ?? 0);
+// =================================================
+// BELANJA RUTIN
+// =================================================
+$pasar =
+    cleanNumber($_POST['belanja_pasar'] ?? 0);
 
-    $gaji =
-        cleanNumber($_POST['gaji'] ?? 0);
+$sembako =
+    cleanNumber($_POST['belanja_sembako'] ?? 0);
 
-    $listrik =
-        cleanNumber($_POST['listrik'] ?? 0);
+$beras =
+    cleanNumber($_POST['belanja_beras'] ?? 0);
 
-    $air =
-        cleanNumber($_POST['air'] ?? 0);
+$toko =
+    cleanNumber($_POST['belanja_toko'] ?? 0);
 
-    $sampah =
-        cleanNumber($_POST['sampah'] ?? 0);
-
-    $keamanan =
-        cleanNumber($_POST['keamanan'] ?? 0);
-
-    $internet =
-        cleanNumber($_POST['internet'] ?? 0);
-
-    $gas =
-        cleanNumber($_POST['gas'] ?? 0);
-
-    $mingguan_karyawan =
-        cleanNumber($_POST['mingguan_karyawan'] ?? 0);
-
-    $es_batu =
-        cleanNumber($_POST['es_batu'] ?? 0);
-
-    $bensin =
-        cleanNumber($_POST['bensin'] ?? 0);
-
-    $lain =
-        cleanNumber($_POST['lain_lain'] ?? 0);
+$total_rutin =
+    $pasar +
+    $sembako +
+    $beras +
+    $toko;
 
 
-    $total_op =
-        $sewa +
-        $gaji +
-        $listrik +
-        $air +
-        $sampah +
-        $keamanan +
-        $internet +
-        $gas +
-        $mingguan_karyawan +
-        $es_batu +
-        $bensin +
-        $lain;
+// =================================================
+// BEBAN OPERASIONAL
+// =================================================
+$sewa =
+    cleanNumber($_POST['sewa'] ?? 0);
+
+$gaji =
+    cleanNumber($_POST['gaji'] ?? 0);
+
+$listrik =
+    cleanNumber($_POST['listrik'] ?? 0);
+
+$air =
+    cleanNumber($_POST['air'] ?? 0);
+
+$sampah =
+    cleanNumber($_POST['sampah'] ?? 0);
+
+$keamanan =
+    cleanNumber($_POST['keamanan'] ?? 0);
+
+$internet =
+    cleanNumber($_POST['internet'] ?? 0);
+
+$gas =
+    cleanNumber($_POST['gas'] ?? 0);
+
+$mingguan_karyawan =
+    cleanNumber($_POST['mingguan_karyawan'] ?? 0);
+
+$es_batu =
+    cleanNumber($_POST['es_batu'] ?? 0);
+
+$bensin =
+    cleanNumber($_POST['bensin'] ?? 0);
+
+$lain =
+    cleanNumber($_POST['lain_lain'] ?? 0);
 
 
-    // TOTAL PENGELUARAN
-    // =================================================
-    $total_pengeluaran =
+$total_op =
+    $sewa +
+    $gaji +
+    $listrik +
+    $air +
+    $sampah +
+    $keamanan +
+    $internet +
+    $gas +
+    $mingguan_karyawan +
+    $es_batu +
+    $bensin +
+    $lain;
+
+
+// =================================================
+// TOTAL PENGELUARAN
+// =================================================
+$total_pengeluaran =
     $total_rutin +
     $total_op;
 
-    // =================================================
-    // LOGIKA TUNAI → QRIS
-    // =================================================
-    // Pengeluaran terlebih dahulu diambil dari TUNAI.
-    // Jika tunai tidak cukup, kekurangannya
-    // akan diambil dari QRIS.
-    // =================================================
 
-    $sisa_tunai =
-    $tunai - $total_pengeluaran;
+// =================================================
+// SISA TUNAI (Sesuai Excel: Tunai - Total Pengeluaran)
+// =================================================
+$sisa_tunai =
+    $tunai -
+    $total_pengeluaran;
 
-    // =================================================
-    // HITUNG KEKURANGAN UNTUK QRIS
-    // =================================================
-    // Jika total pengeluaran lebih besar
-    // dari uang tunai, maka selisihnya
-    // diambil dari QRIS.
-    // =================================================
 
-    $kekurangan =
-    max(
-    0,
-    $total_pengeluaran - $tunai
-    );
-
-    // =================================================
-    // PENCAIRAN QRIS
-    // =================================================
-    // Pencairan QRIS diinput secara manual.
-    // =================================================
-
-    $pencairan_qris =
+// =================================================
+// PENCAIRAN QRIS
+// =================================================
+$pencairan_qris =
     cleanNumber(
-    $_POST['pencairan_qris'] ?? 0
+        $_POST['pencairan_qris'] ?? 0
     );
 
-    // =================================================
-    // HITUNG SISA QRIS
-    // =================================================
-    // QRIS berkurang karena:
-    // 1. Kekurangan pembayaran dari Tunai
-    // 2. Pencairan QRIS
-    // =================================================
 
-    $sisa_qris =
+// =================================================
+// SISA QRIS
+// =================================================
+// Murni saldo QRIS setelah dikurangi pencairan manual
+// =================================================
+$sisa_qris =
     $qris -
-    $kekurangan -
     $pencairan_qris;
 
-    // =================================================
-    // TOTAL SISA UANG
-    // =================================================
 
-    $sisa =
+// =================================================
+// TOTAL SISA UANG
+// =================================================
+$sisa =
     $sisa_tunai +
     $sisa_qris;
 
-    // =================================================
-    // NET PROFIT BERSIH
-    // =================================================
-    // Net Profit =
-    // + Sisa QRIS
-    // + Go Food
-    // + Grab Food
-    // =================================================
 
-    $net =
+// =================================================
+// NET PROFIT BERSIH (Sesuai Excel)
+// =================================================
+// Net Profit = Sisa Tunai + Sisa QRIS + Go Food + Grab Food
+// =================================================
+$net =
     $sisa_qris +
     $go +
     $grab;
 
-    // =================================================
-    // PERSENTASE / MARGIN KEUNTUNGAN
-    // =================================================
-    // Margin = Net Profit : Total Omzet × 100%
-    // =================================================
 
-    $persen =
+// =================================================
+// PERSENTASE / MARGIN KEUNTUNGAN
+// =================================================
+$persen =
     $total_omset > 0
-    ? round(
-    ($net / $total_omset) * 100,
-    2
-    )
-    : 0;
+        ? round(
+            ($net / $total_omset) * 100,
+            2
+        )
+        : 0;
+        
     // =================================================
     // 4. UPLOAD AMAN
     // =================================================
@@ -854,6 +829,7 @@ body {
                     ];
                     foreach ($pendapatan_items as $k => $v):
                     ?>
+                    
                         <div class="col-6 col-md-3">
                             <label class="form-label"><?= $v ?></label>
                             <div class="input-group">
@@ -862,6 +838,22 @@ body {
                             </div>
                         </div>
                     <?php endforeach; ?>
+
+                    <!-- PENCAIRAN QRIS (Dipindahkan ke Pendapatan) -->
+                    <div class="col-6 col-md-3">
+                        <label class="form-label fw-bold">Pencairan QRIS</label>
+                        <div class="input-group">
+                            <span class="input-group-text input-group-text-custom bg-warning text-dark border-warning">Rp</span>
+                            <input
+                                type="text"
+                                id="pencairan_qris"
+                                name="pencairan_qris"
+                                class="form-control form-control-custom bg-light fw-bold text-dark"
+                                value="0"
+                                oninput="formatPencairanQRIS(this); hitung()"
+                            >
+                        </div>
+                    </div>
 
                     <div class="col-12 col-md-3">
                         <label class="form-label fw-bold text-success">Total Pendapatan/Omzet</label>
@@ -920,7 +912,7 @@ body {
                 <i class="bi bi-receipt fs-5"></i> 3. Beban Biaya Operasional
             </div>
             <div class="card-body p-4 p-mobile-custom">
-                <div class="row g-3 mb-3">
+                <div class="row g-3">
                     <?php
                     $operasional_items = [
                         'sewa' => 'Sewa Ruko',
@@ -954,36 +946,6 @@ body {
                             <input type="text" id="total_op" class="form-control form-control-custom bg-light fw-bold text-primary border-primary" readonly>
                         </div>
                     </div>
-                </div>
-
-               <!-- PENCAIRAN QRIS -->
-
-                <div class="row">
-
-                    <div class="col-12 col-md-3">
-
-                        <label class="form-label fw-bold">
-                            Pencairan QRIS
-                        </label>
-
-                        <div class="input-group">
-
-                            <span class="input-group-text input-group-text-custom bg-warning text-dark border-warning">
-                                Rp
-                            </span>
-
-                            <input
-                                type="text"
-                                id="pencairan_qris"
-                                class="form-control form-control-custom bg-light fw-bold text-dark"
-                                value="0"
-                                oninput="formatPencairanQRIS(this); hitung()"
-                            >
-
-                        </div>
-
-                    </div>
-
                 </div>
             </div>
         </div>
@@ -1089,8 +1051,84 @@ body {
 </div>
 
 
-<script>
+<script> 
 
+// Fungsi untuk mempresi gambar jika ukurannya > 2MB
+function kompresGambar(file, maxMB = 2, quality = 0.7) {
+    return new Promise((resolve) => {
+        // Jika ukuran file <= 2MB, langsung kembalikan file asli
+        if (file.size <= maxMB * 1024 * 1024) {
+            resolve(file);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function (event) {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = function () {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Turunkan resolusi maks lebar/tinggi ke 1920px (opsional, agar kompresi lebih optimal)
+                const maxDimension = 1920;
+                if (width > maxDimension || height > maxDimension) {
+                    if (width > height) {
+                        height = Math.round((height * maxDimension) / width);
+                        width = maxDimension;
+                    } else {
+                        width = Math.round((width * maxDimension) / height);
+                        height = maxDimension;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Konversi canvas ke Blob/File baru dengan format JPEG dan kualitas 70%
+                canvas.toBlob((blob) => {
+                    const compressedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    resolve(compressedFile);
+                }, 'image/jpeg', quality);
+            };
+        };
+    });
+}
+
+// Pasang listener pada seluruh input file nota (foto_nota1, foto_nota2, dst)
+document.addEventListener('DOMContentLoaded', function() {
+    const inputNotas = document.querySelectorAll('input[type="file"][name^="foto_nota"]');
+
+    inputNotas.forEach(input => {
+        input.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Jika ukuran > 2 MB, lakukan kompresi
+            if (file.size > 2 * 1024 * 1024) {
+                // Tampilkan notifikasi kecil/efek loading jika perlu
+                console.log(`Mengompresi ${file.name} dari ${(file.size / 1024 / 1024).toFixed(2)} MB...`);
+
+                const fileHasilKompres = await kompresGambar(file, 2, 0.7);
+
+                // Ganti file di input element dengan file yang sudah dikompres
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(fileHasilKompres);
+                e.target.files = dataTransfer.files;
+
+                console.log(`Berhasil dikompresi menjadi ${(fileHasilKompres.size / 1024 / 1024).toFixed(2)} MB`);
+            }
+        });
+    });
+});
 // =====================================================
 // FORMAT RUPIAH
 // =====================================================
@@ -1189,282 +1227,58 @@ function formatPencairanQRIS(input) {
 
 function hitung() {
 
-    // =================================================
-    // PENDAPATAN
-    // =================================================
+    let tunai = getPureNumber('[name="tunai"]');
+    let qris = getPureNumber('[name="qris"]');
+    let grab = getPureNumber('[name="grab_food"]');
+    let go = getPureNumber('[name="go_food"]');
 
-    let tunai =
-        getPureNumber('[name="tunai"]');
-
-    let qris =
-        getPureNumber('[name="qris"]');
-
-    let grab =
-        getPureNumber('[name="grab_food"]');
-
-    let go =
-        getPureNumber('[name="go_food"]');
-
-
-    // =================================================
-    // TOTAL OMZET
-    // =================================================
-
-    let omset =
-        tunai +
-        qris +
-        grab +
-        go;
-
-
-    document.getElementById(
-        'total_omset'
-    ).value =
-        formatRupiahMask(omset);
-
-
-    // =================================================
-    // BELANJA RUTIN
-    // =================================================
-
-    let rutin =
-        Array
-            .from(
-                document.querySelectorAll(
-                    '.hitung_rutin'
-                )
-            )
-            .reduce(
-                (sum, el) =>
-                    sum +
-                    getPureNumber(el),
-                0
-            );
-
-
-    document.getElementById(
-        'total_rutin'
-    ).value =
-        formatRupiahMask(rutin);
-
-
-    // =================================================
-    // OPERASIONAL
-    // =================================================
-
-    let op =
-        Array
-            .from(
-                document.querySelectorAll(
-                    '.hitung_op'
-                )
-            )
-            .reduce(
-                (sum, el) =>
-                    sum +
-                    getPureNumber(el),
-                0
-            );
-
-
-    document.getElementById(
-        'total_op'
-    ).value =
-        formatRupiahMask(op);
-
-
-    // =================================================
-    // TOTAL PENGELUARAN
-    // =================================================
-
-    let total_pengeluaran =
-        rutin +
-        op;
-
-
-    document.getElementById(
-        'total_pengeluaran'
-    ).value =
-        formatRupiahMask(
-            total_pengeluaran
-        );
-
-
-    // =================================================
-    // LOGIKA TUNAI → QRIS
-    // =================================================
-
-    /*
-     * Pengeluaran terlebih dahulu diambil dari TUNAI.
-     *
-     * Jika Tunai mencukupi:
-     *
-     * Tunai       = 1.000.000
-     * Pengeluaran =   700.000
-     *
-     * Sisa Tunai  =   300.000
-     * Kekurangan  =         0
-     *
-     *
-     * Jika Tunai tidak mencukupi:
-     *
-     * Tunai       = 1.000.000
-     * Pengeluaran = 1.200.000
-     *
-     * Sisa Tunai  = -200.000
-     * Kekurangan  = 200.000
-     *
-     * Kekurangan tersebut diambil dari QRIS.
-     */
-
-
-    // =================================================
-    // SISA TUNAI
-    // =================================================
-
-    let sisa_tunai =
-        tunai -
-        total_pengeluaran;
-
-
-    // =================================================
-    // KEKURANGAN YANG DIAMBIL DARI QRIS
-    // =================================================
-
-    let kekurangan =
-        Math.max(
-            0,
-            total_pengeluaran - tunai
-        );
-
-
-    // =================================================
-    // PENCAIRAN QRIS
-    // =================================================
-
-    /*
-     * Nominal diisi MANUAL oleh pengguna.
-     *
-     * Contoh:
-     *
-     * QRIS             = 2.000.000
-     * Kekurangan Tunai =   200.000
-     * Pencairan QRIS   =   500.000
-     *
-     * Sisa QRIS:
-     *
-     * 2.000.000
-     * - 200.000
-     * - 500.000
-     * = 1.300.000
-     */
-
+    // Pencairan QRIS
     let pencairan_qris = 0;
-
-    const elPencairanQRIS =
-        document.getElementById(
-            'pencairan_qris'
-        );
-
+    const elPencairanQRIS = document.getElementById('pencairan_qris');
     if (elPencairanQRIS) {
-
-        pencairan_qris =
-            parseFloat(
-                String(
-                    elPencairanQRIS.value || 0
-                )
+        pencairan_qris = parseFloat(
+            String(elPencairanQRIS.value || 0)
                 .replace(/\./g, '')
                 .replace(/[^0-9-]/g, '')
-            ) || 0;
-
+        ) || 0;
     }
 
+    // TOTAL OMZET (Otomatis dikurangi Pencairan QRIS)
+    let omset = (tunai + qris + grab + go) - pencairan_qris;
 
-    // =================================================
+    document.getElementById('total_omset').value = formatRupiahWithMinus(omset);
+
+    // BELANJA RUTIN
+    let rutin = Array.from(document.querySelectorAll('.hitung_rutin'))
+        .reduce((sum, el) => sum + getPureNumber(el), 0);
+    document.getElementById('total_rutin').value = formatRupiahMask(rutin);
+
+    // OPERASIONAL
+    let op = Array.from(document.querySelectorAll('.hitung_op'))
+        .reduce((sum, el) => sum + getPureNumber(el), 0);
+    document.getElementById('total_op').value = formatRupiahMask(op);
+
+    // TOTAL PENGELUARAN
+    let total_pengeluaran = rutin + op;
+    document.getElementById('total_pengeluaran').value = formatRupiahMask(total_pengeluaran);
+
+    // SISA TUNAI
+    let sisa_tunai = tunai - total_pengeluaran;
+    document.getElementById('sisa_tunai').value = formatRupiahWithMinus(sisa_tunai);
+
     // SISA QRIS
-    // =================================================
-
-    /*
-     * QRIS berkurang karena:
-     *
-     * 1. Kekurangan pembayaran dari Tunai
-     * 2. Pencairan QRIS manual
-     */
-
-    let sisa_qris =
-        qris -
-        kekurangan -
-        pencairan_qris;
-
-
-    // =================================================
-    // TAMPILKAN SISA TUNAI
-    // =================================================
-
-    document.getElementById(
-        'sisa_tunai'
-    ).value =
-        formatRupiahWithMinus(
-            sisa_tunai
-        );
-
-
-    // =================================================
-    // TAMPILKAN SISA QRIS
-    // =================================================
-
-    if (
-        document.getElementById(
-            'sisa_qris'
-        )
-    ) {
-
-        document.getElementById(
-            'sisa_qris'
-        ).value =
-            formatRupiahWithMinus(
-                sisa_qris
-            );
-
+    let sisa_qris = qris - pencairan_qris;
+    if (document.getElementById('sisa_qris')) {
+        document.getElementById('sisa_qris').value = formatRupiahWithMinus(sisa_qris);
     }
 
-
-    // =================================================
     // NET PROFIT
-    // =================================================
+    let net = sisa_tunai + sisa_qris + go + grab;
+    document.getElementById('net_profit').value = formatRupiahWithMinus(net);
 
-    let net =
-        sisa_tunai +
-        sisa_qris +
-        go +
-        grab;
-        
-    document.getElementById(
-        'net_profit'
-    ).value =
-        formatRupiahMask(
-            net
-        );
-
-
-    // =================================================
-    // PERSENTASE
-    // =================================================
-
-    let persen =
-        omset > 0
-            ? (
-                net /
-                omset *
-                100
-            ).toFixed(2)
-            : 0;
-
-
-    document.getElementById(
-        'persentase'
-    ).value =
-        persen;
+    // PERSENTASE MARGIN
+    let persen = omset > 0 ? ((net / omset) * 100).toFixed(2) : 0;
+    document.getElementById('persentase').value = persen;
 }
 
 // =====================================================

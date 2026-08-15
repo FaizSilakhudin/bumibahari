@@ -71,6 +71,8 @@ if(isset($_POST['update_laporan'])){
     $qris = (int)($_POST['qris']?? 0);
     $grab_food = (int)($_POST['grab_food']?? 0);
     $go_food = (int)($_POST['go_food']?? 0);
+    $pencairan_qris = (int)($_POST['pencairan_qris']?? 0); // Kebutuhan Pencairan QRIS
+
     $belanja_pasar = (int)($_POST['belanja_pasar']?? 0);
     $belanja_sembako = (int)($_POST['belanja_sembako']?? 0);
     $belanja_beras = (int)($_POST['belanja_beras']?? 0);
@@ -89,29 +91,37 @@ if(isset($_POST['update_laporan'])){
     $lain_lain = (int)($_POST['lain_lain']?? 0);
     $keterangan = $_POST['keterangan']?? '';
 
-    $total_omset = $tunai + $qris + $grab_food + $go_food;
+    // PERHITUNGAN DISESUAIKAN DENGAN INPUT CABANG
     $total_rutin = $belanja_pasar + $belanja_sembako + $belanja_beras + $belanja_toko;
     $total_operasional = $sewa + $gaji + $listrik + $air + $sampah + $keamanan + $internet + $gas + $mingguan_karyawan + $es_batu + $bensin + $lain_lain;
     $total_pengeluaran = $total_rutin + $total_operasional;
-    $net_profit = $total_omset - $total_pengeluaran;
-    $persentase = $total_omset > 0? round(($net_profit / $total_omset) * 100, 2) : 0;
+
+    // Omzet bersih setelah dipotong pencairan QRIS
+    $total_omset = ($tunai + $qris + $grab_food + $go_food) - $pencairan_qris;
+    
+    // Perhitungan sisa tunai dan QRIS
     $sisa_tunai = $tunai - $total_pengeluaran;
+    $sisa_qris = $qris - $pencairan_qris;
+    
+    // Net profit konsisten dengan form cabang
+    $net_profit = $sisa_tunai + $sisa_qris + $go_food + $grab_food;
+    $persentase = $total_omset > 0? round(($net_profit / $total_omset) * 100, 2) : 0;
 
     $sql = "UPDATE laporan_cabang SET
-            tunai=?, qris=?, grab_food=?, go_food=?, total_omset=?,
+            tunai=?, qris=?, grab_food=?, go_food=?, pencairan_qris=?, total_omset=?,
             belanja_pasar=?, belanja_sembako=?, belanja_beras=?, belanja_toko=?, total_rutin=?,
             sewa=?, gaji=?, listrik=?, air=?, sampah=?, keamanan=?, internet=?, gas=?, mingguan_karyawan=?, es_batu=?, bensin=?, lain_lain=?, total_operasional=?,
-            total_pengeluaran=?, sisa_tunai=?, net_profit=?, persentase=?, keterangan=?
+            total_pengeluaran=?, sisa_tunai=?, sisa_qris=?, net_profit=?, persentase=?, keterangan=?
             WHERE id=?";
 
     $stmt = $conn->prepare($sql);
-    $types = "iiiiiiiiiiiiiiiiiiiiiiiiiidsi";
+    $types = "iiiiiiiiiiiiiiiiiiiiiiiiiiiidsi";
     $stmt->bind_param(
         $types,
-        $tunai, $qris, $grab_food, $go_food, $total_omset,
+        $tunai, $qris, $grab_food, $go_food, $pencairan_qris, $total_omset,
         $belanja_pasar, $belanja_sembako, $belanja_beras, $belanja_toko, $total_rutin,
         $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $gas, $mingguan_karyawan, $es_batu, $bensin, $lain_lain, $total_operasional,
-        $total_pengeluaran, $sisa_tunai, $net_profit, $persentase, $keterangan, $id
+        $total_pengeluaran, $sisa_tunai, $sisa_qris, $net_profit, $persentase, $keterangan, $id
     );
 
     if($stmt->execute()){
@@ -124,7 +134,7 @@ if(isset($_POST['update_laporan'])){
 }
 
 // 2. Query Data Otomatis PAKAI PREPARED
-$where_sql = "WHERE l.tanggal BETWEEN? AND?";
+$where_sql = "WHERE l.tanggal BETWEEN ? AND ?";
 $params = [$tgl_awal, $tgl_akhir];
 $types = "ss";
 if($id_cabang!= '') {
@@ -142,7 +152,7 @@ $total_data = $stmt_count->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_data / $limit);
 
 // Query utama + LIMIT
-$query = "SELECT l.*, c.nama_cabang FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang $where_sql ORDER BY l.tanggal DESC LIMIT? OFFSET?";
+$query = "SELECT l.*, c.nama_cabang FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang $where_sql ORDER BY l.tanggal DESC LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($query);
 $types_limit = $types."ii";
 $params_limit = array_merge($params, [$limit, $offset]);
@@ -157,12 +167,12 @@ $stmt->bind_param($types,...$params);
 $stmt->execute();
 $total_omset = $stmt->get_result()->fetch_assoc()['total']?? 0;
 
-// Total Laba
-$sql_laba = "SELECT SUM(net_profit) as total FROM laporan_cabang l $where_sql";
-$stmt = $conn->prepare($sql_laba);
+// Total Net Profit (Disesuaikan dari Total Laba menjadi Net Profit Cabang)
+$sql_net_profit = "SELECT SUM(net_profit) as total FROM laporan_cabang l $where_sql";
+$stmt = $conn->prepare($sql_net_profit);
 $stmt->bind_param($types,...$params);
 $stmt->execute();
-$total_laba = $stmt->get_result()->fetch_assoc()['total']?? 0;
+$net_profit = $stmt->get_result()->fetch_assoc()['total']?? 0;
 
 $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
 ?>
@@ -190,43 +200,45 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                 <div class="col-lg-2 col-md-4">
                     <label class="form-label fw-semibold text-secondary small">Mode Filter</label>
                     <select name="filter" id="filterMode" class="form-select form-select-md border-2 bg-light">
-                        <option value="harian" <?= $filter=='harian'?'selected':''?>>Harian</option>
-                        <option value="mingguan" <?= $filter=='mingguan'?'selected':''?>>Mingguan</option>
-                        <option value="bulanan" <?= $filter=='bulanan'?'selected':''?>>Bulanan</option>
+                        <option value="harian" <?= ($filter ?? '') == 'harian' ? 'selected' : '' ?>>Harian</option>
+                        <option value="mingguan" <?= ($filter ?? '') == 'mingguan' ? 'selected' : '' ?>>Mingguan</option>
+                        <option value="bulanan" <?= ($filter ?? '') == 'bulanan' ? 'selected' : '' ?>>Bulanan</option>
                     </select>
                 </div>
 
                 <!-- INPUT HARIAN -->
                 <div class="col-lg-3 col-md-6 filter-input" id="input-harian">
                     <label class="form-label fw-semibold text-secondary small">Pilih Tanggal</label>
-                    <input type="date" name="tgl" value="<?= h($_GET['tgl']??date('Y-m-d'))?>" class="form-control form-control-md border-2 bg-light">
+                    <input type="date" name="tgl" value="<?= h($_GET['tgl'] ?? date('Y-m-d')) ?>" class="form-control form-control-md border-2 bg-light">
                 </div>
 
                 <!-- INPUT MINGGUAN -->
                 <div class="col-lg-3 col-md-6 filter-input d-none" id="input-mingguan">
                     <label class="form-label fw-semibold text-secondary small">Pilih Minggu</label>
-                    <input type="week" name="minggu" value="<?= h($_GET['minggu']??date('Y-\WW'))?>" class="form-control form-control-md border-2 bg-light">
+                    <input type="week" name="minggu" value="<?= h($_GET['minggu'] ?? date('Y-\WW')) ?>" class="form-control form-control-md border-2 bg-light">
                 </div>
 
                 <!-- INPUT BULAN -->
                 <div class="col-lg-3 col-md-6 filter-input d-none" id="input-bulanan">
                     <label class="form-label fw-semibold text-secondary small">Pilih Bulan</label>
-                    <input type="month" name="bulan" value="<?= h($_GET['bulan']??date('Y-m'))?>" class="form-control form-control-md border-2 bg-light">
+                    <input type="month" name="bulan" value="<?= h($_GET['bulan'] ?? date('Y-m')) ?>" class="form-control form-control-md border-2 bg-light">
                 </div>
 
                 <!-- Hidden untuk kirim tgl_awal & tgl_akhir ke PHP -->
-                <input type="hidden" name="tgl_awal" id="tgl_awal" value="<?= h($tgl_awal)?>">
-                <input type="hidden" name="tgl_akhir" id="tgl_akhir" value="<?= h($tgl_akhir)?>">
+                <input type="hidden" name="tgl_awal" id="tgl_awal" value="<?= h($tgl_awal ?? '') ?>">
+                <input type="hidden" name="tgl_akhir" id="tgl_akhir" value="<?= h($tgl_akhir ?? '') ?>">
 
                 <div class="col-lg-4 col-md-8">
                     <label class="form-label fw-semibold text-secondary small">Pilih Cabang</label>
                     <select name="id_cabang" class="form-select form-select-md border-2 bg-light">
                         <option value="">Semua Cabang</option>
-                        <?php $cabang->data_seek(0); while($c=$cabang->fetch_assoc()):?>
-                        <option value="<?= $c['id_cabang']?>" <?= $id_cabang==$c['id_cabang']?'selected':''?>>
-                            <?= h($c['nama_cabang'])?>
-                        </option>
-                        <?php endwhile;?>
+                        <?php if (isset($cabang) && $cabang->num_rows > 0): 
+                            $cabang->data_seek(0); 
+                            while($c = $cabang->fetch_assoc()): ?>
+                                <option value="<?= $c['id_cabang'] ?>" <?= ($id_cabang ?? '') == $c['id_cabang'] ? 'selected' : '' ?>>
+                                    <?= h($c['nama_cabang']) ?>
+                                </option>
+                        <?php endwhile; endif; ?>
                     </select>
                 </div>
                 <div class="col-lg-2 col-md-4 d-grid">
@@ -238,13 +250,14 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
         </div>
     </div>
 
+    <!-- Ringkasan Omzet & Laba Bersih -->
     <div class="row g-3 mb-4">
         <div class="col-md-6">
             <div class="card border-0 shadow-sm border-start border-4 border-primary h-100" style="border-radius: 8px;">
                 <div class="card-body d-flex align-items-center justify-content-between p-4">
                     <div>
                         <span class="text-muted small text-uppercase fw-bold tracking-wider">Total Omzet</span>
-                        <h3 class="text-primary fw-bold mb-0 mt-1">Rp <?= number_format($total_omset,0,',','.')?></h3>
+                        <h3 class="text-primary fw-bold mb-0 mt-1">Rp <?= number_format($total_omset ?? 0, 0, ',', '.') ?></h3>
                     </div>
                     <div class="bg-primary bg-opacity-10 text-primary p-3 rounded-3">
                         <i class="bi bi-wallet2 fs-3"></i>
@@ -256,8 +269,8 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
             <div class="card border-0 shadow-sm border-start border-4 border-success h-100" style="border-radius: 8px;">
                 <div class="card-body d-flex align-items-center justify-content-between p-4">
                     <div>
-                        <span class="text-muted small text-uppercase fw-bold tracking-wider">Total Laba Bersih</span>
-                        <h3 class="text-success fw-bold mb-0 mt-1">Rp <?= number_format($total_laba,0,',','.')?></h3>
+                        <span class="text-muted small text-uppercase fw-bold tracking-wider">Net Profit</span>
+                        <h3 class="text-success fw-bold mb-0 mt-1">Rp <?= number_format($net_profit ?? 0, 0, ',', '.') ?></h3>
                     </div>
                     <div class="bg-success bg-opacity-10 text-success p-3 rounded-3">
                         <i class="bi bi-graph-up-arrow fs-3"></i>
@@ -267,6 +280,7 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
         </div>
     </div>
 
+    <!-- Tabel Data Laporan -->
     <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -279,83 +293,88 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                             <th class="py-3">Pengelola</th>
                             <th class="py-3">Omzet</th>
                             <th class="py-3">Pengeluaran</th>
-                            <th class="py-3">Laba Bersih</th>
+                            <th class="py-3">Net Profit</th>
                             <th class="py-3">Margin</th>
                             <th class="py-3">Pencairan QRIS</th>
                             <th class="py-3 text-center">Foto Nota</th>
-                            <th class="py-3 text-center" width="15%">Aksi</th> <!-- LEBAR DITAMBAH -->
+                            <th class="py-3 text-center" width="15%">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if($data->num_rows==0):?>
-                        <tr><td colspan="10" class="text-center py-5 text-muted">Belum ada data laporan pada periode ini</td></tr>
-                        <?php endif;?>
-                        <?php $no=$offset+1; while($row=$data->fetch_assoc()):
-                        $margin = $row['persentase']?? 0;
-                        $id = $row['id'];
-                       ?>
+                        <?php if(!isset($data) || $data->num_rows == 0): ?>
                         <tr>
-                            <td class="text-center px-4 text-muted fw-bold"><?= $no++?></td>
-                            <td><span class="badge bg-light text-dark border p-2"><i class="bi bi-calendar3 me-1 text-muted"></i> <?= date('d/m/Y', strtotime($row['tanggal']))?></span></td>
-                            <td class="fw-semibold text-dark"><?= h($row['nama_cabang'])?></td>
-                            <td class="text-muted"><?= h($row['nama_pengelola'])?></td>
-                            <td><span class="text-dark fw-medium">Rp <?= number_format($row['total_omset']?? 0,0,',','.')?></span></td>
-                            <td><span class="text-secondary">Rp <?= number_format($row['total_pengeluaran']?? 0,0,',','.')?></span></td>
+                            <td colspan="11" class="text-center py-5 text-muted">Belum ada data laporan pada periode ini</td>
+                        </tr>
+                        <?php else: ?>
+                        <?php 
+                        $no = ($offset ?? 0) + 1; 
+                        while($row = $data->fetch_assoc()):
+                            $margin = $row['persentase'] ?? 0;
+                            $id = $row['id'];
+                        ?>
+                        <tr>
+                            <td class="text-center px-4 text-muted fw-bold"><?= $no++ ?></td>
+                            <td><span class="badge bg-light text-dark border p-2"><i class="bi bi-calendar3 me-1 text-muted"></i> <?= date('d/m/Y', strtotime($row['tanggal'])) ?></span></td>
+                            <td class="fw-semibold text-dark"><?= h($row['nama_cabang']) ?></td>
+                            <td class="text-muted"><?= h($row['nama_pengelola']) ?></td>
+                            <td><span class="text-dark fw-medium">Rp <?= number_format($row['total_omset'] ?? 0, 0, ',', '.') ?></span></td>
+                            <td><span class="text-secondary">Rp <?= number_format($row['total_pengeluaran'] ?? 0, 0, ',', '.') ?></span></td>
                             <td>
-                                <span class="fw-bold <?= ($row['net_profit']?? 0) >= 0? 'text-success' : 'text-danger'?>">
-                                    Rp <?= number_format($row['net_profit']?? 0,0,',','.')?>
+                                <span class="fw-bold <?= ($row['net_profit'] ?? 0) >= 0 ? 'text-success' : 'text-danger' ?>">
+                                    Rp <?= number_format($row['net_profit'] ?? 0, 0, ',', '.') ?>
                                 </span>
                             </td>
                             <td>
-                                <span class="badge <?= $margin >= 20? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'?> px-2 py-1.5 rounded">
-                                    <?= number_format($margin,2)?>%
+                                <span class="badge <?= $margin >= 20 ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' ?> px-2 py-1.5 rounded">
+                                    <?= number_format($margin, 2) ?>%
                                 </span>
                             </td>
                             <td>
-                                <span class="fw-bold <?= ($row['net_profit']?? 0) >= 0? 'text-success' : 'text-danger'?>">
-                                    Rp <?= number_format($row['net_profit']?? 0,0,',','.')?>
+                                <span class="fw-semibold text-primary">
+                                    Rp <?= number_format($row['pencairan_qris'] ?? 0, 0, ',', '.') ?>
                                 </span>
                             </td>
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-1">
-                                    <?php for($i=1; $i<=4; $i++):
-                                    if(!empty($row["foto_nota$i"])):?>
-                                    <a href="../uploads/nota/<?= h($row["foto_nota$i"])?>" target="_blank" class="d-inline-block">
-                                        <img src="../uploads/nota/<?= h($row["foto_nota$i"])?>" width="38" height="38" class="img-thumbnail rounded-2 shadow-sm object-fit-cover" style="transition: transform.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                                    </a>
-                                    <?php endif; endfor;?>
+                                    <?php for($i = 1; $i <= 4; $i++):
+                                        if(!empty($row["foto_nota$i"])): ?>
+                                        <a href="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" target="_blank" class="d-inline-block">
+                                            <img src="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" width="38" height="38" class="img-thumbnail rounded-2 shadow-sm object-fit-cover" style="transition: transform .2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                                        </a>
+                                    <?php endif; endfor; ?>
                                 </div>
                             </td>
                             <td class="text-center px-4">
                                 <div class="d-inline-flex gap-2 justify-content-center">
-                                    <button class="btn btn-sm btn-outline-primary px-3 rounded-pill fw-medium" data-bs-toggle="modal" data-bs-target="#detailModal<?= $id?>">
+                                    <button class="btn btn-sm btn-outline-primary px-3 rounded-pill fw-medium" data-bs-toggle="modal" data-bs-target="#detailModal<?= $id ?>">
                                         <i class="bi bi-pencil-square me-1"></i> Edit
                                     </button>
 
-                                    <!-- TOMBOL HAPUS BARU -->
-                                    <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus laporan tanggal <?= date('d/m/Y', strtotime($row['tanggal']))?> cabang <?= h($row['nama_cabang'])?>?')">
-                                        <input type="hidden" name="csrf" value="<?=csrf_token()?>">
-                                        <input type="hidden" name="id" value="<?= $id?>">
+                                    <!-- TOMBOL HAPUS -->
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus laporan tanggal <?= date('d/m/Y', strtotime($row['tanggal'])) ?> cabang <?= h($row['nama_cabang']) ?>?')">
+                                        <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                                        <input type="hidden" name="id" value="<?= $id ?>">
                                         <button type="submit" name="hapus_laporan" class="btn btn-sm btn-action-delete">
                                             <i class="bi bi-trash-fill me-1"></i> Hapus
                                         </button>
                                     </form>
                                 </div>
 
-                                <div class="modal fade text-start" id="detailModal<?= $id?>" tabindex="-1" aria-hidden="true">
+                                <!-- MODAL EDIT -->
+                                <div class="modal fade text-start" id="detailModal<?= $id ?>" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered m-2 m-sm-auto">
                                         <form method="POST" class="w-100">
-                                            <input type="hidden" name="csrf" value="<?=csrf_token()?>">
-                                            <input type="hidden" name="id" value="<?= $id?>">
+                                            <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                                            <input type="hidden" name="id" value="<?= $id ?>">
                                             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
 
                                                 <div class="modal-header bg-dark text-white p-3 p-sm-4">
                                                     <div>
                                                         <h5 class="modal-title fw-bold mb-1 fs-6 fs-sm-5">Detail & Koreksi Laporan</h5>
                                                         <small class="text-white-50 d-block" style="font-size: 0.75rem;">
-                                                            <i class="bi bi-shop me-1"></i> <?= h($row['nama_cabang'])?>
+                                                            <i class="bi bi-shop me-1"></i> <?= h($row['nama_cabang']) ?>
                                                             <span class="mx-1">|</span>
-                                                            <i class="bi bi-calendar3 me-1"></i> <?= date('d/m/Y', strtotime($row['tanggal']))?>
+                                                            <i class="bi bi-calendar3 me-1"></i> <?= date('d/m/Y', strtotime($row['tanggal'])) ?>
                                                         </small>
                                                     </div>
                                                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -364,6 +383,7 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                                 <div class="modal-body p-3 p-sm-4 bg-light">
                                                     <div class="row g-3">
 
+                                                        <!-- 1. PENDAPATAN (OMZET) -->
                                                         <div class="col-lg-6">
                                                             <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
                                                                 <div class="card-header bg-primary bg-opacity-10 text-primary border-0 py-2.5 px-3 fw-bold small">
@@ -372,30 +392,35 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                                                 <div class="card-body p-3">
                                                                     <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded mb-3 border">
                                                                         <span class="fw-semibold text-secondary small">Total Terkalkulasi</span>
-                                                                        <span class="text-primary fw-bold small">Rp <?= number_format($row['total_omset']?? 0,0,',','.')?></span>
+                                                                        <span class="text-primary fw-bold small">Rp <?= number_format($row['total_omset'] ?? 0, 0, ',', '.') ?></span>
                                                                     </div>
                                                                     <div class="row g-2">
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Tunai</label>
-                                                                            <input type="number" name="tunai" class="form-control form-control-sm border-2" value="<?= $row['tunai']?? 0?>">
+                                                                            <input type="number" name="tunai" class="form-control form-control-sm border-2" value="<?= $row['tunai'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">QRIS</label>
-                                                                            <input type="number" name="qris" class="form-control form-control-sm border-2" value="<?= $row['qris']?? 0?>">
+                                                                            <input type="number" name="qris" class="form-control form-control-sm border-2" value="<?= $row['qris'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Grab Food</label>
-                                                                            <input type="number" name="grab_food" class="form-control form-control-sm border-2" value="<?= $row['grab_food']?? 0?>">
+                                                                            <input type="number" name="grab_food" class="form-control form-control-sm border-2" value="<?= $row['grab_food'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Go Food</label>
-                                                                            <input type="number" name="go_food" class="form-control form-control-sm border-2" value="<?= $row['go_food']?? 0?>">
+                                                                            <input type="number" name="go_food" class="form-control form-control-sm border-2" value="<?= $row['go_food'] ?? 0 ?>">
+                                                                        </div>
+                                                                        <div class="col-12 mt-2">
+                                                                            <label class="small text-danger fw-semibold mb-1" style="font-size: 0.75rem;">Pencairan QRIS (Pengurang Omzet)</label>
+                                                                            <input type="number" name="pencairan_qris" class="form-control form-control-sm border-2 border-danger-subtle bg-danger-subtle" value="<?= $row['pencairan_qris'] ?? 0 ?>">
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                         </div>
 
+                                                        <!-- 2. PENGELUARAN / BELANJA -->
                                                         <div class="col-lg-6">
                                                             <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
                                                                 <div class="card-header bg-danger bg-opacity-10 text-danger border-0 py-2.5 px-3 fw-bold small">
@@ -405,25 +430,26 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                                                     <div class="row g-2">
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Belanja Pasar</label>
-                                                                            <input type="number" name="belanja_pasar" class="form-control form-control-sm border-2" value="<?= $row['belanja_pasar']?? 0?>">
+                                                                            <input type="number" name="belanja_pasar" class="form-control form-control-sm border-2" value="<?= $row['belanja_pasar'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Belanja Sembako</label>
-                                                                            <input type="number" name="belanja_sembako" class="form-control form-control-sm border-2" value="<?= $row['belanja_sembako']?? 0?>">
+                                                                            <input type="number" name="belanja_sembako" class="form-control form-control-sm border-2" value="<?= $row['belanja_sembako'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Belanja Beras</label>
-                                                                            <input type="number" name="belanja_beras" class="form-control form-control-sm border-2" value="<?= $row['belanja_beras']?? 0?>">
+                                                                            <input type="number" name="belanja_beras" class="form-control form-control-sm border-2" value="<?= $row['belanja_beras'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Belanja Toko</label>
-                                                                            <input type="number" name="belanja_toko" class="form-control form-control-sm border-2" value="<?= $row['belanja_toko']?? 0?>">
+                                                                            <input type="number" name="belanja_toko" class="form-control form-control-sm border-2" value="<?= $row['belanja_toko'] ?? 0 ?>">
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                         </div>
 
+                                                        <!-- 3. BEBAN OPERASIONAL -->
                                                         <div class="col-lg-6">
                                                             <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
                                                                 <div class="card-header bg-secondary bg-opacity-10 text-dark border-0 py-2.5 px-3 fw-bold small">
@@ -433,57 +459,58 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                                                     <div class="row g-2">
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Sewa</label>
-                                                                            <input type="number" name="sewa" class="form-control form-control-sm border-2" value="<?= $row['sewa']?? 0?>">
+                                                                            <input type="number" name="sewa" class="form-control form-control-sm border-2" value="<?= $row['sewa'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Gaji</label>
-                                                                            <input type="number" name="gaji" class="form-control form-control-sm border-2" value="<?= $row['gaji']?? 0?>">
+                                                                            <input type="number" name="gaji" class="form-control form-control-sm border-2" value="<?= $row['gaji'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Listrik</label>
-                                                                            <input type="number" name="listrik" class="form-control form-control-sm border-2" value="<?= $row['listrik']?? 0?>">
+                                                                            <input type="number" name="listrik" class="form-control form-control-sm border-2" value="<?= $row['listrik'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Air</label>
-                                                                            <input type="number" name="air" class="form-control form-control-sm border-2" value="<?= $row['air']?? 0?>">
+                                                                            <input type="number" name="air" class="form-control form-control-sm border-2" value="<?= $row['air'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Sampah</label>
-                                                                            <input type="number" name="sampah" class="form-control form-control-sm border-2" value="<?= $row['sampah']?? 0?>">
+                                                                            <input type="number" name="sampah" class="form-control form-control-sm border-2" value="<?= $row['sampah'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Keamanan</label>
-                                                                            <input type="number" name="keamanan" class="form-control form-control-sm border-2" value="<?= $row['keamanan']?? 0?>">
+                                                                            <input type="number" name="keamanan" class="form-control form-control-sm border-2" value="<?= $row['keamanan'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Internet</label>
-                                                                            <input type="number" name="internet" class="form-control form-control-sm border-2" value="<?= $row['internet']?? 0?>">
+                                                                            <input type="number" name="internet" class="form-control form-control-sm border-2" value="<?= $row['internet'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Gas</label>
-                                                                            <input type="number" name="gas" class="form-control form-control-sm border-2" value="<?= $row['gas']?? 0?>">
+                                                                            <input type="number" name="gas" class="form-control form-control-sm border-2" value="<?= $row['gas'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Mingguan Karyawan</label>
-                                                                            <input type="number" name="mingguan_karyawan" class="form-control form-control-sm border-2" value="<?= $row['mingguan_karyawan']?? 0?>">
+                                                                            <input type="number" name="mingguan_karyawan" class="form-control form-control-sm border-2" value="<?= $row['mingguan_karyawan'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Es Batu</label>
-                                                                            <input type="number" name="es_batu" class="form-control form-control-sm border-2" value="<?= $row['es_batu']?? 0?>">
+                                                                            <input type="number" name="es_batu" class="form-control form-control-sm border-2" value="<?= $row['es_batu'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Bensin</label>
-                                                                            <input type="number" name="bensin" class="form-control form-control-sm border-2" value="<?= $row['bensin']?? 0?>">
+                                                                            <input type="number" name="bensin" class="form-control form-control-sm border-2" value="<?= $row['bensin'] ?? 0 ?>">
                                                                         </div>
                                                                         <div class="col-6">
                                                                             <label class="small text-muted mb-1" style="font-size: 0.75rem;">Lain-lain</label>
-                                                                            <input type="number" name="lain_lain" class="form-control form-control-sm border-2" value="<?= $row['lain_lain']?? 0?>">
+                                                                            <input type="number" name="lain_lain" class="form-control form-control-sm border-2" value="<?= $row['lain_lain'] ?? 0 ?>">
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                         </div>
 
+                                                        <!-- 4. CATATAN / KETERANGAN -->
                                                         <div class="col-lg-6">
                                                             <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
                                                                 <div class="card-header bg-success bg-opacity-10 text-success border-0 py-2.5 px-3 fw-bold small">
@@ -491,7 +518,7 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                                                 </div>
                                                                 <div class="card-body p-3 d-flex flex-column justify-content-between">
                                                                     <div>
-                                                                        <textarea name="keterangan" class="form-control border-2 mb-2 small" rows="3" placeholder="Tulis rincian tambahan di sini..."><?= h($row['keterangan']?? '')?></textarea>
+                                                                        <textarea name="keterangan" class="form-control border-2 mb-2 small" rows="3" placeholder="Tulis rincian tambahan di sini..."><?= h($row['keterangan'] ?? '') ?></textarea>
                                                                         <div class="text-muted d-block" style="font-size: 0.7rem;">
                                                                             <span class="fw-semibold">Petunjuk:</span> Rincian pengeluaran darurat/tidak terduga.
                                                                         </div>
@@ -516,10 +543,13 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                 </div>
                             </td>
                         </tr>
-                        <?php endwhile;?>
+                        <?php endwhile; endif; ?>
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+</div>
 
             <!-- PAGINATION -->
             <?php if($total_pages > 1):?>

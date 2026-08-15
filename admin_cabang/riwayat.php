@@ -14,14 +14,14 @@ if(!isset($_SESSION['role']) || $_SESSION['role'] != 'cabang'){
 $id_cabang = $_SESSION['id_cabang'];
 $nama_pengelola = $_SESSION['nama_pengelola'];
 
-// 1. LOGIKA PER BULAN - SUDAH DIFIX
+// 1. LOGIKA PER BULAN
 $bulan = $_GET['bulan'] ?? date('m');
 $tahun = $_GET['tahun'] ?? date('Y');
 
 $tgl_awal = date("$tahun-$bulan-01");
 $tgl_akhir = date("Y-m-t", strtotime($tgl_awal)); // akhir bulan
 
-// Bulan sebelumnya & sesudahnya untuk navigasi - FIX
+// Bulan sebelumnya & sesudahnya untuk navigasi
 $prev_time = strtotime('-1 month', strtotime($tgl_awal));
 $next_time = strtotime('+1 month', strtotime($tgl_awal));
 
@@ -30,21 +30,24 @@ $prev_tahun = date('Y', $prev_time);
 $next_bulan = date('m', $next_time);
 $next_tahun = date('Y', $next_time);
 
-// 2. AMBIL DATA LAPORAN 1 BULAN - SUDAH TAMBAH 4 KOLOM BO BARU
+// 2. AMBIL DATA LAPORAN 1 BULAN
 $stmt = $conn->prepare("SELECT 
                         tanggal,
-                        total_omset,
+                        pencairan_qris,
                         total_pengeluaran,
-                        net_profit,
-                        persentase,
                         total_operasional,
                         sisa_tunai,
                         sisa_qris,
-                        pencairan_qris,
-                        foto_nota1,
-                        foto_nota2,
-                        foto_nota3,
-                        foto_nota4
+                        -- Hitung ulang Total Omset
+                        ((tunai + qris + grab_food + go_food) - pencairan_qris) AS total_omset,
+                        -- Hitung ulang Net Profit agar selalu sinkron
+                        (sisa_tunai + sisa_qris + go_food + grab_food) AS net_profit,
+                        -- Hitung ulang Margin
+                        IF(((tunai + qris + grab_food + go_food) - pencairan_qris) > 0, 
+                            ((sisa_tunai + sisa_qris + go_food + grab_food) / ((tunai + qris + grab_food + go_food) - pencairan_qris)) * 100, 
+                            0
+                        ) AS persentase,
+                        foto_nota1, foto_nota2, foto_nota3, foto_nota4
                         FROM laporan_cabang
                         WHERE id_cabang=?
                         AND tanggal BETWEEN ? AND ?
@@ -163,7 +166,7 @@ $no = 1;
             font-size: 0.95rem !important;
         }
         .btn-nav-text {
-            display: none; /* Sembunyikan teks panjang tombol di HP, menyisakan ikon & teks singkat */
+            display: none;
         }
     }
 </style>
@@ -208,6 +211,7 @@ $no = 1;
                             <th class="ps-4" style="width: 70px;">No</th>
                             <th>Tanggal</th>
                             <th>Omzet</th>
+                            <th>Pencairan QRIS</th>
                             <th>Pengeluaran</th>
                             <th>Operasional</th>
                             <th>Sisa Tunai</th>
@@ -220,7 +224,7 @@ $no = 1;
                     <tbody>
                     <?php if($data->num_rows == 0): ?>
                         <tr>
-                            <td colspan="10" class="text-center py-5 text-muted">
+                            <td colspan="11" class="text-center py-5 text-muted">
                                 <i class="bi bi-folder-x fs-1 d-block mb-2 text-success opacity-50"></i>
                                 Belum ada data pada bulan <?= date('F Y', strtotime($tgl_awal)) ?>
                             </td>
@@ -231,16 +235,21 @@ $no = 1;
                             <td class="ps-4 fw-semibold text-muted"><?= $no++ ?></td>
                             <td class="fw-bold text-secondary"><?= date("d M Y", strtotime($row['tanggal'])) ?></td>
                             <td>
-    <span class="text-success fw-bold">
-        Rp <?= number_format($row['total_omset'], 0, ',', '.') ?>
-    </span>
-</td>
+                                <span class="text-success fw-bold">
+                                    Rp <?= number_format($row['total_omset'], 0, ',', '.') ?>
+                                </span>
+                            </td>
 
-<td class="text-muted">
-    Rp <?= number_format($row['total_pengeluaran'], 0, ',', '.') ?>
-</td>
+                            <!-- PENCAIRAN QRIS -->
+                            <td class="fw-semibold text-dark">
+                                Rp <?= number_format($row['pencairan_qris'] ?? 0, 0, ',', '.') ?>
+                            </td>
 
-<td class="fw-semibold text-primary">
+                            <td class="text-muted">
+                                Rp <?= number_format($row['total_pengeluaran'], 0, ',', '.') ?>
+                            </td>
+
+                            <td class="fw-semibold text-primary">
                                 Rp <?= number_format($row['total_operasional'], 0, ',', '.') ?>
                             </td>
 
