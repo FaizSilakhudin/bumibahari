@@ -98,7 +98,7 @@ if(isset($_POST['simpan'])){
     }
 
 
- // =================================================
+// =================================================
 // PENDAPATAN / OMZET
 // =================================================
 $tunai = cleanNumber($_POST['tunai'] ?? 0);
@@ -106,12 +106,15 @@ $qris  = cleanNumber($_POST['qris'] ?? 0);
 $grab  = cleanNumber($_POST['grab_food'] ?? 0);
 $go    = cleanNumber($_POST['go_food'] ?? 0);
 
+// PINDAHKAN KE SINI BIAR KEPAAKE DI OMZET
+$pencairan_qris = cleanNumber($_POST['pencairan_qris'] ?? 0);
+
 $total_omset =
     $tunai +
     $qris +
     $grab +
-    $go;
-
+    $go -
+    $pencairan_qris;
 
 // =================================================
 // BELANJA RUTIN
@@ -133,7 +136,6 @@ $total_rutin =
     $sembako +
     $beras +
     $toko;
-
 
 // =================================================
 // BEBAN OPERASIONAL
@@ -174,7 +176,6 @@ $bensin =
 $lain =
     cleanNumber($_POST['lain_lain'] ?? 0);
 
-
 $total_op =
     $sewa +
     $gaji +
@@ -189,7 +190,6 @@ $total_op =
     $bensin +
     $lain;
 
-
 // =================================================
 // TOTAL PENGELUARAN
 // =================================================
@@ -197,23 +197,12 @@ $total_pengeluaran =
     $total_rutin +
     $total_op;
 
-
 // =================================================
 // SISA TUNAI (Sesuai Excel: Tunai - Total Pengeluaran)
 // =================================================
 $sisa_tunai =
     $tunai -
     $total_pengeluaran;
-
-
-// =================================================
-// PENCAIRAN QRIS
-// =================================================
-$pencairan_qris =
-    cleanNumber(
-        $_POST['pencairan_qris'] ?? 0
-    );
-
 
 // =================================================
 // SISA QRIS
@@ -224,7 +213,6 @@ $sisa_qris =
     $qris -
     $pencairan_qris;
 
-
 // =================================================
 // TOTAL SISA UANG
 // =================================================
@@ -232,17 +220,16 @@ $sisa =
     $sisa_tunai +
     $sisa_qris;
 
-
 // =================================================
 // NET PROFIT BERSIH (Sesuai Excel)
 // =================================================
 // Net Profit = Sisa Tunai + Sisa QRIS + Go Food + Grab Food
 // =================================================
 $net =
-    $sisa_qris +
+    $sisa_qris + 
+    $sisa_tunai +
     $go +
     $grab;
-
 
 // =================================================
 // PERSENTASE / MARGIN KEUNTUNGAN
