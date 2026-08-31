@@ -1,5 +1,37 @@
+# =============================================================================
+#  Warteg Bumi Bahari — .htaccess (routing + pengerasan akses)
+# =============================================================================
+
+Options -Indexes
+ServerSignature Off
+
+# ---- Blokir file / folder sensitif dari akses web -----------------------------
+<FilesMatch "(?i)\.(sql|md|json|lock|log|ini|dist|sh|bak|old|inc|env)$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "^(\.htaccess|\.htaccess\.txt|\.gitignore|\.env|composer\.(json|lock)|magic|bootstrap\.php|hash\.php)$">
+    Require all denied
+</FilesMatch>
+
+# ---- Header keamanan (tidak mengubah tampilan) -------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "same-origin"
+    Header always set X-Permitted-Cross-Domain-Policies "none"
+    Header always unset X-Powered-By
+    Header unset X-Powered-By
+</IfModule>
+
+# ---- Routing + blokir folder sensitif --------------------------------------
 RewriteEngine On
 
+# Blokir seluruh isi folder internal (relatif ke lokasi .htaccess ini)
+RewriteRule ^(?:config|core|app|database|vendor)/ - [F,L]
+RewriteRule (^|/)\.(?:git|env)(/|$) - [F,L]
+
+# Routing lama: /foo -> /foo.php
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^(.+)$ $1.php [L,QSA]

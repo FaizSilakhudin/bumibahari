@@ -1,9 +1,4 @@
 <?php
-
-use App\Models\Cabang;
-use App\Models\Investor;
-
-require '../bootstrap.php';
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
@@ -12,614 +7,198 @@ if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
     header("Location:../login"); exit;
 }
 
-$bulan_ini = date('Y-m');
-$bulan_lalu = date('Y-m', strtotime('-1 month'));
+// =====================================================================
+// FILTER DASHBOARD — periode (bulan/tahun) + investor.
+// Semua isi dashboard mengikuti pilihan ini.
+// =====================================================================
+$sel_tahun = (int) ($_GET['tahun'] ?? date('Y'));
+$sel_bulan = (int) ($_GET['bulan'] ?? date('m'));
+if ($sel_tahun < tahun_data_paling_lama($conn) || $sel_tahun > ((int) date('Y') + 1)) $sel_tahun = (int) date('Y');
+if ($sel_bulan < 1 || $sel_bulan > 12) $sel_bulan = (int) date('m');
+
+$periode_ini   = sprintf('%04d-%02d', $sel_tahun, $sel_bulan);            // mis. 2026-08
+$periode_lalu  = date('Y-m', strtotime("$periode_ini-01 -1 month"));      // bulan sebelum yang dipilih
+$nama_periode  = date('F Y', strtotime("$periode_ini-01"));
+
+// "Hari ini" pada KPI diambil 1 hari ke belakang: laporan tgl 28 = data tgl 27.
 $hari_ini = date('Y-m-d');
+$kemarin  = date('Y-m-d', strtotime('-1 day'));
 
-// Filter investor - PAKAI PREPARED + TABEL RELASI
-$filter_investor = $_GET['investor'] ?? '';
-$where_filter = "";
-$where_filter_cabang = "";
+// ---- Filter investor (lewat tabel relasi cabang_investor) ----
+$filter_investor = ctype_digit((string) ($_GET['investor'] ?? '')) ? (int) $_GET['investor'] : 0;
+
+// Dashboard pusat hanya menghitung laporan yang sudah difinalisasi PIC (status 'lengkap'),
+// supaya baris nota-only (belum diisi PIC) tidak ikut ke angka KPI.
+$where_filter        = "AND l.status_laporan = 'lengkap'";   // untuk query yang JOIN/pakai laporan_cabang l
+$where_filter_cabang = "";   // untuk query yang pakai cabang c
 $params = [];
-$types = "";
+$types  = "";
 
-if($filter_investor){
-    // FIX 1: Ganti ke tabel relasi cabang_investor
-    $where_filter = "AND l.id_cabang IN (SELECT ci.id_cabang FROM cabang_investor ci WHERE ci.id_investor=?)";
-    $where_filter_cabang = "AND c.id_cabang IN (SELECT ci.id_cabang FROM cabang_investor ci WHERE ci.id_investor=?)"; // FIX buat query cabang
+// Sub-query: id_cabang yang investor AKTIF-nya = ? (tahan terhadap baris relasi lama/basi).
+$cabang_of_investor = "SELECT c2.id_cabang FROM cabang c2 WHERE (
+        SELECT ci.id_investor FROM cabang_investor ci
+        WHERE ci.id_cabang = c2.id_cabang
+          AND ci.tgl_mulai <= CURDATE()
+          AND (ci.tgl_selesai IS NULL OR ci.tgl_selesai >= CURDATE())
+        ORDER BY ci.tgl_mulai DESC, ci.id DESC LIMIT 1
+    ) = ?";
+
+if ($filter_investor) {
+    $where_filter        .= " AND l.id_cabang IN ($cabang_of_investor)";
+    $where_filter_cabang = "AND c.id_cabang IN ($cabang_of_investor)";
     $params[] = $filter_investor;
-    $types .= "i";
+    $types   .= "i";
 }
+$bind_types = "s" . $types; // 1 string (tanggal/periode) + param investor
 
-// Ambil list investor
+// ---- Daftar & nama investor ----
 $list_investor = [];
 $res_inv = $conn->query("SELECT id_investor, nama_investor FROM investor ORDER BY nama_investor ASC");
-while($row = $res_inv->fetch_assoc()) $list_investor[] = $row;
+while ($r = $res_inv->fetch_assoc()) $list_investor[] = $r;
 
 $nama_filter = '';
-if($filter_investor){
-    $stmt = $conn->prepare("SELECT nama_investor FROM investor WHERE id_investor=?");
-    $stmt->bind_param("i", $filter_investor);
-    $stmt->execute();
-    $nama_filter = $stmt->get_result()->fetch_assoc()['nama_investor']?? '';
+if ($filter_investor) {
+    $st = $conn->prepare("SELECT nama_investor FROM investor WHERE id_investor = ?");
+    $st->bind_param("i", $filter_investor);
+    $st->execute();
+    $nama_filter = $st->get_result()->fetch_assoc()['nama_investor'] ?? '';
 }
 
-// 1. KPI Bulan Ini
-$sql_kpi = "SELECT COALESCE(SUM(l.total_omset),0) as omzet, COALESCE(SUM(l.net_profit),0) as laba, COALESCE(AVG(l.persentase),0) as margin FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter";
-$stmt = $conn->prepare($sql_kpi);
-$bind_params = array_merge([$bulan_ini], $params);
-$bind_types = "s".$types;
-$stmt->bind_param($bind_types, ...$bind_params);
-$stmt->execute();
-$kpi = $stmt->get_result()->fetch_assoc();
+// =====================================================================
+// 1. KPI — periode terpilih
+// =====================================================================
+$st = $conn->prepare("SELECT COALESCE(SUM(l.total_omset),0) omzet, COALESCE(SUM(l.net_profit),0) laba,
+                             COALESCE(AVG(l.persentase),0) margin
+                      FROM laporan_cabang l
+                      WHERE DATE_FORMAT(l.tanggal,'%Y-%m') = ? $where_filter");
+$st->bind_param($bind_types, ...array_merge([$periode_ini], $params));
+$st->execute();
+$kpi = $st->get_result()->fetch_assoc();
 
-// 1.1 KPI HARI INI
-$sql_hari = "SELECT COALESCE(SUM(l.total_omset),0) as omzet, COALESCE(SUM(l.net_profit),0) as laba FROM laporan_cabang l WHERE l.tanggal = ? $where_filter";
-$stmt = $conn->prepare($sql_hari);
-$bind_params_hari = array_merge([$hari_ini], $params); // FIX 2: variabel baru
-$stmt->bind_param($bind_types, ...$bind_params_hari);
-$stmt->execute();
-$kpi_hari_ini = $stmt->get_result()->fetch_assoc();
+// 1.1 KPI "Hari ini" (= kemarin)
+$st = $conn->prepare("SELECT COALESCE(SUM(l.total_omset),0) omzet, COALESCE(SUM(l.net_profit),0) laba
+                      FROM laporan_cabang l WHERE l.tanggal = ? $where_filter");
+$st->bind_param($bind_types, ...array_merge([$kemarin], $params));
+$st->execute();
+$kpi_hari_ini = $st->get_result()->fetch_assoc();
 
-// 2. KPI Bulan Lalu
-$sql_lalu = "SELECT COALESCE(SUM(l.total_omset),0) as omzet FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter";
-$stmt = $conn->prepare($sql_lalu);
-$bind_params_lalu = array_merge([$bulan_lalu], $params); // FIX 2: variabel baru
-$stmt->bind_param($bind_types, ...$bind_params_lalu);
-$stmt->execute();
-$kpi_lalu = $stmt->get_result()->fetch_assoc();
-$naik_turun = $kpi_lalu['omzet'] > 0? (($kpi['omzet'] - $kpi_lalu['omzet']) / $kpi_lalu['omzet']) * 100 : 0;
+// 2. KPI bulan sebelum periode terpilih (untuk perbandingan)
+$st = $conn->prepare("SELECT COALESCE(SUM(l.total_omset),0) omzet
+                      FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal,'%Y-%m') = ? $where_filter");
+$st->bind_param($bind_types, ...array_merge([$periode_lalu], $params));
+$st->execute();
+$kpi_lalu = $st->get_result()->fetch_assoc();
+$naik_turun = $kpi_lalu['omzet'] > 0 ? (($kpi['omzet'] - $kpi_lalu['omzet']) / $kpi_lalu['omzet']) * 100 : 0;
 
-// 3. Cabang aktif bulan ini
-$sql_aktif = "SELECT COUNT(DISTINCT l.id_cabang) as total FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter";
-$stmt = $conn->prepare($sql_aktif);
-$bind_params_aktif = array_merge([$bulan_ini], $params); // FIX 3: tadinya ketuker pake bulan_lalu
-$stmt->bind_param($bind_types, ...$bind_params_aktif);
-$stmt->execute();
-$cabang_aktif = $stmt->get_result()->fetch_assoc()['total'];
+// 3. Cabang aktif pada periode terpilih
+$st = $conn->prepare("SELECT COUNT(DISTINCT l.id_cabang) total
+                      FROM laporan_cabang l WHERE DATE_FORMAT(l.tanggal,'%Y-%m') = ? $where_filter");
+$st->bind_param($bind_types, ...array_merge([$periode_ini], $params));
+$st->execute();
+$cabang_aktif = (int) $st->get_result()->fetch_assoc()['total'];
 
-// 4. Total cabang
-if($filter_investor){
-    // FIX 4: Pakai $where_filter_cabang + DISTINCT biar gak double
-    $stmt = $conn->prepare("SELECT COUNT(DISTINCT c.id_cabang) as total FROM cabang c WHERE 1=1 $where_filter_cabang");
-    $stmt->bind_param("i", $filter_investor);
-    $stmt->execute();
-    $total_cabang = $stmt->get_result()->fetch_assoc()['total'];
+// 4. Total cabang (ikut filter investor)
+if ($filter_investor) {
+    $st = $conn->prepare("SELECT COUNT(DISTINCT c.id_cabang) total FROM cabang c WHERE 1=1 $where_filter_cabang");
+    $st->bind_param("i", $filter_investor);
+    $st->execute();
+    $total_cabang = (int) $st->get_result()->fetch_assoc()['total'];
 } else {
-    $total_cabang = $conn->query("SELECT COUNT(*) as total FROM cabang c")->fetch_assoc()['total'];
+    $total_cabang = (int) $conn->query("SELECT COUNT(*) total FROM cabang")->fetch_assoc()['total'];
 }
 
-// 5. Top 5 cabang bulan ini
-$sql_top = "SELECT c.nama_cabang, SUM(l.total_omset) as omzet FROM laporan_cabang l JOIN cabang c ON l.id_cabang = c.id_cabang WHERE DATE_FORMAT(l.tanggal, '%Y-%m') = ? $where_filter GROUP BY l.id_cabang ORDER BY omzet DESC LIMIT 5";
-$stmt = $conn->prepare($sql_top);
-$bind_params_top = array_merge([$bulan_ini], $params); // FIX 2: variabel baru
-$stmt->bind_param($bind_types, ...$bind_params_top);
-$stmt->execute();
-$top_cabang = $stmt->get_result();
-
-// 6. Data grafik 6 bulan
-$sql_grafik = "SELECT DATE_FORMAT(l.tanggal, '%b %Y') as bulan, COALESCE(SUM(l.total_omset),0) as omzet, COALESCE(SUM(l.net_profit),0) as laba FROM laporan_cabang l WHERE l.tanggal >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) $where_filter GROUP BY DATE_FORMAT(l.tanggal, '%Y-%m') ORDER BY l.tanggal ASC";
-$stmt = $conn->prepare($sql_grafik);
-if($filter_investor) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$grafik = $stmt->get_result();
+// =====================================================================
+// 5. Grafik tren 6 bulan — berakhir di periode terpilih
+// =====================================================================
+$g_start = date('Y-m-01', strtotime("$periode_ini-01 -5 month"));
+$g_end   = date('Y-m-t', strtotime("$periode_ini-01"));
+$st = $conn->prepare("SELECT DATE_FORMAT(l.tanggal,'%b %Y') bulan,
+                             COALESCE(SUM(l.total_omset),0) omzet,
+                             COALESCE(SUM(l.net_profit),0) laba
+                      FROM laporan_cabang l
+                      WHERE l.tanggal BETWEEN ? AND ? $where_filter
+                      GROUP BY DATE_FORMAT(l.tanggal,'%Y-%m') ORDER BY l.tanggal ASC");
+$st->bind_param("ss" . $types, ...array_merge([$g_start, $g_end], $params));
+$st->execute();
+$grafik = $st->get_result();
 $label_grafik = $data_omzet = $data_laba = [];
-while($g = $grafik->fetch_assoc()){
+while ($g = $grafik->fetch_assoc()) {
     $label_grafik[] = $g['bulan'];
-    $data_omzet[] = $g['omzet'];
-    $data_laba[] = $g['laba'];
+    $data_omzet[]   = $g['omzet'];
+    $data_laba[]    = $g['laba'];
 }
 
-// 7. PERINGATAN DINI + PAGINATION
-$limit_peringatan = 10;
-$page_peringatan = isset($_GET['page_peringatan']) ? (int)$_GET['page_peringatan'] : 1;
-$page_peringatan = $page_peringatan < 1 ? 1 : $page_peringatan;
+// =====================================================================
+// 6. Peringatan dini — cabang yang belum lapor untuk tanggal KEMARIN
+// =====================================================================
+$limit_peringatan  = 10;
+$page_peringatan   = max(1, (int) ($_GET['page_peringatan'] ?? 1));
 $offset_peringatan = ($page_peringatan - 1) * $limit_peringatan;
 
-// 7.1 Hitung total data peringatan
-$sql_count_peringatan = "SELECT COUNT(*) as total FROM cabang c WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = CURDATE()) $where_filter_cabang";
-$stmt_count = $conn->prepare($sql_count_peringatan);
-if($filter_investor) $stmt_count->bind_param("i", $filter_investor);
-$stmt_count->execute();
-$total_peringatan = $stmt_count->get_result()->fetch_assoc()['total'];
-$total_pages_peringatan = ceil($total_peringatan / $limit_peringatan);
+$st = $conn->prepare("SELECT COUNT(*) total FROM cabang c
+    WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ? AND status_laporan = 'lengkap') $where_filter_cabang");
+$st->bind_param("s" . $types, ...array_merge([$kemarin], $params));
+$st->execute();
+$total_peringatan = (int) $st->get_result()->fetch_assoc()['total'];
+$total_pages_peringatan = (int) ceil($total_peringatan / $limit_peringatan);
 
-// 7.2 Ambil data peringatan dengan LIMIT
-$sql_peringatan = "SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola, MAX(l.tanggal) as input_terakhir, DATEDIFF(CURDATE(), MAX(l.tanggal)) as selisih_hari FROM cabang c LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = CURDATE()) $where_filter_cabang GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC LIMIT ? OFFSET ?";
-$stmt = $conn->prepare($sql_peringatan);
-if($filter_investor) $stmt->bind_param("iii", $filter_investor, $limit_peringatan, $offset_peringatan);
-else $stmt->bind_param("ii", $limit_peringatan, $offset_peringatan);
-$stmt->execute();
-$peringatan = $stmt->get_result();
+$st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola,
+        MAX(l.tanggal) input_terakhir, DATEDIFF(?, MAX(l.tanggal)) selisih_hari
+    FROM cabang c LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang
+    WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ? AND status_laporan = 'lengkap') $where_filter_cabang
+    GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC
+    LIMIT ? OFFSET ?");
+$st->bind_param("ss" . $types . "ii", ...array_merge([$kemarin, $kemarin], $params, [$limit_peringatan, $offset_peringatan]));
+$st->execute();
+$peringatan = $st->get_result();
 
-// Helper untuk build URL biar filter investor kebawa
-function build_url($page){
-    $params = $_GET;
-    $params['page_peringatan'] = $page;
-    return '?' . http_build_query($params);
+// =====================================================================
+// 7. Admin Fee Pusat = 3% dari total net profit (periode terpilih, ikut investor)
+// =====================================================================
+$filter_cabang_by_inv = $filter_investor ? "AND c.id_cabang IN ($cabang_of_investor)" : "";
+
+$st = $conn->prepare("SELECT COALESCE(SUM(l.net_profit),0) tot
+    FROM cabang c
+    LEFT JOIN laporan_cabang l ON l.id_cabang = c.id_cabang
+        AND YEAR(l.tanggal) = $sel_tahun AND MONTH(l.tanggal) = $sel_bulan AND l.status_laporan = 'lengkap'
+    WHERE 1=1 $filter_cabang_by_inv");
+if ($filter_investor) $st->bind_param("i", $filter_investor);
+$st->execute();
+$total_net_profit = (float) $st->get_result()->fetch_assoc()['tot'];
+$admin_fee = $total_net_profit > 0 ? $total_net_profit * 3 / 100 : 0;
+
+// =====================================================================
+// 8. Ranking cabang (periode terpilih, ikut investor)
+// =====================================================================
+$ranking_cabang = [];
+$st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola,
+        COALESCE(SUM(l.total_omset),0) total_omset,
+        COALESCE(SUM(l.net_profit),0) total_net_profit
+    FROM cabang c
+    LEFT JOIN laporan_cabang l ON l.id_cabang = c.id_cabang
+        AND YEAR(l.tanggal) = $sel_tahun AND MONTH(l.tanggal) = $sel_bulan AND l.status_laporan = 'lengkap'
+    WHERE 1=1 $filter_cabang_by_inv
+    GROUP BY c.id_cabang
+    ORDER BY total_omset DESC");
+if ($filter_investor) $st->bind_param("i", $filter_investor);
+$st->execute();
+$res_rank = $st->get_result();
+$no = 1;
+while ($row = $res_rank->fetch_assoc()) {
+    $row['no'] = $no++;
+    $ranking_cabang[] = $row;
 }
-
-$share_pengelola_kotor = ($kpi['laba']?? 0) * 0.50; 
-$admin_fee = $share_pengelola_kotor * 0.03;
 ?>
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
-<style>
-    body {
-        background-color: #f8fafc!important;
-        font-family: 'Plus Jakarta Sans', sans-serif!important;
-        color: #1e293b;
-    }
-    
-    /* Global Soft Glassmorphism Card Style */
-    .saas-card {
-        background: #ffffff;
-        border: 1px solid #f1f5f9!important;
-        border-radius: 18px!important;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02), 0 10px 15px -3px rgb(0 0 0 / 0.01)!important;
-        padding: 24px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-    }
-    .saas-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05)!important;
-    }
-
-    /* KPI Premium Card Refinement */
-    .kpi-premium-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        padding: 24px;
-        position: relative;
-        overflow: hidden;
-        min-height: 160px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .kpi-premium-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 20px -8px rgba(15, 23, 42, 0.08);
-    }
-    .kpi-premium-card::before {
-        content: '';
-        position: absolute;
-        top: -20px; right: -20px;
-        width: 140px; height: 140px;
-        background: radial-gradient(circle, var(--kpi-glow) 0%, transparent 75%);
-        opacity: 0.08;
-        pointer-events: none;
-    }
-    .kpi-badge-icon {
-        width: 46px; height: 46px;
-        border-radius: 12px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        background-color: var(--badge-bg);
-        color: var(--badge-color);
-        box-shadow: 0 4px 10px -2px var(--badge-bg);
-    }
-    .kpi-meta {
-        font-size: 11px;
-        font-weight: 700;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .kpi-value {
-        font-size: 24px;
-        font-weight: 800;
-        color: #0f172a;
-        letter-spacing: -0.5px;
-        line-height: 1.2;
-        margin-top: 4px;
-    }
-    .kpi-subvalue {
-        font-size: 12px;
-        font-weight: 500;
-        color: #64748b;
-        margin-top: 4px;
-    }
-
-    /* Modernized Badges */
-    .badge-modern-danger {
-        background-color: #fef2f2;
-        color: #ef4444;
-        font-weight: 600;
-        padding: 5px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        border: 1px solid #fee2e2;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-    .badge-modern-warning {
-        background-color: #fffbeb;
-        color: #f59e0b;
-        font-weight: 600;
-        padding: 5px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        border: 1px solid #fef3c7;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-    .badge-modern-success {
-        background-color: #f0fdf4;
-        color: #22c55e;
-        font-weight: 600;
-        padding: 5px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        border: 1px solid #dcfce7;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    /* Clean Form Elements */
-    .form-select-filter {
-        border-radius: 12px!important;
-        border: 1px solid #e2e8f0!important;
-        font-size: 14px;
-        font-weight: 600;
-        color: #334155;
-        padding: 10px 16px;
-        min-width: 240px;
-        background-color: #ffffff;
-        transition: all 0.2s ease;
-    }
-    .form-select-filter:focus {
-        border-color: #4318ff!important;
-        box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1)!important;
-    }
-
-    /* Elegant SaaS Tables */
-    .table-saas-container {
-        border-radius: 14px;
-        overflow: hidden;
-        border: 1px solid #e2e8f0;
-    }
-    .table-saas {
-        margin-bottom: 0;
-        background: #ffffff;
-    }
-    .table-saas thead th {
-        background-color: #f8fafc;
-        color: #475569;
-        font-weight: 700;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border-bottom: 1px solid #e2e8f0;
-        padding: 14px 20px;
-    }
-    .table-saas tbody tr {
-        transition: background-color 0.2s ease;
-    }
-    .table-saas tbody tr:hover {
-        background-color: #f8fafc;
-    }
-    .table-saas tbody td {
-        padding: 16px 20px;
-        border-bottom: 1px solid #f1f5f9;
-        color: #334155;
-        font-size: 14px;
-    }
-
-    /* Pagination Style Baru */
-    .pagination .page-link {border-radius: 10px!important; margin: 0 3px; border: 1px solid #e2e8f0; color: #4318ff; font-weight: 600;}
-    .pagination .page-item.active .page-link {background: #4318ff; border-color: #4318ff; color: #fff;}
-    .pagination .page-link:hover {background-color: #f1f5f9;}
-    
-    /* Leaderboard Rank Badges */
-    .rank-box {
-        width: 26px;
-        height: 26px;
-        background: #f1f5f9;
-        color: #475569;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 700;
-    }
-    .d-flex:nth-child(1) .rank-box { background: rgba(67, 24, 255, 0.1); color: #4318ff; }
-    .d-flex:nth-child(2) .rank-box { background: rgba(14, 165, 233, 0.1); color: #0ea5e9; }
-    .d-flex:nth-child(3) .rank-box { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-
-    @media (max-width: 767.98px) {
-        .table-saas thead { display: none; }
-        .table-saas tbody tr { 
-            display: block; 
-            border: 1px solid #e2e8f0; 
-            border-radius: 14px; 
-            margin: 12px; 
-            padding: 12px;
-            background: #ffffff;
-        }
-        .table-saas tbody td { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 10px 0!important; 
-            border-bottom: 1px dashed #e2e8f0!important;
-            text-align: right;
-        }
-        .table-saas tbody td:last-child { border-bottom: none!important; }
-        .table-saas tbody td::before {
-            content: attr(data-label);
-            font-weight: 700;
-            color: #94a3b8;
-            font-size: 11px;
-            text-transform: uppercase;
-            text-align: left;
-        }
-    }
-</style>
-<style>
-    body {
-        background-color: #f8fafc!important;
-        font-family: 'Plus Jakarta Sans', sans-serif!important;
-        color: #1e293b;
-    }
-    
-    /* Global Soft Glassmorphism Card Style */
-    .saas-card {
-        background: #ffffff;
-        border: 1px solid #f1f5f9!important;
-        border-radius: 18px!important;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02), 0 10px 15px -3px rgb(0 0 0 / 0.01)!important;
-        padding: 24px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-    }
-    .saas-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05)!important;
-    }
-
-    /* KPI Premium Card Refinement */
-    .kpi-premium-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        padding: 24px;
-        position: relative;
-        overflow: hidden;
-        min-height: 160px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .kpi-premium-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 20px -8px rgba(15, 23, 42, 0.08);
-    }
-    .kpi-premium-card::before {
-        content: '';
-        position: absolute;
-        top: -20px; right: -20px;
-        width: 140px; height: 140px;
-        background: radial-gradient(circle, var(--kpi-glow) 0%, transparent 75%);
-        opacity: 0.08;
-        pointer-events: none;
-    }
-    .kpi-badge-icon {
-        width: 46px; height: 46px;
-        border-radius: 12px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        background-color: var(--badge-bg);
-        color: var(--badge-color);
-        box-shadow: 0 4px 10px -2px var(--badge-bg);
-    }
-    .kpi-meta {
-        font-size: 11px;
-        font-weight: 700;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .kpi-value {
-        font-size: 24px;
-        font-weight: 800;
-        color: #0f172a;
-        letter-spacing: -0.5px;
-        line-height: 1.2;
-        margin-top: 4px;
-    }
-    .kpi-subvalue {
-        font-size: 12px;
-        font-weight: 500;
-        color: #64748b;
-        margin-top: 4px;
-    }
-
-    /* Modernized Badges */
-    .badge-modern-danger {
-        background-color: #fef2f2;
-        color: #ef4444;
-        font-weight: 600;
-        padding: 5px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        border: 1px solid #fee2e2;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-    .badge-modern-warning {
-        background-color: #fffbeb;
-        color: #f59e0b;
-        font-weight: 600;
-        padding: 5px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        border: 1px solid #fef3c7;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-    .badge-modern-success {
-        background-color: #f0fdf4;
-        color: #22c55e;
-        font-weight: 600;
-        padding: 5px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        border: 1px solid #dcfce7;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    /* Clean Form Elements */
-    .form-select-filter {
-        border-radius: 12px!important;
-        border: 1px solid #e2e8f0!important;
-        font-size: 14px;
-        font-weight: 600;
-        color: #334155;
-        padding: 10px 16px;
-        min-width: 240px;
-        background-color: #ffffff;
-        transition: all 0.2s ease;
-    }
-    .form-select-filter:focus {
-        border-color: #4318ff!important;
-        box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1)!important;
-    }
-
-    /* Elegant SaaS Tables */
-    .table-saas-container {
-        border-radius: 14px;
-        overflow: hidden;
-        border: 1px solid #e2e8f0;
-    }
-    .table-saas {
-        margin-bottom: 0;
-        background: #ffffff;
-    }
-    .table-saas thead th {
-        background-color: #f8fafc;
-        color: #475569;
-        font-weight: 700;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border-bottom: 1px solid #e2e8f0;
-        padding: 14px 20px;
-    }
-    .table-saas tbody tr {
-        transition: background-color 0.2s ease;
-    }
-    .table-saas tbody tr:hover {
-        background-color: #f8fafc;
-    }
-    .table-saas tbody td {
-        padding: 16px 20px;
-        border-bottom: 1px solid #f1f5f9;
-        color: #334155;
-        font-size: 14px;
-    }
-
-    /* Pagination Style Baru untuk Peringatan Dini */
-    .pagination .page-link {
-        border-radius: 10px!important; 
-        margin: 0 3px; 
-        border: 1px solid #e2e8f0; 
-        color: #4318ff; 
-        font-weight: 600;
-        padding: 6px 12px;
-        font-size: 13px;
-    }
-    .pagination .page-item.active .page-link {
-        background: #4318ff; 
-        border-color: #4318ff; 
-        color: #fff;
-    }
-    .pagination .page-link:hover {
-        background-color: #f1f5f9;
-        border-color: #cbd5e1;
-        color: #4318ff;
-    }
-    
-    /* Leaderboard Rank Badges */
-    .rank-box {
-        width: 26px;
-        height: 26px;
-        background: #f1f5f9;
-        color: #475569;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 700;
-    }
-    .d-flex:nth-child(1) .rank-box { background: rgba(67, 24, 255, 0.1); color: #4318ff; }
-    .d-flex:nth-child(2) .rank-box { background: rgba(14, 165, 233, 0.1); color: #0ea5e9; }
-    .d-flex:nth-child(3) .rank-box { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-
-    @media (max-width: 767.98px) {
-        .table-saas thead { display: none; }
-        .table-saas tbody tr { 
-            display: block; 
-            border: 1px solid #e2e8f0; 
-            border-radius: 14px; 
-            margin: 12px; 
-            padding: 12px;
-            background: #ffffff;
-        }
-        .table-saas tbody td { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 10px 0!important; 
-            border-bottom: 1px dashed #e2e8f0!important;
-            text-align: right;
-        }
-        .table-saas tbody td:last-child { border-bottom: none!important; }
-        .table-saas tbody td::before {
-            content: attr(data-label);
-            font-weight: 700;
-            color: #94a3b8;
-            font-size: 11px;
-            text-transform: uppercase;
-            text-align: left;
-        }
-        .pagination { justify-content: center!important; }
-    }
-</style>
 <!-- TARUH DISINI -->
 <audio id="notifSound" src="../assets/sound/notif.wav" preload="auto"></audio>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- SCRIPT CHART KAMU YANG SUDAH ADA -->
-<script>
-const ctx = document.getElementById('grafikTrend').getContext('2d');
-... script chart kamu ...
-</script>
-
-<!-- SCRIPT NOTIFIKASI SUARA TARUH SETELAH SCRIPT CHART -->
+<!-- SCRIPT NOTIFIKASI SUARA -->
 <script>
 let lastCheck = '<?= $hari_ini ?> 00:00:00'; 
 const notifSound = document.getElementById('notifSound');
@@ -659,13 +238,6 @@ function showToast(title, message){
 // biar bisa autoplay, browser harus ada interaksi 1x
 document.addEventListener('click', () => notifSound.play().then(()=>notifSound.pause()), {once: true});
 </script>
-
-</body>
-</html>
-
-<!-- Impor Font Modern & Icon (Bisa diletakkan di <head> utama Anda) -->
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 <style>
   :root {
@@ -790,29 +362,38 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
     box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.15);
   }
 
-  /* Rank Box */
-  .rank-box {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    background: #e0e7ff;
-    color: var(--primary-color);
-    font-weight: 700;
-    font-size: 12px;
+  /* Ranking Card Header Styling */
+  .kpi-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.03);
+  }
+  .kpi-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .kpi-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #ffffff;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  }
+  .kpi-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dark);
   }
 
-  /* Table Custom */
-  .table-saas-container {
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  .table-saas {
-    margin-bottom: 0;
-  }
-  .table-saas thead th {
+  /* Table Standar Modern (Samping Scroll) */
+  .table-modern thead th {
     background: #f8fafc;
     color: var(--text-muted);
     font-size: 12px;
@@ -821,66 +402,28 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
     font-weight: 700;
     padding: 14px 16px;
     border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
   }
-  .table-saas tbody td {
+  .table-modern tbody td {
     padding: 16px;
     border-bottom: 1px solid #f1f5f9;
     font-size: 14px;
-  }
-
-  /* Responsive Mobile Table Styles */
-  @media (max-width: 767.98px) {
-    .table-saas thead {
-      display: none;
-    }
-    .table-saas, .table-saas tbody, .table-saas tr, .table-saas td {
-      display: block;
-      width: 100%;
-    }
-    .table-saas tr {
-      margin-bottom: 12px;
-      background: #ffffff;
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 8px 12px;
-    }
-    .table-saas td {
-      text-align: right;
-      padding: 8px 10px;
-      position: relative;
-      border-bottom: 1px solid #f8fafc;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .table-saas td:last-child {
-      border-bottom: none;
-    }
-    .table-saas td::before {
-      content: attr(data-label);
-      font-weight: 600;
-      font-size: 12px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      text-align: left;
-    }
-    .kpi-value {
-      font-size: 20px;
-    }
+    white-space: nowrap;
   }
 </style>
 
 <div class="container-fluid py-4 px-3 px-md-4">
+    <!-- HEADER & FILTER -->
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
         <div>
-            <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 11px; letter-spacing: 1px; color:#94a3b8!important;">RINGKASAN BISNIS</span>
+            <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 11px; letter-spacing: 1px; color:#94a3b8!important;">RINGKASAN BISNIS &bull; <?= strtoupper($nama_periode) ?></span>
             <h3 class="fw-extrabold mb-0 mt-1" style="color: #0f172a!important; font-size: 24px; letter-spacing: -0.5px; font-weight: 800;">
                 Dashboard Pusat <?= $nama_filter? "<span style='color: #4318ff;'>• ".h($nama_filter)."</span>" : ""?>
             </h3>
         </div>
         
         <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 w-100 w-lg-auto">
-            <form method="GET" class="d-flex align-items-center gap-2 flex-grow-1 flex-sm-grow-0">
+            <form method="GET" class="d-flex flex-wrap align-items-center gap-2 flex-grow-1 flex-sm-grow-0">
                 <select name="investor" class="form-select form-select-filter" onchange="this.form.submit()">
                     <option value="">Semua Investor</option>
                     <?php foreach($list_investor as $inv):?>
@@ -889,15 +432,25 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                     </option>
                     <?php endforeach;?>
                 </select>
+
+                <select name="bulan" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
+                    <?php for($m=1;$m<=12;$m++):?>
+                    <option value="<?= $m ?>" <?= $sel_bulan==$m?'selected':''?>><?= date('F', mktime(0,0,0,$m,1)) ?></option>
+                    <?php endfor;?>
+                </select>
+
+                <select name="tahun" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
+                    <?php for($y=(int)date('Y')+1; $y>=tahun_data_paling_lama($conn); $y--):?>
+                    <option value="<?= $y ?>" <?= $sel_tahun==$y?'selected':''?>><?= $y ?></option>
+                    <?php endfor;?>
+                </select>
+
                 <?php if($filter_investor):?>
-                <a href="index" class="btn btn-light d-flex align-items-center justify-content-center" style="border-radius: 12px; padding: 9px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter">
+                <a href="?bulan=<?= $sel_bulan ?>&tahun=<?= $sel_tahun ?>" class="btn btn-light d-flex align-items-center justify-content-center" style="border-radius: 12px; padding: 9px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter Investor">
                     <i class="bi bi-x-lg text-danger"></i>
                 </a>
                 <?php endif;?>
             </form>
-            <div class="bg-white px-3 py-2 rounded-3 border d-flex align-items-center justify-content-center shadow-sm" style="border-radius: 12px!important; font-weight: 600; color: #475569!important; font-size: 14px; border-color: #e2e8f0!important;">
-                <i class="bi bi-calendar4-event me-2 text-primary" style="color: #4318ff!important;"></i><?= date('F Y')?>
-            </div>
         </div>
     </div>
 
@@ -982,8 +535,9 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
         </div>
     </div>
 
-    <!-- ROW GRAFIK & TOP 5 -->
+    <!-- ROW GRAFIK & RANKING CABANG (BERJEJERAN) -->
     <div class="row g-3 mb-4">
+        <!-- GRAFIK -->
         <div class="col-lg-8 col-12">
             <div class="saas-card h-100">
                 <div class="d-flex align-items-center justify-content-between mb-4">
@@ -998,42 +552,78 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
             </div>
         </div>
 
+        <!-- RANKING CABANG -->
         <div class="col-lg-4 col-12">
-            <div class="saas-card h-100">
-                <div class="d-flex align-items-center mb-4">
-                    <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">Top 5 Cabang Terlaris</h6>
+            <div class="kpi-card h-100">
+                <div class="kpi-header">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);">
+                        <i class="bi bi-trophy-fill"></i>
+                    </div>
+                    <div>
+                        <div class="kpi-label">Ranking Cabang</div>
+                        <div style="font-size: 12px; color: #64748b;">Urut Omzet Tertinggi</div>
+                    </div>
                 </div>
-                <div class="d-flex flex-column gap-2">
-                    <?php $no=1; while($t=$top_cabang->fetch_assoc()):?>
-                    <div class="d-flex justify-content-between align-items-center" style="background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px!important; padding: 12px 14px;">
-                        <div class="d-flex align-items-center">
-                            <div class="rank-box me-3"><?= $no++?></div>
-                            <span class="fw-semibold" style="font-size: 14px; color: #334155;"><?= h($t['nama_cabang'])?></span>
-                        </div>
-                        <span class="text-end" style="color: #4318ff; font-size: 14px; font-weight:700;">Rp <?= number_format($t['omzet'],0,',','.')?></span>
-                    </div>
-                    <?php endwhile;?>
-                    
-                    <?php if($top_cabang->num_rows==0):?>
-                    <div class="text-muted text-center py-5" style="color: #94a3b8!important;">
-                        <i class="bi bi-folder-x fs-2 d-block mb-2"></i> Tidak ada data penjualan
-                    </div>
-                    <?php endif;?>
+                
+                <div style="max-height: 290px; overflow-y: auto; margin-top: 15px; padding-right: 5px;">
+                    <table class="table table-sm align-middle" style="font-size: 13px; margin-bottom: 0;">
+                        <thead style="position: sticky; top: 0; background: #fff; z-index: 1;">
+                            <tr style="border-bottom: 2px solid #e2e8f0;">
+                                <th style="width: 35px; color: #64748b; font-weight: 700;">#</th>
+                                <th style="color: #64748b; font-weight: 700;">Cabang</th>
+                                <th class="text-end" style="color: #64748b; font-weight: 700;">Omzet</th>
+                                <th class="text-end" style="color: #64748b; font-weight: 700;">Net Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if(empty($ranking_cabang)): ?>
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">Belum ada data</td>
+                            </tr>
+                            <?php else: ?>
+                            <?php foreach($ranking_cabang as $rank): ?>
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td>
+                                    <?php if($rank['no'] == 1): ?>
+                                        <span class="badge rounded-pill bg-warning text-dark px-2">1</span>
+                                    <?php elseif($rank['no'] == 2): ?>
+                                        <span class="badge rounded-pill bg-secondary px-2">2</span>
+                                    <?php elseif($rank['no'] == 3): ?>
+                                        <span class="badge rounded-pill px-2" style="background: #cd7f32; color: #fff;">3</span>
+                                    <?php else: ?>
+                                        <span class="fw-bold text-muted ps-1"><?= $rank['no'] ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div style="font-weight: 700; color: #0f172a;"><?= $rank['nama_cabang'] ?></div>
+                                    <div style="font-size: 11px; color: #64748b;"><?= $rank['nama_pengelola'] ?></div>
+                                </td>
+                                <td class="text-end" style="font-weight: 700; color: #0ea5e9;">
+                                    Rp <?= number_format($rank['total_omset'],0,',','.')?>
+                                </td>
+                                <td class="text-end" style="font-weight: 700; color: <?= $rank['total_net_profit'] >= 0 ? '#10b981' : '#ef4444' ?>;">
+                                    Rp <?= number_format($rank['total_net_profit'],0,',','.')?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- TABEL PERINGATAN -->
+    <!-- TABEL PERINGATAN DINI (DENGAN SCROLL SAMPING STANDARD) -->
     <div class="saas-card p-0 overflow-hidden mb-4">
         <div class="px-4 pt-4 pb-3 border-bottom" style="border-color: #f1f5f9!important;">
             <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">🚨 Peringatan Dini Operasional</h6>
-            <p class="text-muted small mb-0 mt-1">Daftar cabang terdeteksi yang belum mengirimkan data transaksi hari ini.</p>
+            <p class="text-muted small mb-0 mt-1">Daftar cabang yang belum mengirimkan laporan untuk tanggal <?= date('d M Y', strtotime($kemarin)) ?><?= $nama_filter ? ' &bull; Investor: ' . h($nama_filter) : '' ?>.</p>
         </div>
 
-        <div class="px-md-4 px-3 pb-4 pt-3">
-            <div class="table-saas-container">
-                <table class="table table-saas align-middle">
+        <div class="p-0">
+            <div class="table-responsive">
+                <table class="table table-modern align-middle mb-0">
                     <thead>
                         <tr>
                             <th>Status</th>
@@ -1048,7 +638,7 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                         <tr>
                             <td colspan="5" class="text-center text-success py-5 fw-bold" style="color: #16a34a!important; background: #ffffff;">
                                 <div class="d-flex align-items-center justify-content-center gap-2 fs-6">
-                                    <i class="bi bi-shield-check fs-4"></i> Luar Biasa! Semua pengelola cabang sudah menginput laporan hari ini.
+                                    <i class="bi bi-shield-check fs-4"></i> Luar Biasa! Semua cabang sudah mengirim laporan untuk tanggal <?= date('d M Y', strtotime($kemarin)) ?>.
                                 </div>
                             </td>
                         </tr>
@@ -1066,52 +656,23 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                             }
                         ?>
                         <tr>
-                            <td data-label="Status"><?= $status_badge?></td>
-                            <td data-label="Nama Cabang"><span class="fw-bold" style="color: #0f172a;"><?= h($p['nama_cabang'])?></span></td>
-                            <td data-label="Nama Pengelola">
+                            <td><?= $status_badge?></td>
+                            <td><span class="fw-bold" style="color: #0f172a;"><?= h($p['nama_cabang'])?></span></td>
+                            <td>
                                 <div class="fw-semibold text-secondary" style="font-size: 13.5px;">
                                     <i class="bi bi-person-badge me-1 text-primary" style="color: #4318ff!important;"></i>
                                     <?= h($p['nama_pengelola']?? 'Belum Diatur')?>
                                 </div>
                             </td>
-                            <td data-label="Masalah"><?= $masalah_text?></td>
-                            <td data-label="Input Terakhir" class="text-muted fw-medium"><?= $txt_terakhir?></td>
+                            <td><?= $masalah_text?></td>
+                            <td class="text-muted fw-medium"><?= $txt_terakhir?></td>
                         </tr>
                         <?php endwhile; endif;?>
                     </tbody>
                 </table>
             </div>
 
-            <!-- PAGINATION PERINGATAN DINI -->
-            <?php if($total_pages_peringatan > 1): ?>
-            <div class="d-flex justify-content-between align-items-center mt-3 px-2 flex-wrap gap-2">
-                <small class="text-muted">Menampilkan <?= $offset_peringatan+1 ?> - <?= min($offset_peringatan+$limit_peringatan, $total_peringatan) ?> dari <?= $total_peringatan ?> cabang</small>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0">
-                        <?php if($page_peringatan > 1): ?>
-                        <li class="page-item">
-                            <a class="page-link" href="<?= build_url($page_peringatan-1) ?>"><i class="bi bi-chevron-left"></i> Prev</a>
-                        </li>
-                        <?php endif; ?>
-
-                        <?php 
-                        $start = max(1, $page_peringatan - 2);
-                        $end = min($total_pages_peringatan, $page_peringatan + 2);
-                        for($i=$start; $i<=$end; $i++): ?>
-                        <li class="page-item <?= $i==$page_peringatan ? 'active' : '' ?>">
-                            <a class="page-link" href="<?= build_url($i) ?>"><?= $i ?></a>
-                        </li>
-                        <?php endfor; ?>
-
-                        <?php if($page_peringatan < $total_pages_peringatan): ?>
-                        <li class="page-item">
-                            <a class="page-link" href="<?= build_url($page_peringatan+1) ?>">Next <i class="bi bi-chevron-right"></i></a>
-                        </li>
-                        <?php endif; ?>
-                    </ul>
-                </nav>
-            </div>
-            <?php endif; ?>
+            <?php render_pagination($page_peringatan, $total_pages_peringatan, ['from' => $offset_peringatan + 1, 'to' => min($offset_peringatan + $limit_peringatan, $total_peringatan), 'total' => $total_peringatan, 'label' => 'cabang'], 'page_peringatan'); ?>
         </div>
     </div>
 </div>
@@ -1127,7 +688,7 @@ gradOmzet.addColorStop(1, 'rgba(67, 24, 255, 0.0)');
 
 const gradLaba = ctx.createLinearGradient(0, 0, 0, 280);
 gradLaba.addColorStop(0, 'rgba(14, 165, 233, 0.15)');
-gradLaba.addColorStop(1, 'rgba(14, 165, 233, 0.0)');
+gradLaba.addColorStop(1, 'rgba(14, 165, 233, 0.0)'); 
 
 new Chart(ctx, {
     type: 'line',

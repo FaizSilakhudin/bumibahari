@@ -1,537 +1,628 @@
 <?php
 require '../config/koneksi.php';
-include 'sidebar_pusat.php';
 
-// HELPER BIAR GAK ERROR
-if(!function_exists('h')){ function h($s){ return htmlspecialchars($s??'', ENT_QUOTES); } }
-if(!function_exists('csrf_token')){
-    function csrf_token(){
-        if(empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+// HELPER SANITASI & SECURITY
+if (!function_exists('h')) { 
+    function h($s) { 
+        return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); 
+    } 
+}
+if (!function_exists('csrf_token')) {
+    function csrf_token() {
+        if (empty($_SESSION['csrf'])) {
+            $_SESSION['csrf'] = bin2hex(random_bytes(32));
+        }
         return $_SESSION['csrf'];
     }
 }
-if(!function_exists('csrf_check')){
-    function csrf_check($t){ return hash_equals($_SESSION['csrf']??'', $t); }
+if (!function_exists('csrf_check')) {
+    function csrf_check($t) { 
+        return hash_equals($_SESSION['csrf'] ?? '', $t); 
+    }
 }
 
 // 1. PROTEKSI ROLE PUSAT
-if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
-    header("Location:../login.php"); exit;
+if (!isset($_SESSION['role']) || $_SESSION['role'] != 'pusat') {
+    header("Location: ../login"); 
+    exit;
 }
 
-$upload_dir = '../uploads/surat_perjanjian/';
-
-// BARU: Ambil total semua investor untuk card di atas
-$total_investor_all = $conn->query("SELECT COUNT(*) as total FROM investor")->fetch_assoc()['total'];
-
-// Proses tambah/edit
-if(isset($_POST['simpan'])){
-    if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
+// --- ENDPOINT FALLBACK INTERNAL AJAX UNTUK DETAIL CABANG INVESTOR ---
+if (isset($_GET['ajax_detail_cabang'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $id_investor = (int)$_GET['ajax_detail_cabang'];
     
-    $id = $_POST['id_investor'] ?? '';
-    $nama = trim($_POST['nama_investor']);
-    $hp = trim($_POST['no_hp']);
-    $alamat = trim($_POST['alamat']);
-    $no_rek = trim($_POST['no_rekening']);
-    $nama_bank = trim($_POST['nama_bank']);
-    $atas_nama = trim($_POST['atas_nama_rekening']); 
-    $tgl_mulai = !empty($_POST['tgl_mulai_investasi']) ? $_POST['tgl_mulai_investasi'] : NULL; 
-    $tgl_selesai = !empty($_POST['tgl_selesai_investasi']) ? $_POST['tgl_selesai_investasi'] : NULL; 
-    $file_lama = $_POST['file_lama'] ?? '';
+    $sql_cabang = "SELECT ci.*, c.nama_cabang 
+                   FROM cabang_investor ci 
+                   LEFT JOIN cabang c ON ci.id_cabang = c.id_cabang 
+                   WHERE ci.id_investor = ?
+                   ORDER BY ci.tgl_mulai DESC";
     
-    // UPLOAD FILE AMAN
-    $file_surat = $file_lama;
-    if(isset($_FILES['surat_perjanjian']) && $_FILES['surat_perjanjian']['error'] == 0 && $_FILES['surat_perjanjian']['name']!= ''){
-        if(!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $cek = getimagesize($_FILES['surat_perjanjian']['tmp_name']);
-        $ext = strtolower(pathinfo($_FILES['surat_perjanjian']['name'], PATHINFO_EXTENSION));
-        $is_pdf = $ext=='pdf' && $_FILES['surat_perjanjian']['type']=='application/pdf';
-        $is_img = $cek!== false && in_array($ext, ['jpg','jpeg','png']);
-        
-        if(($is_pdf || $is_img) && $_FILES['surat_perjanjian']['size'] < 5000000){
-            $file_surat = 'SP_'.uniqid().'.'.$ext;
-            move_uploaded_file($_FILES['surat_perjanjian']['tmp_name'], $upload_dir.$file_surat);
-            if($file_lama && file_exists($upload_dir.$file_lama)) @unlink($upload_dir.$file_lama);
+    $stmt_c = $conn->prepare($sql_cabang);
+    if (!$stmt_c) {
+        $sql_cabang = "SELECT * FROM cabang_investor WHERE id_investor = ?";
+        $stmt_c = $conn->prepare($sql_cabang);
+    }
+    
+    $stmt_c->bind_param("i", $id_investor);
+    $stmt_c->execute();
+    $res = $stmt_c->get_result();
+    
+    $data_cabang = [];
+    $today = date('Y-m-d');
+
+    while ($row = $res->fetch_assoc()) {
+        $tgl_mulai   = !empty($row['tgl_mulai']) ? $row['tgl_mulai'] : null;
+        $tgl_selesai = !empty($row['tgl_selesai']) ? $row['tgl_selesai'] : null;
+
+        if (isset($row['status']) && !empty($row['status'])) {
+            $status = ucfirst(strtolower($row['status']));
+        } else {
+            $status = (empty($tgl_selesai) || $tgl_selesai >= $today) ? 'Aktif' : 'Selesai';
         }
+
+        $data_cabang[] = [
+            'id_cabang'       => $row['id_cabang'] ?? null,
+            'nama_cabang'     => $row['nama_cabang'] ?? ('Cabang ID #' . ($row['id_cabang'] ?? '-')),
+            'tgl_mulai'       => $tgl_mulai,
+            'tgl_selesai'     => $tgl_selesai,
+            'tgl_mulai_fmt'   => $tgl_mulai ? date('d-m-Y', strtotime($tgl_mulai)) : '-',
+            'tgl_selesai_fmt' => $tgl_selesai ? date('d-m-Y', strtotime($tgl_selesai)) : '-',
+            'status'          => $status
+        ];
+    }
+    $stmt_c->close();
+    
+    echo json_encode([
+        'success' => true,
+        'data'    => $data_cabang
+    ]);
+    exit;
+}
+
+// Total semua investor untuk statistik
+$total_investor_all = 0;
+$query_stat = $conn->query("SELECT COUNT(*) as total FROM investor");
+if ($query_stat) {
+    $total_investor_all = $query_stat->fetch_assoc()['total'];
+}
+
+// 2. PROSES TAMBAH / EDIT INVESTOR
+if (isset($_POST['simpan'])) {
+    if (!csrf_check($_POST['csrf'] ?? '')) {
+        $_SESSION['error'] = 'Token CSRF tidak valid!';
+        header("Location: data_investor");
+        exit;
+    }
+    
+    $id     = !empty($_POST['id_investor']) ? (int)$_POST['id_investor'] : null;
+    $nama   = trim($_POST['nama_investor'] ?? '');
+    $hp     = trim($_POST['no_hp'] ?? '');
+    $status = in_array($_POST['status'] ?? '', ['aktif', 'nonaktif']) ? $_POST['status'] : 'aktif';
+    
+    if (empty($nama)) {
+        $_SESSION['error'] = 'Nama Investor wajib diisi!';
+        header("Location: data_investor");
+        exit;
     }
 
-    if($id){
-        $stmt = $conn->prepare("UPDATE investor SET nama_investor=?, no_hp=?, alamat=?, no_rekening=?, nama_bank=?, atas_nama_rekening=?, tgl_mulai_investasi=?, tgl_selesai_investasi=?, surat_perjanjian=? WHERE id_investor=?");
-        $stmt->bind_param("sssssssssi", $nama,$hp,$alamat,$no_rek,$nama_bank,$atas_nama,$tgl_mulai,$tgl_selesai,$file_surat,$id); // 9s + 1i = 10
+    if ($id) {
+        $stmt = $conn->prepare("UPDATE investor SET nama_investor=?, no_hp=?, status=? WHERE id_investor=?");
+        $stmt->bind_param("sssi", $nama, $hp, $status, $id);
     } else {
-        $stmt = $conn->prepare("INSERT INTO investor (nama_investor, no_hp, alamat, no_rekening, nama_bank, atas_nama_rekening, tgl_mulai_investasi, tgl_selesai_investasi, surat_perjanjian) VALUES (?,?,?,?,?,?,?,?,?)");
-        $stmt->bind_param("ssssssssi", $nama,$hp,$alamat,$no_rek,$nama_bank,$atas_nama,$tgl_mulai,$tgl_selesai,$file_surat); // 9s
+        $stmt = $conn->prepare("INSERT INTO investor (nama_investor, no_hp, status) VALUES (?,?,?)");
+        $stmt->bind_param("sss", $nama, $hp, $status);
     }
 
-    if($stmt->execute()){
-        echo "<script>alert('Data berhasil disimpan');window.location='data_investor.php'</script>"; exit;
+    if ($stmt->execute()) {
+        $rec = $id ?: $conn->insert_id;
+        $stmt->close();
+        audit($conn, $id ? 'investor_edit' : 'investor_tambah', 'investor', $rec, ['nama' => $nama, 'status' => $status]);
+        $_SESSION['success'] = 'Data investor berhasil disimpan!';
+        header("Location: data_investor");
+        exit;
     } else {
-        echo "<script>alert('Gagal Simpan: ".$stmt->error."'); history.back();</script>"; exit;
+        $error_msg = $stmt->error;
+        $stmt->close();
+        $_SESSION['error'] = 'Gagal menyimpan data: ' . $error_msg;
+        header("Location: data_investor");
+        exit;
     }
 }
 
-// HAPUS PAKAI POST + CSRF
-if(isset($_POST['hapus'])){
-    if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
+// 3. PROSES HAPUS INVESTOR
+if (isset($_POST['hapus'])) {
+    if (!csrf_check($_POST['csrf'] ?? '')) {
+        $_SESSION['error'] = 'Token CSRF tidak valid!';
+        header("Location: data_investor");
+        exit;
+    }
     
     $id = (int)$_POST['id_investor'];
 
-    $q = $conn->prepare("SELECT surat_perjanjian FROM investor WHERE id_investor=?");
-    $q->bind_param("i", $id);
-    $q->execute();
-    $res = $q->get_result();
-    if($res->num_rows > 0){
-        $file = $res->fetch_assoc()['surat_perjanjian'];
-        if($file && file_exists($upload_dir.$file)) @unlink($upload_dir.$file);
-    }
-    $q->close();
-    
-    // Hapus relasi di tabel cabang_investor juga pakai prepared
     $del_relasi = $conn->prepare("DELETE FROM cabang_investor WHERE id_investor=?");
     $del_relasi->bind_param("i", $id);
     $del_relasi->execute();
+    $del_relasi->close();
 
     $del = $conn->prepare("DELETE FROM investor WHERE id_investor=?");
     $del->bind_param("i", $id);
-    $del->execute();
-    $del->close();
-
-    echo "<script>alert('Data berhasil dihapus');window.location='data_investor.php'</script>"; exit;
+    
+    if ($del->execute()) {
+        $del->close();
+        audit($conn, 'investor_hapus', 'investor', $id);
+        $_SESSION['success'] = 'Data investor berhasil dihapus!';
+        header("Location: data_investor");
+        exit;
+    } else {
+        $error_msg = $del->error;
+        $del->close();
+        $_SESSION['error'] = 'Gagal menghapus data: ' . $error_msg;
+        header("Location: data_investor");
+        exit;
+    }
 }
 
-// FILTER + PAGINATION
-$search = $_GET['search'] ?? '';
+// 4. FILTER + PAGINATION
+$search = trim($_GET['search'] ?? '');
 $where_sql = "";
 $params = [];
 $types = "";
 
-if($search != ''){
-    $where_sql = "WHERE nama_investor LIKE ? OR no_hp LIKE ? OR nama_bank LIKE ?";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-    $types = "sss";
+if ($search != '') {
+    $where_sql = "WHERE nama_investor LIKE ? OR no_hp LIKE ?";
+    $search_param = "%{$search}%";
+    $params = [$search_param, $search_param];
+    $types = "ss";
 }
 
-$limit = 10;
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$page = $page < 1 ? 1 : $page;
+$limit  = 10;
+$page   = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page   = $page < 1 ? 1 : $page;
 $offset = ($page - 1) * $limit;
 
-// Hitung total data
 $sql_count = "SELECT COUNT(*) as total FROM investor $where_sql";
 $stmt_count = $conn->prepare($sql_count);
-if($search) $stmt_count->bind_param($types, ...$params);
+if ($search != '') {
+    $stmt_count->bind_param($types, ...$params);
+}
 $stmt_count->execute();
-$total_data = $stmt_count->get_result()->fetch_assoc()['total'];
+$total_data  = $stmt_count->get_result()->fetch_assoc()['total'];
+$stmt_count->close();
 $total_pages = ceil($total_data / $limit);
 
-// Ambil data dengan LIMIT
 $sql = "SELECT * FROM investor $where_sql ORDER BY id_investor DESC LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($sql);
-if($search){
-    $types .= "ii";
-    $params[] = $limit;
-    $params[] = $offset;
-    $stmt->bind_param($types, ...$params);
+
+if ($search != '') {
+    $fetch_types = $types . "ii";
+    $fetch_params = array_merge($params, [$limit, $offset]);
+    $stmt->bind_param($fetch_types, ...$fetch_params);
 } else {
     $stmt->bind_param("ii", $limit, $offset);
 }
-$stmt->execute();
-$investor = $stmt->get_result();
 
-// EDIT PAKAI GET
-$edit = null;
-if(isset($_GET['edit'])){
-    $stmt = $conn->prepare("SELECT * FROM investor WHERE id_investor=?");
-    $stmt->bind_param("i", $_GET['edit']);
-    $stmt->execute();
-    $edit = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+$stmt->execute();
+$investor_result = $stmt->get_result();
+
+$investor_list = [];
+while ($row = $investor_result->fetch_assoc()) {
+    $investor_list[] = $row;
 }
+$stmt->close();
+
+// Sidebar + <head>/<body> di-include SETELAH semua handler POST (yang pakai header redirect)
+include 'sidebar_pusat.php';
 ?>
 
+<!-- CSS Assets -->
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
     body { background-color: #f4f7fe !important; font-family: 'Plus Jakarta Sans', sans-serif !important; color: #1b2559; }
-    .saas-card { background: #ffffff; border: none !important; border-radius: 20px !important; box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.06) !important; padding: 24px; }
+    
+    .saas-card { background: #ffffff; border: none !important; border-radius: 20px !important; box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.06) !important; padding: 20px; }
     .title-mark { width: 12px; height: 12px; background-color: #4318ff; border-radius: 4px; display: inline-block; margin-right: 10px; }
+    
     .btn-premium { background-color: #4318ff !important; color: #ffffff !important; border: none !important; padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; transition: all 0.2s ease; }
     .btn-premium:hover { background-color: #3310cc !important; transform: translateY(-1px); box-shadow: 0px 8px 20px rgba(67, 24, 255, 0.15); }
-    .btn-premium-outline { background-color: #f4f7fe !important; color: #4318ff !important; border: 1px solid #e0e7ff !important; padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; }
+    .btn-premium-outline { background-color: #f4f7fe !important; color: #4318ff !important; border: 1px solid #e0e7ff !important; padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; }
     .btn-premium-outline:hover { background-color: #e0e7ff !important; }
+    
     .form-control-premium, .form-select-premium { border-radius: 12px !important; border: 1px solid #e0e7ff !important; padding: 10px 16px; color: #1b2559; font-size: 14px; background-color: #ffffff; }
     .form-control-premium:focus, .form-select-premium:focus { border-color: #4318ff !important; box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1) !important; }
     
-    .btn-action-info { background-color: #dbeafe; color: #2563eb; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
-    .btn-action-info:hover { background-color: #bfdbfe; }
-    .btn-action-edit { background-color: #fff3cd; color: #856404; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
-    .btn-action-edit:hover { background-color: #ffe8a1; }
-    .btn-action-delete { background-color: #fde8e8; color: #ef4444; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+    .btn-action-info { background-color: #dbeafe; color: #2563eb; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+    .btn-action-info:hover { background-color: #bfdbfe; color: #1d4ed8; }
+    .btn-action-edit { background-color: #fff3cd; color: #856404; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+    .btn-action-edit:hover { background-color: #ffe8a1; color: #856404; }
+    .btn-action-delete { background-color: #fde8e8; color: #ef4444; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
     .btn-action-delete:hover { background-color: #fbd5d5; }
     
-    .pagination .page-link { border-radius: 10px !important; margin: 0 3px; border: 1px solid #e0e7ff; color: #4318ff; font-weight: 600; }
-    .pagination .page-item.active .page-link { background-color: #4318ff; border-color: #4318ff; color: #fff; }
-    .pagination .page-link:hover { background-color: #e0e7ff; }
-    .pagination .page-item.disabled .page-link { color: #a3aed0; }
-    
-    .stat-card { border-radius: 16px; padding: 20px; background: #fff; border: 1px solid #e0e7ff; }
+    .stat-card { border-radius: 16px; padding: 20px; background: #fff; border: 1px solid #e0e7ff; box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.04); }
     .stat-card .icon { width: 48px; height: 48px; background: #f4f7fe; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #4318ff; }
     
     .table-saas { margin-bottom: 0; width: 100% !important; }
-    .table-saas thead th { background-color: #f8f9fc !important; color: #8f9bba !important; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eef2f9 !important; padding: 16px 12px; border-top: none !important; }
-    .table-saas tbody td { padding: 16px 12px; border-bottom: 1px solid #f4f7fe !important; color: #1b2559; font-size: 14px; vertical-align: middle; }
-    .table-saas tbody tr:hover { background-color: rgba(244, 247, 254, 0.5); }
+    .table-saas thead th { background-color: #f8f9fc !important; color: #8f9bba !important; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eef2f9 !important; padding: 14px 12px; }
+    .table-saas tbody td { padding: 14px 12px; border-bottom: 1px solid #f4f7fe !important; color: #2b3674; font-size: 14px; vertical-align: middle; }
     
     .modal-premium .modal-content { border-radius: 24px !important; border: none !important; box-shadow: 0px 24px 48px rgba(112, 144, 176, 0.15) !important; }
-    .modal-premium .modal-header { border-bottom: 1px solid #f4f7fe !important; padding: 20px 24px !important; }
-    .modal-premium .modal-body { padding: 24px !important; }
-    .modal-premium .modal-footer { border-top: 1px solid #f4f7fe !important; padding: 16px 24px !important; }
 
-    @media (max-width: 767.98px) {
-        .saas-card { padding: 16px !important; }
-        .header-container { flex-direction: column; align-items: flex-start !important; gap: 12px; }
-        .action-container { flex-direction: column; align-items: stretch !important; gap: 16px; }
-        .action-container form { flex-direction: column; width: 100%; }
-        .action-container input { width: 100% !important; }
-        .action-container button, .action-container a { flex: 1; justify-content: center; }
-        
-        .table-saas thead { display: none; }
-        .table-saas tbody tr { display: block; border: 1px solid #e0e7ff; border-radius: 16px; margin-bottom: 16px; padding: 16px; background: #ffffff; box-shadow: 0px 4px 12px rgba(112, 144, 176, 0.03); }
-        .table-saas tbody td { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 !important; border-bottom: 1px dashed #f4f7fe !important; text-align: right; }
-        .table-saas tbody td:last-child { border-bottom: none !important; padding-top: 14px !important; }
-        .table-saas tbody td::before { content: attr(data-label); font-weight: 600; color: #8f9bba; font-size: 13px; text-transform: uppercase; text-align: left; margin-right: 15px; }
-        .table-saas tbody td .d-inline-flex { width: 100%; }
-        .table-saas tbody td .btn-action-info, .table-saas tbody td .btn-action-edit, .table-saas tbody td .btn-action-delete { flex: 1; }
+    .mobile-card { display: none; }
+    @media (max-width: 768px) {
+        .table-desktop { display: none; }
+        .mobile-card { display: block; }
+        .search-container { width: 100% !important; }
+        .search-container input { width: 100% !important; }
+        .btn-premium { width: 100%; justify-content: center; }
+        .saas-card { padding: 12px; }
     }
 </style>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center header-container mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <div class="d-flex align-items-center">
                 <span class="title-mark"></span>
-                <h3 class="fw-bold mb-0" style="color: #1b2559; font-size: calc(1.3rem + 0.6vw);">Data Investor</h3>
+                <h3 class="fw-bold mb-0" style="color: #1b2559;">Data Investor</h3>
             </div>
-            <span class="text-muted small ms-sm-4 d-block mt-1 mt-sm-0">Manajemen data investor Warteg Bumi Bahari</span>
+            <span class="text-muted small ms-4">Manajemen data investor Warteg Bumi Bahari</span>
         </div>
     </div>
 
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-12 col-md-4">
             <div class="stat-card d-flex align-items-center gap-3">
                 <div class="icon"><i class="bi bi-people-fill"></i></div>
                 <div>
                     <div class="text-muted small">Total Investor</div>
-                    <div class="fw-bold fs-3"><?= number_format($total_investor_all)?></div>
+                    <div class="fw-bold fs-3" style="color: #1b2559;"><?= number_format($total_investor_all) ?></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center action-container gap-3 mb-4">
-        <div>
-            <button class="btn btn-premium d-flex align-items-center gap-2 w-100 justify-content-center" data-bs-toggle="modal" data-bs-target="#modalInvestor" onclick="resetForm()">
-                <i class="bi bi-plus-circle-fill"></i> Tambah Investor Baru
-            </button>
-        </div>
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-3 mb-4">
+        <button type="button" class="btn btn-premium d-flex align-items-center gap-2" onclick="resetForm()">
+            <i class="bi bi-person-plus-fill"></i> Tambah Investor Baru
+        </button>
         
-        <form method="GET" class="d-flex gap-2">
-            <input type="text" name="search" class="form-control form-control-premium" placeholder="Cari nama, no HP, bank..." value="<?= h($search)?>" style="width: 280px;">
-            <div class="d-flex gap-2 w-100">
-                <button type="submit" class="btn btn-premium-outline d-flex align-items-center gap-2 justify-content-center">
-                    <i class="bi bi-search"></i> Cari
-                </button>
-                <?php if ($search): ?>
-                    <a href="data_investor" class="btn btn-premium-outline bg-white text-secondary d-flex align-items-center justify-content-center">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </a>
-                <?php endif; ?>
-            </div>
+        <form method="GET" class="d-flex gap-2 search-container">
+            <input type="text" name="search" class="form-control form-control-premium" placeholder="Cari nama atau No. HP..." value="<?= h($search) ?>">
+            <button type="submit" class="btn btn-premium-outline"><i class="bi bi-search"></i></button>
+            <?php if ($search !== ''): ?>
+                <a href="data_investor" class="btn btn-premium-outline bg-white text-secondary"><i class="bi bi-arrow-clockwise"></i></a>
+            <?php endif; ?>
         </form>
     </div>
 
     <div class="card saas-card p-0 overflow-hidden border-0">
-        <div class="table-responsive-md">
+        <!-- TAMPILAN TABLE DESKTOP -->
+        <div class="table-responsive table-desktop">
             <table class="table table-saas align-middle mb-0">
                 <thead>
                     <tr>
-                        <th width="4%" class="text-center">No</th>
-                        <th width="15%">Nama Investor</th>
-                        <th width="10%">Telephone</th>
-                        <th width="15%">Alamat</th>
-                        <th width="11%">Rekening</th>
-                        <th width="8%">Bank</th>
-                        <th width="12%">Atas Nama Rekening</th>
-                        <th width="12%">Periode Investasi</th>
-                        <th width="6%">Surat</th>
-                        <th width="7%" class="text-center">Aksi</th>
+                        <th width="8%" class="text-center">No</th>
+                        <th width="35%">Nama Investor</th>
+                        <th width="22%">No. Telephone / HP</th>
+                        <th width="12%" class="text-center">Status</th>
+                        <th width="23%" class="text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if($investor->num_rows==0):?>
+                    <?php if (empty($investor_list)): ?>
                     <tr>
-                        <td colspan="10" class="text-center py-5 text-muted fw-semibold">
+                        <td colspan="5" class="text-center py-5 text-muted fw-semibold">
                             <i class="bi bi-inbox fs-2 d-block mb-2"></i> Belum ada data investor
                         </td>
                     </tr>
-                    <?php else: $no=$offset+1; while($d=$investor->fetch_assoc()):?>
+                    <?php else: $no = $offset + 1; foreach ($investor_list as $d): ?>
                     <tr>
-                        <td data-label="No" class="text-center text-muted fw-semibold"><?= $no++?></td>
-                        <td data-label="Nama Investor"><span class="fw-bold" style="color: #1b2559;"><?= h($d['nama_investor'])?></span></td>
-                        <td data-label="Telephone" class="text-secondary"><?= h($d['no_hp'])?></td>
-                        <td data-label="Alamat" class="text-secondary"><?= substr(h($d['alamat']),0,30)?><?= strlen($d['alamat'])>30?'...':''?></td>
-                        <td data-label="Rekening" class="font-monospace text-secondary" style="font-size: 13px;"><?= h($d['no_rekening'])?></td>
-                        <td data-label="Bank">
-                            <?php if($d['nama_bank']):?>
-                                <span class="badge bg-light text-dark px-2 py-1 border text-uppercase" style="font-size: 10px; letter-spacing: 0.5px;"><?= h($d['nama_bank'])?></span>
+                        <td class="text-center text-muted fw-semibold"><?= $no++ ?></td>
+                        <td>
+                            <span class="fw-bold text-dark d-block"><?= h($d['nama_investor']) ?></span>
+                        </td>
+                        <td>
+                            <small class="d-block text-dark fw-semibold"><i class="bi bi-telephone me-1"></i><?= h($d['no_hp'] ?: '-') ?></small>
+                        </td>
+                        <td class="text-center">
+                            <?php if (($d['status'] ?? 'aktif') == 'aktif'): ?>
+                                <span class="badge bg-success-subtle text-success px-2 py-1">Aktif</span>
                             <?php else: ?>
-                                <span class="text-muted">-</span>
-                            <?php endif;?>
+                                <span class="badge bg-danger-subtle text-danger px-2 py-1">Nonaktif</span>
+                            <?php endif; ?>
                         </td>
-                        <td data-label="Atas Nama Rekening" class="fw-semibold"><?= !empty($d['atas_nama_rekening']) ? h($d['atas_nama_rekening']) : '<span class="text-muted">-</span>' ?></td>
-                        <td data-label="Periode Investasi">
-                            <small>
-                                <?= $d['tgl_mulai_investasi'] ? date('d M Y', strtotime($d['tgl_mulai_investasi'])) : '-' ?> 
-                                <i class="bi bi-arrow-right"></i> 
-                                <?= $d['tgl_selesai_investasi'] ? date('d M Y', strtotime($d['tgl_selesai_investasi'])) : '<span class="text-success fw-bold">Aktif</span>' ?>
-                            </small>
-                        </td>
-                        <td data-label="Surat Perjanjian">
-                            <?php if($d['surat_perjanjian']):?>
-                                <a href="../uploads/surat_perjanjian/<?= h($d['surat_perjanjian'])?>" target="_blank" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-pdf"></i> Lihat</a>
-                            <?php else:?><span class="text-muted">-</span><?php endif;?>
-                        </td>
-                        <td data-label="Aksi" class="text-center">
-                            <div class="d-inline-flex gap-2 w-100 justify-content-end justify-content-md-center">
-                                <button class="btn btn-action-info" data-bs-toggle="modal" data-bs-target="#modalDetail<?= $d['id_investor']?>" title="Riwayat Cabang">
-                                    <i class="bi bi-eye me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-eye"></i></span> Riwayat
+                        <td class="text-center">
+                            <div class="d-inline-flex gap-1 justify-content-center">
+                                <button type="button" class="btn btn-action-info" onclick="showDetailInvestor(<?= (int)$d['id_investor'] ?>, '<?= h(addslashes($d['nama_investor'])) ?>')">
+                                    <i class="bi bi-info-circle me-1"></i> Detail
                                 </button>
-                                <button class="btn btn-action-edit" data-bs-toggle="modal" data-bs-target="#modalInvestor" onclick="editInvestor(<?= $d['id_investor']?>, '<?= addslashes(h($d['nama_investor']))?>', '<?= addslashes(h($d['no_hp']))?>', '<?= addslashes(h($d['alamat']))?>', '<?= addslashes(h($d['no_rekening']))?>', '<?= addslashes(h($d['nama_bank']))?>', '<?= addslashes(h($d['atas_nama_rekening']))?>', '<?= $d['tgl_mulai_investasi']?>', '<?= $d['tgl_selesai_investasi']?>', '<?= h($d['surat_perjanjian'])?>')" title="Edit">
-                                    <i class="bi bi-pencil-square me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-pencil-square"></i></span> Edit
+                                <a href="data_user?open_modal=1&id_investor=<?= (int)$d['id_investor'] ?>&nama_investor=<?= urlencode($d['nama_investor']) ?>" class="btn btn-action-edit" title="Buat/atur akun login investor ini">
+                                    <i class="bi bi-key-fill"></i>
+                                </a>
+                                <button type="button" class="btn btn-action-edit" onclick="editInvestor(<?= htmlspecialchars(json_encode($d), ENT_QUOTES, 'UTF-8') ?>)">
+                                    <i class="bi bi-pencil-square"></i>
                                 </button>
-                                <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus investor <?= addslashes(h($d['nama_investor']))?>?')">
-                                    <input type="hidden" name="csrf" value="<?=csrf_token()?>">
-                                    <input type="hidden" name="id_investor" value="<?= $d['id_investor']?>">
-                                    <button type="submit" name="hapus" class="btn btn-action-delete" title="Hapus">
-                                        <i class="bi bi-trash-fill me-1 d-md-none"></i> <span class="d-none d-md-inline"><i class="bi bi-trash-fill"></i></span> Hapus
+                                <form method="POST" class="d-inline" id="form-delete-<?= (int)$d['id_investor'] ?>">
+                                    <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                                    <input type="hidden" name="id_investor" value="<?= (int)$d['id_investor'] ?>">
+                                    <input type="hidden" name="hapus" value="1">
+                                    <button type="button" class="btn btn-action-delete" onclick="confirmDelete(<?= (int)$d['id_investor'] ?>, '<?= h(addslashes($d['nama_investor'])) ?>')">
+                                        <i class="bi bi-trash-fill"></i>
                                     </button>
                                 </form>
                             </div>
                         </td>
                     </tr>
-                    <?php endwhile; endif;?>
+                    <?php endforeach; endif; ?>
                 </tbody>
             </table>
         </div>
 
-        <!-- PAGINATION BARU -->
-        <?php if($total_pages > 1): ?>
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center p-3 border-top">
-            <div class="text-muted small mb-3 mb-md-0">
-                Menampilkan <?= $offset + 1?> - <?= min($offset + $limit, $total_data)?> dari <?= $total_data?> data
-            </div>
-            <nav>
-                <ul class="pagination pagination-sm mb-0">
-                    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=<?= $page-1 ?>&search=<?= urlencode($search)?>">
-                            <i class="bi bi-chevron-left"></i>
+        <!-- TAMPILAN MOBILE CARD -->
+        <div class="mobile-card p-3">
+            <?php if (empty($investor_list)): ?>
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox fs-2 d-block mb-2"></i> Belum ada data investor
+                </div>
+            <?php else: $no_m = $offset + 1; foreach ($investor_list as $d): ?>
+                <div class="bg-light p-3 rounded-4 mb-3 border">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge bg-white text-dark border fw-bold">#<?= $no_m++ ?></span>
+                        <div>
+                            <?php if (($d['status'] ?? 'aktif') == 'aktif'): ?>
+                                <span class="badge bg-success-subtle text-success me-1">Aktif</span>
+                            <?php else: ?>
+                                <span class="badge bg-danger-subtle text-danger me-1">Nonaktif</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="text-muted small">Nama Investor</div>
+                        <div class="fw-bold text-dark fs-6"><?= h($d['nama_investor']) ?></div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="text-muted small">No HP / Telephone</div>
+                        <div class="fw-semibold text-secondary small"><?= h($d['no_hp'] ?: '-') ?></div>
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-action-info flex-fill py-2" onclick="showDetailInvestor(<?= (int)$d['id_investor'] ?>, '<?= h(addslashes($d['nama_investor'])) ?>')">
+                            <i class="bi bi-info-circle me-1"></i> Detail Cabang
+                        </button>
+                        <a href="data_user?open_modal=1&id_investor=<?= (int)$d['id_investor'] ?>&nama_investor=<?= urlencode($d['nama_investor']) ?>" class="btn btn-action-edit py-2" title="Buat/atur akun login investor ini">
+                            <i class="bi bi-key-fill"></i>
                         </a>
-                    </li>
-                    <?php 
-                    $range = 2;
-                    $start = max(1, $page - $range);
-                    $end = min($total_pages, $page + $range);
-                    if($start > 1){
-                        echo '<li class="page-item"><a class="page-link" href="?page=1&search='.urlencode($search).'">1</a></li>';
-                        if($start > 2) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                    }
-                    for($i = $start; $i <= $end; $i++): 
-                    ?>
-                    <li class="page-item <?= $i == $page ? 'active' : '' ?>">
-                        <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search)?>">
-                            <?= $i ?>
-                        </a>
-                    </li>
-                    <?php endfor; ?>
-                    <?php 
-                    if($end < $total_pages){
-                        if($end < $total_pages - 1) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                        echo '<li class="page-item"><a class="page-link" href="?page='.$total_pages.'&search='.urlencode($search).'">'.$total_pages.'</a></li>';
-                    }
-                    ?>
-                    <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=<?= $page+1 ?>&search=<?= urlencode($search)?>">
-                            <i class="bi bi-chevron-right"></i>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
+                        <button type="button" class="btn btn-action-edit py-2" onclick="editInvestor(<?= htmlspecialchars(json_encode($d), ENT_QUOTES, 'UTF-8') ?>)">
+                            <i class="bi bi-pencil-square"></i>
+                        </button>
+                        <form method="POST" class="d-inline" id="form-delete-m-<?= (int)$d['id_investor'] ?>">
+                            <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                            <input type="hidden" name="id_investor" value="<?= (int)$d['id_investor'] ?>">
+                            <input type="hidden" name="hapus" value="1">
+                            <button type="button" class="btn btn-action-delete py-2" onclick="confirmDelete(<?= (int)$d['id_investor'] ?>, '<?= h(addslashes($d['nama_investor'])) ?>', true)">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            <?php endforeach; endif; ?>
         </div>
-        <?php endif; ?>
-    </div>
 
-    <!-- MODAL DETAIL RIWAYAT CABANG -->
-    <?php 
-    $sql_modal = "SELECT * FROM investor $where_sql ORDER BY id_investor DESC";
-    $stmt_modal = $conn->prepare($sql_modal);
-    if($search){
-        $types_modal = "sss";
-        $params_modal = ["%$search%", "%$search%", "%$search%"];
-        $stmt_modal->bind_param($types_modal, ...$params_modal);
-    }
-    $stmt_modal->execute();
-    $investor_modal = $stmt_modal->get_result();
-    while($d=$investor_modal->fetch_assoc()):
-    ?>
-    <div class="modal fade modal-premium" id="modalDetail<?= $d['id_investor']?>" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title fw-bold" style="color: #1b2559;">Riwayat Investasi: <?= h($d['nama_investor'])?></h5>
-                        <small class="text-muted">Daftar cabang yang pernah/sedang diinvestasikan</small>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <?php 
-                    $stmt = $conn->prepare("SELECT c.nama_cabang, c.alamat, ci.tgl_mulai, ci.tgl_selesai FROM cabang_investor ci JOIN cabang c ON ci.id_cabang=c.id_cabang WHERE ci.id_investor=? ORDER BY ci.tgl_mulai DESC");
-                    $stmt->bind_param("i", $d['id_investor']);
-                    $stmt->execute();
-                    $cabang_inv = $stmt->get_result();
-                    if($cabang_inv->num_rows > 0):?>
-                    <div class="table-responsive">
-                        <table class="table table-saas table-sm mb-0">
-                            <thead><tr><th>Nama Cabang</th><th>Alamat</th><th>Periode Investasi</th></tr></thead>
-                            <tbody>
-                                <?php while($c=$cabang_inv->fetch_assoc()):?>
-                                <tr>
-                                    <td class="fw-semibold"><?= h($c['nama_cabang'])?></td>
-                                    <td class="text-secondary"><?= h($c['alamat'])?></td>
-                                    <td>
-                                        <?= date('d M Y', strtotime($c['tgl_mulai']))?> 
-                                        <i class="bi bi-arrow-right"></i> 
-                                        <?= $c['tgl_selesai'] ? date('d M Y', strtotime($c['tgl_selesai'])) : '<span class="badge bg-success-subtle text-success">Aktif</span>' ?>
-                                    </td>
-                                </tr>
-                                <?php endwhile;?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <?php else:?>
-                    <div class="text-center py-4 text-muted"><i class="bi bi-building-x fs-2 d-block mb-2"></i>Investor ini belum memiliki riwayat cabang</div>
-                    <?php endif; $stmt->close();?>
-                </div>
-                <div class="modal-footer"><button type="button" class="btn btn-premium-outline text-secondary" data-bs-dismiss="modal">Tutup</button></div>
-            </div>
-        </div>
+        <?php render_pagination($page, $total_pages, ['from' => $offset + 1, 'to' => min($offset + $limit, $total_data), 'total' => $total_data, 'label' => 'investor']); ?>
     </div>
-    <?php endwhile;?>
 </div>
 
-<!-- Modal Tambah/Edit Investor -->
-<div class="modal fade modal-premium" id="modalInvestor" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <form method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="csrf" value="<?=csrf_token()?>">
-            <div class="modal-content">
-                <div class="modal-header">
+<!-- MODAL TAMBAH / EDIT INVESTOR -->
+<div class="modal fade modal-premium" id="modalInvestor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                <div class="modal-header border-bottom-0 pb-0">
                     <div>
-                        <h5 class="modal-title fw-bold" id="modalTitle" style="color: #1b2559;"><?= $edit? 'Modifikasi Data Investor' : 'Registrasi Investor Baru'?></h5>
-                        <small class="text-muted">Kelola kredensial dan informasi profil investor</small>
+                        <h5 class="modal-title fw-bold" id="modalTitle" style="color: #1b2559;">Registrasi Investor Baru</h5>
+                        <small class="text-muted">Kelola data profil investor</small>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" name="id_investor" id="id_investor" value="<?= $edit['id_investor']?? ''?>">
-                    <input type="hidden" name="file_lama" id="file_lama" value="<?= $edit['surat_perjanjian']?? ''?>">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted mb-1">Nama Investor</label>
-                            <input type="text" name="nama_investor" id="nama_investor" class="form-control form-control-premium" value="<?= h($edit['nama_investor']?? '')?>" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted mb-1">Telephone</label>
-                            <input type="text" name="no_hp" id="no_hp" class="form-control form-control-premium" value="<?= h($edit['no_hp']?? '')?>">
-                        </div>
+                    <input type="hidden" name="id_investor" id="id_investor" value="">
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted mb-1">Nama Investor *</label>
+                        <input type="text" name="nama_investor" id="nama_investor" class="form-control form-control-premium" required autocomplete="off">
                     </div>
-                    <div class="mt-3">
-                        <label class="form-label small fw-bold text-muted mb-1">Alamat</label>
-                        <textarea name="alamat" id="alamat" class="form-control form-control-premium" rows="2"><?= h($edit['alamat']?? '')?></textarea>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted mb-1">Telephone / No HP</label>
+                        <input type="text" name="no_hp" id="no_hp" class="form-control form-control-premium" placeholder="08123456789">
                     </div>
-                    <div class="row g-3 mt-1">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted mb-1">Rekening</label>
-                            <input type="text" name="no_rekening" id="no_rekening" class="form-control form-control-premium" value="<?= h($edit['no_rekening']?? '')?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted mb-1">Bank</label>
-                            <input type="text" name="nama_bank" id="nama_bank" class="form-control form-control-premium" value="<?= h($edit['nama_bank']?? '')?>">
-                        </div>
-                    </div>
-                    <div class="row g-3 mt-1">
-                        <div class="col-md-12">
-                            <label class="form-label small fw-bold text-muted mb-1">Atas Nama Rekening</label>
-                            <input type="text" name="atas_nama_rekening" id="atas_nama_rekening" class="form-control form-control-premium" value="<?= h($edit['atas_nama_rekening']?? '')?>" placeholder="PT. BUMI BAHARI SEJAHTERA">
-                        </div>
-                    </div>
-                    <div class="row g-3 mt-1">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted mb-1">Tgl Mulai Investasi</label>
-                            <input type="date" name="tgl_mulai_investasi" id="tgl_mulai_investasi" class="form-control form-control-premium" value="<?= h($edit['tgl_mulai_investasi']?? '')?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted mb-1">Tgl Selesai Investasi</label>
-                            <input type="date" name="tgl_selesai_investasi" id="tgl_selesai_investasi" class="form-control form-control-premium" value="<?= h($edit['tgl_selesai_investasi']?? '')?>">
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <label class="form-label small fw-bold text-muted mb-1">Surat Perjanjian</label>
-                        <input type="file" name="surat_perjanjian" class="form-control form-control-premium" accept=".pdf,.jpg,.jpeg,.png">
-                        <small class="text-muted" id="file_info"><?= $edit && $edit['surat_perjanjian'] ? 'File saat ini: '.h($edit['surat_perjanjian']) : ''?></small>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted mb-1">Status Investor</label>
+                        <select name="status" id="status" class="form-select form-select-premium">
+                            <option value="aktif">Aktif</option>
+                            <option value="nonaktif">Nonaktif</option>
+                        </select>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer border-top-0 pt-0">
                     <button type="button" class="btn btn-premium-outline text-secondary" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" name="simpan" class="btn btn-premium">Simpan Data</button>
                 </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DETAIL CABANG INVESTOR -->
+<div class="modal fade modal-premium" id="modalDetailInvestor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <div>
+                    <h5 class="modal-title fw-bold" style="color: #1b2559;">Riwayat Investor Cabang</h5>
+                    <small class="text-muted" id="detailNamaInvestor">Daftar cabang tempat investor ini menanamkan modal</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        </form>
+            <div class="modal-body">
+                <div id="loadingDetail" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="small text-muted mt-2">Mengambil data riwayat cabang...</p>
+                </div>
+                <div id="contentDetail" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-saas align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th width="6%" class="text-center">NO</th>
+                                    <th width="28%">NAMA CABANG</th>
+                                    <th width="22%">PENGELOLA</th>
+                                    <th width="28%" class="text-center">PERIODE INVESTASI</th>
+                                    <th width="16%" class="text-center">STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="listCabangInvestor">
+                                <!-- Data diisi via Javascript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-premium-outline text-secondary" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-function resetForm(){
+let investorModal;
+let detailModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    investorModal = new bootstrap.Modal(document.getElementById('modalInvestor'));
+    detailModal = new bootstrap.Modal(document.getElementById('modalDetailInvestor'));
+});
+
+function editInvestor(data) {
+    document.getElementById('modalTitle').innerText = 'Edit Data Investor';
+    document.getElementById('id_investor').value = data.id_investor || '';
+    document.getElementById('nama_investor').value = data.nama_investor || '';
+    document.getElementById('no_hp').value = data.no_hp || '';
+    document.getElementById('status').value = data.status || 'aktif';
+    
+    investorModal.show();
+}
+
+function resetForm() {
+    document.getElementById('modalTitle').innerText = 'Registrasi Investor Baru';
     document.getElementById('id_investor').value = '';
-    document.getElementById('file_lama').value = '';
     document.getElementById('nama_investor').value = '';
     document.getElementById('no_hp').value = '';
-    document.getElementById('alamat').value = '';
-    document.getElementById('no_rekening').value = '';
-    document.getElementById('nama_bank').value = '';
-    document.getElementById('atas_nama_rekening').value = '';
-    document.getElementById('tgl_mulai_investasi').value = '';
-    document.getElementById('tgl_selesai_investasi').value = '';
-    document.getElementById('modalTitle').innerText = 'Registrasi Investor Baru';
-    document.getElementById('file_info').innerText = '';
+    document.getElementById('status').value = 'aktif';
+    
+    investorModal.show();
 }
-function editInvestor(id, nama, hp, alamat, no_rek, bank, atas_nama, tgl_mulai, tgl_selesai, file){
-    document.getElementById('id_investor').value = id;
-    document.getElementById('file_lama').value = file;
-    document.getElementById('nama_investor').value = nama;
-    document.getElementById('no_hp').value = hp;
-    document.getElementById('alamat').value = alamat;
-    document.getElementById('no_rekening').value = no_rek;
-    document.getElementById('nama_bank').value = bank;
-    document.getElementById('atas_nama_rekening').value = atas_nama;
-    document.getElementById('tgl_mulai_investasi').value = tgl_mulai;
-    document.getElementById('tgl_selesai_investasi').value = tgl_selesai;
-    document.getElementById('modalTitle').innerText = 'Modifikasi Data Investor';
-    document.getElementById('file_info').innerText = file? 'File saat ini: ' + file : '';
+
+function confirmDelete(id, nama, isMobile = false) {
+    Swal.fire({
+        title: 'Hapus Investor?',
+        text: "Apakah Anda yakin ingin menghapus investor " + nama + "? Relasi cabang investor terkait juga akan terhapus.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Ya, Hapus!',
+        cancelButtonText: 'Batal',
+        customClass: { popup: 'rounded-4' }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            let formId = isMobile ? 'form-delete-m-' + id : 'form-delete-' + id;
+            document.getElementById(formId).submit();
+        }
+    });
 }
-<?php if($edit):?>var modal = new bootstrap.Modal(document.getElementById('modalInvestor')); modal.show();<?php endif;?>
+
+function showDetailInvestor(idInvestor, namaInvestor) {
+    document.getElementById('detailNamaInvestor').innerText = 'Investor: ' + namaInvestor;
+    document.getElementById('loadingDetail').style.display = 'block';
+    document.getElementById('contentDetail').style.display = 'none';
+    
+    detailModal.show();
+    
+    // Panggil file get_riwayat_investor.php via AJAX
+    fetch('get_riwayat_investor.php?id_investor=' + idInvestor)
+        .then(response => {
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+            return response.json();
+        })
+        .then(res => {
+            let html = '';
+            let dataCabang = (res && res.success) ? res.data : [];
+
+            const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+
+            if (dataCabang.length === 0) {
+                html = '<tr><td colspan="5" class="text-center py-4 text-muted fw-semibold"><i class="bi bi-info-circle d-block fs-3 mb-1"></i>Investor ini belum terhubung ke cabang manapun.</td></tr>';
+            } else {
+                dataCabang.forEach((item, index) => {
+                    let badgeClass = (item.status && item.status.toLowerCase() === 'aktif') ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary';
+                    let tglMulaiFmt = item.tgl_mulai_fmt || item.tgl_mulai || '-';
+                    let tglSelesaiFmt = item.tgl_selesai_fmt || item.tgl_selesai || '-';
+
+                    html += `
+                        <tr>
+                            <td class="text-center fw-semibold text-muted">${index + 1}</td>
+                            <td class="fw-bold text-dark">${esc(item.nama_cabang)}</td>
+                            <td class="text-secondary">${esc(item.nama_pengelola || '-')}</td>
+                            <td class="text-center small text-muted">${esc(tglMulaiFmt)} s/d ${esc(tglSelesaiFmt)}</td>
+                            <td class="text-center"><span class="badge ${badgeClass} px-2 py-1">${esc(item.status)}</span></td>
+                        </tr>
+                    `;
+                });
+            }
+            document.getElementById('listCabangInvestor').innerHTML = html;
+            document.getElementById('loadingDetail').style.display = 'none';
+            document.getElementById('contentDetail').style.display = 'block';
+        })
+        .catch(err => {
+            console.error('AJAX Error:', err);
+            document.getElementById('listCabangInvestor').innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">Gagal memuat data riwayat cabang.</td></tr>';
+            document.getElementById('loadingDetail').style.display = 'none';
+            document.getElementById('contentDetail').style.display = 'block';
+        });
+}
+
+// Alert Notifikasi Session
+<?php if (isset($_SESSION['success'])): ?>
+    Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: '<?= addslashes($_SESSION['success']) ?>',
+        timer: 2500,
+        showConfirmButton: false,
+        customClass: { popup: 'rounded-4' }
+    });
+    <?php unset($_SESSION['success']); ?>
+<?php endif; ?>
+
+<?php if (isset($_SESSION['error'])): ?>
+    Swal.fire({
+        icon: 'error',
+        title: 'Gagal!',
+        text: '<?= addslashes($_SESSION['error']) ?>',
+        customClass: { popup: 'rounded-4' }
+    });
+    <?php unset($_SESSION['error']); ?>
+<?php endif; ?>
 </script>

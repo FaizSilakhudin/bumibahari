@@ -1,6 +1,11 @@
 <?php
 require 'config/koneksi.php'; // biar session_start nya dari sini
 
+// Catat aktivitas logout sebelum sesi dihapus.
+if (!empty($_SESSION['user_id'])) {
+    audit($conn, 'logout', 'users', $_SESSION['user_id'], ['username' => $_SESSION['username'] ?? null]);
+}
+
 // 1. Kosongkan semua data session
 $_SESSION = [];
 

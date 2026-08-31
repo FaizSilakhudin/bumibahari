@@ -2,1053 +2,285 @@
 require '../config/koneksi.php';
 include 'sidebar.php';
 
-// =====================================================
-// HELPER BIAR GAK ERROR
-// =====================================================
-if(!function_exists('h')){
-    function h($s){
-        return htmlspecialchars($s ?? '', ENT_QUOTES);
-    }
-}
-
-if(!function_exists('csrf_token')){
-    function csrf_token(){
-        if(empty($_SESSION['csrf'])){
-            $_SESSION['csrf'] = bin2hex(random_bytes(32));
-        }
-
-        return $_SESSION['csrf'];
-    }
-}
-
-if(!function_exists('csrf_check')){
-    function csrf_check($t){
-        return hash_equals($_SESSION['csrf'] ?? '', $t);
-    }
-}
+$id_cabang = (int) $_SESSION['id_cabang'];
 
 // =====================================================
-// 1. PROTEKSI LOGIN + ROLE
-// =====================================================
-if(
-    !isset($_SESSION['user_id']) ||
-    ($_SESSION['role'] ?? '') != 'cabang'
-){
-    header("Location:../login");
-    exit;
-}
-
-$id_cabang = $_SESSION['id_cabang'];
-$nama_pengelola = $_SESSION['nama_pengelola'];
-
-// =====================================================
-// 2. AMANKAN QUERY SELECT PAKAI PREPARED
+// IDENTITAS CABANG + PENGELOLA AKTIF
 // =====================================================
 $stmt = $conn->prepare("
-    SELECT nama_cabang
-    FROM cabang
-    WHERE id_cabang=?
+    SELECT
+        c.nama_cabang,
+        COALESCE(
+            (SELECT p.nama_pengelola FROM pengelola p
+               WHERE p.id_cabang = c.id_cabang AND p.status = 'aktif'
+               ORDER BY p.tgl_mulai DESC LIMIT 1),
+            c.nama_pengelola
+        ) AS nama_pengelola
+    FROM cabang c
+    WHERE c.id_cabang = ?
 ");
-
 $stmt->bind_param("i", $id_cabang);
 $stmt->execute();
-
-$result = $stmt->get_result();
-
-$cabang = $result->fetch_assoc()['nama_cabang'] ?? '-';
-
+$data_cabang = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
+$cabang = $data_cabang['nama_cabang'] ?? '-';
+$nama_pengelola = $data_cabang['nama_pengelola'] ?: '-';
+$_SESSION['nama_pengelola'] = $nama_pengelola;
+
+// Tanggal laporan = 1 hari sebelum hari input (cabang tidak bisa memilih tanggal).
+$tgl = date('Y-m-d', strtotime('-1 day'));
+
+// Status nota untuk tanggal ini (kalau sudah pernah kirim / sudah diproses PIC).
+$stmt = $conn->prepare("SELECT foto_nota1, foto_nota2, foto_nota3, foto_nota4, status_laporan, keterangan_nota
+                         FROM laporan_cabang WHERE id_cabang = ? AND tanggal = ?");
+$stmt->bind_param("is", $id_cabang, $tgl);
+$stmt->execute();
+$laporan_hari_ini = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+$status_saat_ini = $laporan_hari_ini['status_laporan'] ?? null;
 
 // =====================================================
-// PROSES SIMPAN
+// PROSES SIMPAN (UPLOAD NOTA)
 // =====================================================
+if (isset($_POST['simpan'])) {
 
-// FIX: WAJIB ADA { SETELAH IF
-if(isset($_POST['simpan'])){
-
-    // =================================================
-    // 3. VALIDASI CSRF
-    // =================================================
-    if(!csrf_check($_POST['csrf'] ?? '')){
-        die("
-            <script>
-                alert('Token tidak valid!');
-                history.back();
-            </script>
-        ");
+    if (!csrf_check($_POST['csrf'] ?? '')) {
+        die("<script>alert('Token tidak valid!'); history.back();</script>");
     }
 
-    $tgl = $_POST['tanggal'] ?? date('Y-m-d');
-
-    $ket = $_POST['keterangan'] ?? '';
-
+    $ket_nota = trim($_POST['keterangan_nota'] ?? '');
 
     // =================================================
-    // CLEAN NUMBER
+    // UPLOAD AMAN — 4 foto nota
     // =================================================
-    function cleanNumber($val) {
-
-        return (int)preg_replace(
-            '/[^0-9]/',
-            '',
-            $val ?? ''
-        );
-
-    }
-
-
-// =================================================
-// PENDAPATAN / OMZET
-// =================================================
-$tunai = cleanNumber($_POST['tunai'] ?? 0);
-$qris  = cleanNumber($_POST['qris'] ?? 0);
-$grab  = cleanNumber($_POST['grab_food'] ?? 0);
-$go    = cleanNumber($_POST['go_food'] ?? 0);
-
-// PINDAHKAN KE SINI BIAR KEPAAKE DI OMZET
-$pencairan_qris = cleanNumber($_POST['pencairan_qris'] ?? 0);
-
-$total_omset =
-    $tunai +
-    $qris +
-    $grab +
-    $go -
-    $pencairan_qris;
-
-// =================================================
-// BELANJA RUTIN
-// =================================================
-$pasar =
-    cleanNumber($_POST['belanja_pasar'] ?? 0);
-
-$sembako =
-    cleanNumber($_POST['belanja_sembako'] ?? 0);
-
-$beras =
-    cleanNumber($_POST['belanja_beras'] ?? 0);
-
-$toko =
-    cleanNumber($_POST['belanja_toko'] ?? 0);
-
-$total_rutin =
-    $pasar +
-    $sembako +
-    $beras +
-    $toko;
-
-// =================================================
-// BEBAN OPERASIONAL
-// =================================================
-$sewa =
-    cleanNumber($_POST['sewa'] ?? 0);
-
-$gaji =
-    cleanNumber($_POST['gaji'] ?? 0);
-
-$listrik =
-    cleanNumber($_POST['listrik'] ?? 0);
-
-$air =
-    cleanNumber($_POST['air'] ?? 0);
-
-$sampah =
-    cleanNumber($_POST['sampah'] ?? 0);
-
-$keamanan =
-    cleanNumber($_POST['keamanan'] ?? 0);
-
-$internet =
-    cleanNumber($_POST['internet'] ?? 0);
-
-$gas =
-    cleanNumber($_POST['gas'] ?? 0);
-
-$mingguan_karyawan =
-    cleanNumber($_POST['mingguan_karyawan'] ?? 0);
-
-$es_batu =
-    cleanNumber($_POST['es_batu'] ?? 0);
-
-$bensin =
-    cleanNumber($_POST['bensin'] ?? 0);
-
-$lain =
-    cleanNumber($_POST['lain_lain'] ?? 0);
-
-$total_op =
-    $sewa +
-    $gaji +
-    $listrik +
-    $air +
-    $sampah +
-    $keamanan +
-    $internet +
-    $gas +
-    $mingguan_karyawan +
-    $es_batu +
-    $bensin +
-    $lain;
-
-// =================================================
-// TOTAL PENGELUARAN
-// =================================================
-$total_pengeluaran =
-    $total_rutin +
-    $total_op;
-
-// =================================================
-// SISA TUNAI (Sesuai Excel: Tunai - Total Pengeluaran)
-// =================================================
-$sisa_tunai =
-    $tunai -
-    $total_pengeluaran;
-
-// =================================================
-// SISA QRIS
-// =================================================
-// Murni saldo QRIS setelah dikurangi pencairan manual
-// =================================================
-$sisa_qris =
-    $qris -
-    $pencairan_qris;
-
-// =================================================
-// TOTAL SISA UANG
-// =================================================
-$sisa =
-    $sisa_tunai +
-    $sisa_qris;
-
-// =================================================
-// NET PROFIT BERSIH (Sesuai Excel)
-// =================================================
-// Net Profit = Sisa Tunai + Sisa QRIS + Go Food + Grab Food
-// =================================================
-$net =
-    $sisa_qris + 
-    $sisa_tunai +
-    $go +
-    $grab;
-
-// =================================================
-// PERSENTASE / MARGIN KEUNTUNGAN
-// =================================================
-$persen =
-    $total_omset > 0
-        ? round(
-            ($net / $total_omset) * 100,
-            2
-        )
-        : 0;
-        
-    // =================================================
-    // 4. UPLOAD AMAN
-    // =================================================
-    $foto = [
-        '',
-        '',
-        '',
-        ''
-    ];
-
+    $foto = ['', '', '', ''];
     $upload_dir = "../uploads/nota/";
 
-
-    // Buat folder jika belum ada
-    if(!is_dir($upload_dir)){
-
-        mkdir(
-            $upload_dir,
-            0755,
-            true
-        );
-
+    if (!is_dir($upload_dir)) {
+        mkdir($upload_dir, 0755, true);
     }
 
+    $ada_error_upload = false;
 
-    for($i = 1; $i <= 4; $i++){
+    for ($i = 1; $i <= 4; $i++) {
+        if (isset($_FILES["foto_nota$i"]) && $_FILES["foto_nota$i"]['error'] == 0) {
 
-        if(
-            isset($_FILES["foto_nota$i"]) &&
-            $_FILES["foto_nota$i"]['error'] == 0
-        ){
+            $tmp_name  = $_FILES["foto_nota$i"]["tmp_name"];
+            $file_size = $_FILES["foto_nota$i"]["size"];
 
-            $tmp_name =
-                $_FILES["foto_nota$i"]["tmp_name"];
+            // Cek isi berkas (bukan sekadar nama), MIME sebenarnya dari isi berkas.
+            $cek = is_uploaded_file($tmp_name) ? @getimagesize($tmp_name) : false;
 
-            $file_name =
-                $_FILES["foto_nota$i"]["name"];
-
-            $file_size =
-                $_FILES["foto_nota$i"]["size"];
-
-
-            // =========================================
-            // CEK GAMBAR
-            // =========================================
-            $cek =
-                getimagesize($tmp_name);
-
-
-            $ext =
-                strtolower(
-                    pathinfo(
-                        $file_name,
-                        PATHINFO_EXTENSION
-                    )
-                );
-
-
-            // =========================================
-            // FORMAT YANG DIIZINKAN
-            // =========================================
-            if(
-                $cek !== false &&
-                in_array(
-                    $ext,
-                    [
-                        'jpg',
-                        'jpeg',
-                        'png'
-                    ]
-                )
-            ){
-
-                // =====================================
-                // MAKSIMAL 2 MB
-                // =====================================
-                if($file_size <= 2000000){
-
-                    // =================================
-                    // NAMA FILE AMAN
-                    // =================================
-                    $nama_file =
-                        date('Ymd') .
-                        "_" .
-                        $id_cabang .
-                        "_" .
-                        uniqid() .
-                        "_" .
-                        $i .
-                        "." .
-                        $ext;
-
-
-                    if(
-                        move_uploaded_file(
-                            $tmp_name,
-                            $upload_dir . $nama_file
-                        )
-                    ){
-
-                        $foto[$i - 1] =
-                            $nama_file;
-
-                    }else{
-
-                        echo "
-                            <script>
-                                alert(
-                                    'Gagal upload foto nota $i'
-                                );
-                            </script>
-                        ";
-
-                    }
-
-                }else{
-
-                    echo "
-                        <script>
-                            alert(
-                                'Foto nota $i terlalu besar. Max 2MB'
-                            );
-                        </script>
-                    ";
-
+            $mime_map = [
+                'image/jpeg'  => 'jpg',
+                'image/pjpeg' => 'jpg',
+                'image/png'   => 'png',
+            ];
+            $real_mime = is_array($cek) ? ($cek['mime'] ?? '') : '';
+            if (function_exists('finfo_open')) {
+                $fi = finfo_open(FILEINFO_MIME_TYPE);
+                if ($fi) {
+                    $real_mime = finfo_file($fi, $tmp_name) ?: $real_mime;
+                    finfo_close($fi);
                 }
-
-            }else{
-
-                echo "
-                    <script>
-                        alert(
-                            'Format foto nota $i salah. Harus JPG/JPEG/PNG'
-                        );
-                    </script>
-                ";
-
             }
+            $ext = $mime_map[$real_mime] ?? '';
 
+            if ($cek !== false && $ext !== '') {
+                if ($file_size <= 2000000) {
+                    $nama_file = date('Ymd') . "_" . $id_cabang . "_" . uniqid() . "_" . $i . "." . $ext;
+
+                    if (move_uploaded_file($tmp_name, $upload_dir . $nama_file)) {
+                        $foto[$i - 1] = $nama_file;
+                    } else {
+                        $ada_error_upload = true;
+                        echo "<script>alert('Gagal upload foto nota $i');</script>";
+                    }
+                } else {
+                    $ada_error_upload = true;
+                    echo "<script>alert('Foto nota $i terlalu besar. Max 2MB');</script>";
+                }
+            } else {
+                $ada_error_upload = true;
+                echo "<script>alert('Format foto nota $i salah. Harus JPG/JPEG/PNG');</script>";
+            }
         }
-
     }
 
+    // Minimal satu foto (baru atau sudah ada sebelumnya) supaya tidak kirim kosong total.
+    $ada_foto_baru = ($foto[0] !== '' || $foto[1] !== '' || $foto[2] !== '' || $foto[3] !== '');
+    $ada_foto_lama = !empty($laporan_hari_ini['foto_nota1']) || !empty($laporan_hari_ini['foto_nota2'])
+        || !empty($laporan_hari_ini['foto_nota3']) || !empty($laporan_hari_ini['foto_nota4']);
 
-    // =================================================
-    // 5. UPSERT
-    // INSERT BARU ATAU UPDATE
-    // KALAU TANGGAL + CABANG SAMA
-    // =================================================
+    if (!$ada_error_upload && !$ada_foto_baru && !$ada_foto_lama) {
+        echo "<script>alert('Unggah minimal 1 foto nota.'); history.back();</script>";
+        exit;
+    }
+
+    $id_user_nota = current_user_id();
 
     $sql = "
-    INSERT INTO laporan_cabang
-    (
-        id_cabang,
-        nama_pengelola,
-        tanggal,
-
-        tunai,
-        qris,
-        grab_food,
-        go_food,
-        total_omset,
-
-        belanja_pasar,
-        belanja_sembako,
-        belanja_beras,
-        belanja_toko,
-        total_rutin,
-
-        sewa,
-        gaji,
-        listrik,
-        air,
-        sampah,
-        keamanan,
-        internet,
-        gas,
-        mingguan_karyawan,
-        es_batu,
-        bensin,
-        lain_lain,
-
-        total_operasional,
-        total_pengeluaran,
-        sisa_tunai,
-        pencairan_qris,
-        sisa_qris,
-
-        net_profit,
-        persentase,
-
-        keterangan,
-
-        foto_nota1,
-        foto_nota2,
-        foto_nota3,
-        foto_nota4
-    )
-
-    VALUES
-    (
-        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-    )
-
-    ON DUPLICATE KEY UPDATE
-
-        nama_pengelola = VALUES(nama_pengelola),
-
-        tunai = VALUES(tunai),
-        qris = VALUES(qris),
-        grab_food = VALUES(grab_food),
-        go_food = VALUES(go_food),
-        total_omset = VALUES(total_omset),
-
-        belanja_pasar = VALUES(belanja_pasar),
-        belanja_sembako = VALUES(belanja_sembako),
-        belanja_beras = VALUES(belanja_beras),
-        belanja_toko = VALUES(belanja_toko),
-        total_rutin = VALUES(total_rutin),
-
-        sewa = VALUES(sewa),
-        gaji = VALUES(gaji),
-        listrik = VALUES(listrik),
-        air = VALUES(air),
-        sampah = VALUES(sampah),
-        keamanan = VALUES(keamanan),
-        internet = VALUES(internet),
-        gas = VALUES(gas),
-        mingguan_karyawan = VALUES(mingguan_karyawan),
-        es_batu = VALUES(es_batu),
-        bensin = VALUES(bensin),
-        lain_lain = VALUES(lain_lain),
-
-        total_operasional = VALUES(total_operasional),
-        total_pengeluaran = VALUES(total_pengeluaran),
-        sisa_tunai = VALUES(sisa_tunai),
-        pencairan_qris = VALUES(pencairan_qris),
-        sisa_qris = VALUES(sisa_qris),
-
-        net_profit = VALUES(net_profit),
-        persentase = VALUES(persentase),
-
-        keterangan = VALUES(keterangan),
-
-        foto_nota1 = IF(
-            VALUES(foto_nota1) = '',
-            foto_nota1,
-            VALUES(foto_nota1)
-        ),
-
-        foto_nota2 = IF(
-            VALUES(foto_nota2) = '',
-            foto_nota2,
-            VALUES(foto_nota2)
-        ),
-
-        foto_nota3 = IF(
-            VALUES(foto_nota3) = '',
-            foto_nota3,
-            VALUES(foto_nota3)
-        ),
-
-        foto_nota4 = IF(
-            VALUES(foto_nota4) = '',
-            foto_nota4,
-            VALUES(foto_nota4)
-        )
+        INSERT INTO laporan_cabang
+            (id_cabang, nama_pengelola, tanggal, foto_nota1, foto_nota2, foto_nota3, foto_nota4,
+             keterangan_nota, id_user_nota, status_laporan)
+        VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, 'menunggu')
+        ON DUPLICATE KEY UPDATE
+            nama_pengelola   = VALUES(nama_pengelola),
+            foto_nota1       = IF(VALUES(foto_nota1) = '', foto_nota1, VALUES(foto_nota1)),
+            foto_nota2       = IF(VALUES(foto_nota2) = '', foto_nota2, VALUES(foto_nota2)),
+            foto_nota3       = IF(VALUES(foto_nota3) = '', foto_nota3, VALUES(foto_nota3)),
+            foto_nota4       = IF(VALUES(foto_nota4) = '', foto_nota4, VALUES(foto_nota4)),
+            keterangan_nota  = VALUES(keterangan_nota),
+            id_user_nota     = VALUES(id_user_nota),
+            status_laporan   = IF(status_laporan = 'lengkap', 'lengkap', 'menunggu')
     ";
 
-
-    $stmt =
-        $conn->prepare($sql);
-
-
-    if(!$stmt){
-
-        die(
-            "Prepare gagal: " .
-            $conn->error
-        );
-
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        die("Prepare gagal: " . $conn->error);
     }
-
-
-    // =================================================
-    // PASTIKAN NILAI TIDAK NULL
-    // =================================================
-    $pencairan_qris =
-        $pencairan_qris ?? 0;
-
-    $sisa_tunai =
-        $sisa_tunai ?? 0;
-
-    $sisa_qris =
-        $sisa_qris ?? 0;
-
-
-    // =================================================
-    // BIND PARAM
-    // =================================================
     $stmt->bind_param(
-        "issdddddddddddddddddddddddddddddsssss",
-
-        $id_cabang,
-        $nama_pengelola,
-        $tgl,
-
-        $tunai,
-        $qris,
-        $grab,
-        $go,
-        $total_omset,
-
-        $pasar,
-        $sembako,
-        $beras,
-        $toko,
-        $total_rutin,
-
-        $sewa,
-        $gaji,
-        $listrik,
-        $air,
-        $sampah,
-        $keamanan,
-        $internet,
-        $gas,
-        $mingguan_karyawan,
-        $es_batu,
-        $bensin,
-        $lain,
-
-        $total_op,
-        $total_pengeluaran,
-
-        $sisa_tunai,
-        $pencairan_qris,
-        $sisa_qris,
-
-        $net,
-        $persen,
-
-        $ket,
-
-        $foto[0],
-        $foto[1],
-        $foto[2],
-        $foto[3]
+        "isssssssi",
+        $id_cabang, $nama_pengelola, $tgl,
+        $foto[0], $foto[1], $foto[2], $foto[3],
+        $ket_nota, $id_user_nota
     );
 
+    if ($stmt->execute()) {
+        audit($conn, 'nota_kirim', 'laporan_cabang', $id_cabang . '@' . $tgl, [
+            'id_cabang' => $id_cabang, 'tanggal' => $tgl,
+        ]);
 
-    // =================================================
-    // EXECUTE
-    // =================================================
-    if($stmt->execute()){
-
-        echo "
-            <script>
-                alert('Data berhasil disimpan!');
+        echo "<script>
+                alert('Nota berhasil dikirim. Terima kasih, PIC akan segera memproses laporan.');
                 window.location.replace('input_data.php');
-            </script>
-        ";
-
+              </script>";
         exit;
-
-    }else{
-
-        echo "
-            <script>
-                alert('Gagal simpan: " .
-                addslashes($stmt->error) .
-                "');
-                history.back();
-            </script>
-        ";
-
+    } else {
+        echo "<script>alert('Gagal simpan: " . addslashes($stmt->error) . "'); history.back();</script>";
         exit;
-
     }
-
-} // FIX: PENUTUP IF isset($_POST['simpan'])
-
+}
 ?>
 
-
 <style>
-
-body {
-    background-color: #f6f8fa;
-}
-
-.card-custom {
-    background: #ffffff;
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    margin-bottom: 24px;
-    overflow: hidden;
-}
-
-.card-custom-header {
-    padding: 16px 24px;
-    font-weight: 600;
-    font-size: 1.05rem;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.form-label {
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: #4A5568;
-    margin-bottom: 6px;
-}
-
-.input-group-text-custom {
-    background-color: #EDF2F7;
-    border-color: #E2E8F0;
-    color: #4A5568;
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-
-.form-control-custom {
-    border-color: #E2E8F0;
-    font-size: 0.95rem;
-    padding: 10px 14px;
-    border-radius: 8px;
-}
-
-.form-control-custom:focus {
-    border-color: #4A5568;
-    box-shadow: 0 0 0 3px rgba(74, 85, 104, 0.1);
-}
-
-.bg-header-success {
-    background: #E6FFFA;
-    color: #00875A;
-}
-
-.bg-header-warning {
-    background: #FEF3C7;
-    color: #B45309;
-}
-
-.bg-header-info {
-    background: #EBF8FF;
-    color: #2B6CB0;
-}
-
-.bg-header-danger {
-    background: #FFF5F5;
-    color: #C53030;
-}
-
-.bg-header-secondary {
-    background: #F7FAFC;
-    color: #4A5568;
-}
-
-
-/* Responsive Badge Info */
-.badge-info-cabang {
-    background: linear-gradient(
-        135deg,
-        #2D3748 0%,
-        #1A202C 100%
-    );
-
-    border-radius: 12px;
-    padding: 16px 20px;
-    color: #ffffff;
-
-    box-shadow:
-        0 4px 15px
-        rgba(26, 32, 44, 0.1);
-}
-
-
-/* Preview Grid for Form inputs on mobile */
-@media (max-width: 576px) {
-
-    .card-custom-header {
-        padding: 12px 16px;
-    }
-
-    .p-mobile-custom {
-        padding: 16px!important;
-    }
-
-}
-
+body { background-color: #f6f8fa; }
+.card-custom { background: #ffffff; border: none; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); margin-bottom: 24px; overflow: hidden; }
+.card-custom-header { padding: 16px 24px; font-weight: 600; font-size: 1.05rem; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; gap: 10px; }
+.form-label { font-weight: 500; font-size: 0.85rem; color: #4A5568; margin-bottom: 6px; }
+.form-control-custom { border-color: #E2E8F0; font-size: 0.95rem; padding: 10px 14px; border-radius: 8px; }
+.form-control-custom:focus { border-color: #4A5568; box-shadow: 0 0 0 3px rgba(74, 85, 104, 0.1); }
+.bg-header-secondary { background: #F7FAFC; color: #4A5568; }
+.badge-info-cabang { background: linear-gradient(135deg, #2D3748 0%, #1A202C 100%); border-radius: 12px; padding: 16px 20px; color: #ffffff; box-shadow: 0 4px 15px rgba(26, 32, 44, 0.1); }
+.status-pill { border-radius: 999px; padding: 6px 16px; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 576px) { .card-custom-header { padding: 12px 16px; } .p-mobile-custom { padding: 16px!important; } }
 </style>
-
 
 <div class="container-fluid py-3 px-md-4">
 
     <div class="d-flex align-items-center justify-content-between mb-4">
         <h3 class="mb-0 fw-bold text-dark">
-            <i class="bi bi-clipboard-plus text-secondary me-2"></i> Input Data Harian
+            <i class="bi bi-camera text-secondary me-2"></i> Kirim Nota Harian
         </h3>
     </div>
 
-    <!-- =================================================
-         INFORMASI CABANG
-    ================================================== -->
     <div class="badge-info-cabang d-flex align-items-center mb-4">
         <div class="bg-light text-dark rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;">
             <i class="bi bi-shop fs-4 text-dark"></i>
         </div>
         <div>
             <h5 class="mb-0 fw-bold"><?= h($cabang) ?></h5>
-            <small class="opacity-75">
-                Nama Pengelola: <strong><?= h($nama_pengelola) ?></strong>
-            </small>
+            <small class="opacity-75">Nama Pengelola: <strong><?= h($nama_pengelola) ?></strong></small>
         </div>
     </div>
 
-    <!-- =================================================
-         FORM 
-    ================================================== -->
-    <form method="POST" enctype="multipart/form-data" onsubmit="prepareSubmitForm()">
+    <?php if ($status_saat_ini === 'lengkap'): ?>
+        <div class="alert alert-success d-flex align-items-center rounded-4 mb-4">
+            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+            <div>
+                <strong>Laporan tanggal <?= date('d M Y', strtotime($tgl)) ?> sudah diproses PIC.</strong>
+                Anda tetap boleh mengirim ulang foto nota jika ada koreksi.
+            </div>
+        </div>
+    <?php elseif ($status_saat_ini === 'menunggu'): ?>
+        <div class="alert alert-warning d-flex align-items-center rounded-4 mb-4">
+            <i class="bi bi-hourglass-split fs-4 me-3"></i>
+            <div>Nota tanggal <?= date('d M Y', strtotime($tgl)) ?> sudah terkirim, menunggu diproses PIC.</div>
+        </div>
+    <?php endif; ?>
+
+    <form method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
 
-        <!-- =================================================
-             IDENTITAS
-        ================================================== -->
         <div class="card card-custom mb-4">
             <div class="card-body p-4 p-mobile-custom">
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <label class="form-label">
-                            <i class="bi bi-person me-1"></i> Nama Pengelola
-                        </label>
+                        <label class="form-label"><i class="bi bi-person me-1"></i> Nama Pengelola</label>
                         <input type="text" value="<?= h($nama_pengelola) ?>" class="form-control form-control-custom bg-light" readonly>
                     </div>
-
                     <div class="col-md-4">
-                        <label class="form-label">
-                            <i class="bi bi-shop me-1"></i> Nama Cabang
-                        </label>
+                        <label class="form-label"><i class="bi bi-shop me-1"></i> Nama Cabang</label>
                         <input type="text" value="<?= h($cabang) ?>" class="form-control form-control-custom bg-light" readonly>
                     </div>
-
                     <div class="col-md-4">
-                        <label class="form-label">
-                            <i class="bi bi-calendar me-1"></i> Tanggal Input
-                        </label>
-                        <input type="date" name="tanggal" value="<?= date('Y-m-d') ?>" class="form-control form-control-custom" required>
+                        <label class="form-label"><i class="bi bi-calendar me-1"></i> Tanggal Laporan</label>
+                        <input type="date" value="<?= h($tgl) ?>" class="form-control form-control-custom bg-light" readonly>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- =================================================
-             PENDAPATAN
-        ================================================== -->
-        <div class="card card-custom mb-4">
-            <div class="card-custom-header bg-header-success">
-                <i class="bi bi-cash-stack fs-5"></i> 1. Pendapatan / Omzet Cabang
-            </div>
-            <div class="card-body p-4 p-mobile-custom">
-                <div class="row g-3">
-                    <?php
-                    $pendapatan_items = [
-                        'tunai' => 'Tunai',
-                        'qris' => 'QRIS',
-                        'grab_food' => 'Grab Food',
-                        'go_food' => 'Go Food'
-                    ];
-                    foreach ($pendapatan_items as $k => $v):
-                    ?>
-                    
-                        <div class="col-6 col-md-3">
-                            <label class="form-label"><?= $v ?></label>
-                            <div class="input-group">
-                                <span class="input-group-text input-group-text-custom">Rp</span>
-                                <input type="text" name="<?= $k ?>" class="form-control form-control-custom hitung mask-money" value="0">
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-
-                    <!-- PENCAIRAN QRIS (Dipindahkan ke Pendapatan) -->
-                    <div class="col-6 col-md-3">
-                        <label class="form-label fw-bold">Pencairan QRIS</label>
-                        <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-warning text-dark border-warning">Rp</span>
-                            <input
-                                type="text"
-                                id="pencairan_qris"
-                                name="pencairan_qris"
-                                class="form-control form-control-custom bg-light fw-bold text-dark"
-                                value="0"
-                                oninput="formatPencairanQRIS(this); hitung()"
-                            >
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-md-3">
-                        <label class="form-label fw-bold text-success">Total Pendapatan/Omzet</label>
-                        <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-success text-white border-success">Rp</span>
-                            <input type="text" id="total_omset" class="form-control form-control-custom bg-light fw-bold text-success border-success" readonly>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- =================================================
-             BELANJA RUTIN
-        ================================================== -->
-        <div class="card card-custom mb-4">
-            <div class="card-custom-header bg-header-warning">
-                <i class="bi bi-basket fs-5"></i> 2. Pengeluaran Belanja Rutin
-            </div>
-            <div class="card-body p-4 p-mobile-custom">
-                <div class="row g-3">
-                    <?php
-                    $rutin_items = [
-                        'belanja_pasar' => 'Pasar',
-                        'belanja_sembako' => 'Sembako',
-                        'belanja_beras' => 'Beras',
-                        'belanja_toko' => 'Toko'
-                    ];
-                    foreach ($rutin_items as $k => $v):
-                    ?>
-                        <div class="col-6 col-md-3">
-                            <label class="form-label"><?= $v ?></label>
-                            <div class="input-group">
-                                <span class="input-group-text input-group-text-custom">Rp</span>
-                                <input type="text" name="<?= $k ?>" class="form-control form-control-custom hitung_rutin mask-money" value="0">
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-
-                    <div class="col-12 col-md-3">
-                        <label class="form-label fw-bold text-warning">Total Belanja Rutin</label>
-                        <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-warning text-dark border-warning">Rp</span>
-                            <input type="text" id="total_rutin" class="form-control form-control-custom bg-light fw-bold text-warning border-warning" readonly>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- =================================================
-             OPERASIONAL
-        ================================================== -->
-        <div class="card card-custom mb-4">
-            <div class="card-custom-header bg-header-info">
-                <i class="bi bi-receipt fs-5"></i> 3. Beban Biaya Operasional
-            </div>
-            <div class="card-body p-4 p-mobile-custom">
-                <div class="row g-3">
-                    <?php
-                    $operasional_items = [
-                        'sewa' => 'Sewa Ruko',
-                        'gaji' => 'Gaji Karyawan',
-                        'listrik' => 'Listrik',
-                        'air' => 'Air PAM',
-                        'sampah' => 'Sampah',
-                        'keamanan' => 'Keamanan',
-                        'internet' => 'Internet',
-                        'gas' => 'Gas',
-                        'mingguan_karyawan' => 'Mingguan Karyawan',
-                        'es_batu' => 'Es Batu - Air Galon',
-                        'bensin' => 'Bensin',
-                        'lain_lain' => 'Operasional Lain'
-                    ];
-                    foreach ($operasional_items as $k => $v):
-                    ?>
-                        <div class="col-6 col-md-3">
-                            <label class="form-label"><?= $v ?></label>
-                            <div class="input-group">
-                                <span class="input-group-text input-group-text-custom">Rp</span>
-                                <input type="text" name="<?= $k ?>" class="form-control form-control-custom hitung_op mask-money" value="0">
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-
-                    <div class="col-12 col-md-3">
-                        <label class="form-label fw-bold text-primary">Total Operasional</label>
-                        <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-primary text-white border-primary">Rp</span>
-                            <input type="text" id="total_op" class="form-control form-control-custom bg-light fw-bold text-primary border-primary" readonly>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- =================================================
-             RINGKASAN
-        ================================================== -->
-        <div class="card card-custom mb-4">
-            <div class="card-body p-4 p-mobile-custom">
-                <div class="row g-3 mb-4">
-                    <!-- TOTAL PENGELUARAN -->
-                    <div class="col-6 col-md">
-                        <label class="form-label fw-bold">Total Pengeluaran</label>
-                        <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-dark text-white">Rp</span>
-                            <input type="text" id="total_pengeluaran" class="form-control form-control-custom bg-light fw-bold text-dark" readonly>
-                        </div>
-                    </div>
-
-                    <!-- SISA TUNAI -->
-                    <div class="col-6 col-md">
-                        <label class="form-label fw-bold">Sisa Uang Tunai</label>
-                        <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-info text-white border-info">Rp</span>
-                            <input type="text" id="sisa_tunai" class="form-control form-control-custom bg-light text-primary fw-bold" readonly>
-                        </div>
-                    </div>
-
-                    <!-- SISA QRIS -->
-                    <div class="col-6 col-md">
-                        <label class="form-label fw-bold">Sisa QRIS</label>
-                        <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-warning text-dark border-warning">Rp</span>
-                            <input type="text" id="sisa_qris" class="form-control form-control-custom bg-light text-warning fw-bold" readonly>
-                        </div>
-                    </div>
-
-                    <!-- NET PROFIT -->
-                    <div class="col-6 col-md">
-                        <label class="form-label fw-bold">Net Profit Bersih</label>
-                        <div class="input-group">
-                            <span class="input-group-text input-group-text-custom bg-success text-white border-success">Rp</span>
-                            <input type="text" id="net_profit" class="form-control form-control-custom bg-light text-success fw-bold fs-6" readonly>
-                        </div>
-                    </div>
-
-                    <!-- MARGIN -->
-                    <div class="col-6 col-md">
-                        <label class="form-label fw-bold">Margin Keuntungan</label>
-                        <div class="input-group">
-                            <input type="text" id="persentase" class="form-control form-control-custom bg-light text-center fw-bold fs-6" readonly>
-                            <span class="input-group-text input-group-text-custom">%</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- KETERANGAN -->
-                <div>
-                    <label class="form-label">
-                        <i class="bi bi-chat-left-text me-1"></i> Catatan / Keterangan Tambahan
-                    </label>
-                    <textarea name="keterangan" class="form-control form-control-custom" rows="3" placeholder="Tulis rincian tambahan jika ada pengeluaran tidak terduga..."></textarea>
-                </div>
-            </div>
-        </div>
-
-        <!-- =================================================
-             FOTO NOTA
-        ================================================== -->
         <div class="card card-custom mb-4">
             <div class="card-custom-header bg-header-secondary">
-                <i class="bi bi-camera fs-5"></i> 5. Lampiran Berkas / Dokumen Nota & Struk
+                <i class="bi bi-camera fs-5"></i> Foto Nota &amp; Struk Hari Ini
             </div>
             <div class="card-body p-4 p-mobile-custom">
                 <div class="row g-3">
-                    <?php for ($i = 1; $i <= 4; $i++): ?>
+                    <?php for ($i = 1; $i <= 4; $i++):
+                        $sudah_ada = !empty($laporan_hari_ini["foto_nota$i"]);
+                    ?>
                         <div class="col-6 col-md-3">
                             <div class="p-2 border rounded-3 text-center bg-light">
-                                <label class="form-label fw-bold d-block mb-2">Foto Nota <?= $i ?></label>
-                                <input type="file" name="foto_nota<?= $i ?>" class="form-control form-control-sm" accept="image/*" capture="environment">
+                                <label class="form-label fw-bold d-block mb-2">
+                                    Foto Nota <?= $i ?>
+                                    <?php if ($sudah_ada): ?><i class="bi bi-check-circle-fill text-success ms-1" title="Sudah terkirim"></i><?php endif; ?>
+                                </label>
+                                <input type="file" name="foto_nota<?= $i ?>" class="form-control form-control-sm" accept="image/jpeg,image/png">
+                                <?php if ($sudah_ada): ?>
+                                    <a href="../uploads/nota/<?= h($laporan_hari_ini["foto_nota$i"]) ?>" target="_blank" class="d-block small mt-2 text-success">Lihat yang sudah terkirim</a>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endfor; ?>
                 </div>
-
                 <div class="mt-3 text-muted" style="font-size: 0.8rem;">
                     <i class="bi bi-info-circle me-1"></i>
-                    Syarat dokumen resmi: Format gambar (JPG, PNG) dengan ukuran berkas maksimal 2MB. Ketika ditekan di HP, kamera belakang akan otomatis aktif.
+                    Format JPG/PNG, maksimal 2MB per berkas. Gambar di atas 2MB akan dikompres otomatis. Kosongkan kolom yang tidak ingin diganti.
+                </div>
+
+                <div class="mt-3">
+                    <label class="form-label"><i class="bi bi-chat-left-text me-1"></i> Catatan untuk PIC (opsional)</label>
+                    <textarea name="keterangan_nota" class="form-control form-control-custom" rows="3" placeholder="Mis. nota rusak, ada retur, dsb."><?= h($laporan_hari_ini['keterangan_nota'] ?? '') ?></textarea>
                 </div>
             </div>
         </div>
 
-        <!-- =================================================
-             TOMBOL SIMPAN
-        ================================================== -->
         <div class="mb-5">
             <button type="submit" name="simpan" class="btn btn-success btn-lg w-100 py-3 shadow-sm fw-bold rounded-3">
-                <i class="bi bi-send-check-fill me-2"></i> Simpan Laporan & Kirim ke Pusat
+                <i class="bi bi-send-check-fill me-2"></i> Kirim Nota ke PIC
             </button>
         </div>
     </form>
-
 </div>
 
-
-<script> 
-
-// Fungsi untuk mempresi gambar jika ukurannya > 2MB
+<script>
 function kompresGambar(file, maxMB = 2, quality = 0.7) {
     return new Promise((resolve) => {
-        // Jika ukuran file <= 2MB, langsung kembalikan file asli
-        if (file.size <= maxMB * 1024 * 1024) {
-            resolve(file);
-            return;
-        }
-
+        if (file.size <= maxMB * 1024 * 1024) { resolve(file); return; }
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = function (event) {
@@ -1056,312 +288,34 @@ function kompresGambar(file, maxMB = 2, quality = 0.7) {
             img.src = event.target.result;
             img.onload = function () {
                 const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                // Turunkan resolusi maks lebar/tinggi ke 1920px (opsional, agar kompresi lebih optimal)
+                let width = img.width, height = img.height;
                 const maxDimension = 1920;
                 if (width > maxDimension || height > maxDimension) {
-                    if (width > height) {
-                        height = Math.round((height * maxDimension) / width);
-                        width = maxDimension;
-                    } else {
-                        width = Math.round((width * maxDimension) / height);
-                        height = maxDimension;
-                    }
+                    if (width > height) { height = Math.round((height * maxDimension) / width); width = maxDimension; }
+                    else { width = Math.round((width * maxDimension) / height); height = maxDimension; }
                 }
-
-                canvas.width = width;
-                canvas.height = height;
-
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Konversi canvas ke Blob/File baru dengan format JPEG dan kualitas 70%
+                canvas.width = width; canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
                 canvas.toBlob((blob) => {
-                    const compressedFile = new File([blob], file.name, {
-                        type: 'image/jpeg',
-                        lastModified: Date.now()
-                    });
-                    resolve(compressedFile);
+                    resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
                 }, 'image/jpeg', quality);
             };
         };
     });
 }
 
-// Pasang listener pada seluruh input file nota (foto_nota1, foto_nota2, dst)
 document.addEventListener('DOMContentLoaded', function() {
-    const inputNotas = document.querySelectorAll('input[type="file"][name^="foto_nota"]');
-
-    inputNotas.forEach(input => {
+    document.querySelectorAll('input[type="file"][name^="foto_nota"]').forEach(input => {
         input.addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
-
-            // Jika ukuran > 2 MB, lakukan kompresi
             if (file.size > 2 * 1024 * 1024) {
-                // Tampilkan notifikasi kecil/efek loading jika perlu
-                console.log(`Mengompresi ${file.name} dari ${(file.size / 1024 / 1024).toFixed(2)} MB...`);
-
                 const fileHasilKompres = await kompresGambar(file, 2, 0.7);
-
-                // Ganti file di input element dengan file yang sudah dikompres
                 const dataTransfer = new DataTransfer();
                 dataTransfer.items.add(fileHasilKompres);
                 e.target.files = dataTransfer.files;
-
-                console.log(`Berhasil dikompresi menjadi ${(fileHasilKompres.size / 1024 / 1024).toFixed(2)} MB`);
             }
         });
     });
 });
-// =====================================================
-// FORMAT RUPIAH
-// =====================================================
-
-function formatRupiahMask(angka) {
-
-    if(!angka){
-        return '0';
-    }
-
-    let cleanNumber =
-        angka
-            .toString()
-            .replace(/[^0-9]/g, '');
-
-    if(cleanNumber === ''){
-        return '0';
-    }
-
-    return parseInt(
-        cleanNumber,
-        10
-    ).toLocaleString('en-US');
-}
-
-
-// =====================================================
-// FORMAT RUPIAH DENGAN MINUS
-// =====================================================
-
-function formatRupiahWithMinus(angka) {
-
-    angka = Number(angka) || 0;
-
-    // Jika negatif
-    if(angka < 0){
-
-        return '-' +
-            Math.abs(angka)
-                .toLocaleString('en-US');
-
-    }
-
-    return angka.toLocaleString('en-US');
-}
-
-
-// =====================================================
-// AMBIL ANGKA MURNI
-// =====================================================
-
-function getPureNumber(selectorOrEl) {
-
-    let el =
-        typeof selectorOrEl === 'string'
-            ? document.querySelector(selectorOrEl)
-            : selectorOrEl;
-
-    if(!el){
-        return 0;
-    }
-
-    let cleanVal =
-        el.value.replace(/,/g, '');
-
-    return parseInt(
-        cleanVal,
-        10
-    ) || 0;
-}
-
-function formatPencairanQRIS(input) {
-
-    // Ambil hanya angka
-    let angka = input.value.replace(/\D/g, '');
-
-    // Jika kosong
-    if (angka === '') {
-        input.value = '0';
-        return;
-    }
-
-    // Hapus angka 0 di depan
-    angka = angka.replace(/^0+(?=\d)/, '');
-
-    // Format titik ribuan
-    input.value = angka.replace(
-        /\B(?=(\d{3})+(?!\d))/g,
-        '.'
-    );
-}
-
-// =====================================================
-// FUNGSI UTAMA PERHITUNGAN
-// =====================================================
-
-function hitung() {
-
-    let tunai = getPureNumber('[name="tunai"]');
-    let qris = getPureNumber('[name="qris"]');
-    let grab = getPureNumber('[name="grab_food"]');
-    let go = getPureNumber('[name="go_food"]');
-
-    // Pencairan QRIS
-    let pencairan_qris = 0;
-    const elPencairanQRIS = document.getElementById('pencairan_qris');
-    if (elPencairanQRIS) {
-        pencairan_qris = parseFloat(
-            String(elPencairanQRIS.value || 0)
-                .replace(/\./g, '')
-                .replace(/[^0-9-]/g, '')
-        ) || 0;
-    }
-
-    // TOTAL OMZET (Otomatis dikurangi Pencairan QRIS)
-    let omset = (tunai + qris + grab + go) - pencairan_qris;
-
-    document.getElementById('total_omset').value = formatRupiahWithMinus(omset);
-
-    // BELANJA RUTIN
-    let rutin = Array.from(document.querySelectorAll('.hitung_rutin'))
-        .reduce((sum, el) => sum + getPureNumber(el), 0);
-    document.getElementById('total_rutin').value = formatRupiahMask(rutin);
-
-    // OPERASIONAL
-    let op = Array.from(document.querySelectorAll('.hitung_op'))
-        .reduce((sum, el) => sum + getPureNumber(el), 0);
-    document.getElementById('total_op').value = formatRupiahMask(op);
-
-    // TOTAL PENGELUARAN
-    let total_pengeluaran = rutin + op;
-    document.getElementById('total_pengeluaran').value = formatRupiahMask(total_pengeluaran);
-
-    // SISA TUNAI
-    let sisa_tunai = tunai - total_pengeluaran;
-    document.getElementById('sisa_tunai').value = formatRupiahWithMinus(sisa_tunai);
-
-    // SISA QRIS
-    let sisa_qris = qris - pencairan_qris;
-    if (document.getElementById('sisa_qris')) {
-        document.getElementById('sisa_qris').value = formatRupiahWithMinus(sisa_qris);
-    }
-
-    // NET PROFIT
-    let net = sisa_tunai + sisa_qris + go + grab;
-    document.getElementById('net_profit').value = formatRupiahWithMinus(net);
-
-    // PERSENTASE MARGIN
-    let persen = omset > 0 ? ((net / omset) * 100).toFixed(2) : 0;
-    document.getElementById('persentase').value = persen;
-}
-
-// =====================================================
-// EVENT LISTENER MASKING
-// =====================================================
-
-document
-    .querySelectorAll('.mask-money')
-    .forEach(el => {
-
-        el.addEventListener(
-            'input',
-            function(){
-
-                let cursorPosition =
-                    this.selectionStart;
-
-                let oldLength =
-                    this.value.length;
-
-
-                this.value =
-                    formatRupiahMask(
-                        this.value
-                    );
-
-
-                let newLength =
-                    this.value.length;
-
-
-                cursorPosition =
-                    cursorPosition +
-                    (
-                        newLength -
-                        oldLength
-                    );
-
-
-                this.setSelectionRange(
-                    cursorPosition,
-                    cursorPosition
-                );
-
-
-                hitung();
-
-            }
-        );
-
-    });
-
-
-// =====================================================
-// BERSIHKAN KOMA SEBELUM SUBMIT
-// =====================================================
-
-function prepareSubmitForm(){
-
-    document
-        .querySelectorAll('.mask-money')
-        .forEach(el => {
-
-            el.value =
-                el.value.replace(
-                    /,/g,
-                    ''
-                );
-
-        });
-
-}
-
-
-// =====================================================
-// HITUNG SAAT HALAMAN DIMUAT
-// =====================================================
-
-window.addEventListener(
-    'DOMContentLoaded',
-    () => {
-
-        document
-            .querySelectorAll('.mask-money')
-            .forEach(el => {
-
-                el.value =
-                    formatRupiahMask(
-                        el.value
-                    );
-
-            });
-
-
-        hitung();
-
-    }
-);
 </script>

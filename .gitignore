@@ -1,1 +1,13 @@
 /vendor/
+
+# Berkas unggahan pengguna — jangan di-commit, kecuali aturan proteksi.
+/uploads/*
+!/uploads/.htaccess
+
+# Konfigurasi lokal / rahasia
+/config/env.php
+/config/db_credentials.php
+
+# Cadangan database & artefak sementara
+/database/backups/
+/database/_dumperr.txt

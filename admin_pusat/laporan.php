@@ -2,167 +2,365 @@
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
+// ==========================================================
 // HELPER
-if(!function_exists('h')){ function h($s){ return htmlspecialchars($s??'', ENT_QUOTES); } }
+// ==========================================================
+
+if(!function_exists('h')){
+    function h($s){
+        return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8');
+    }
+}
+
 if(!function_exists('csrf_token')){
     function csrf_token(){
-        if(empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+
+        if(empty($_SESSION['csrf'])){
+            $_SESSION['csrf'] = bin2hex(random_bytes(32));
+        }
+
         return $_SESSION['csrf'];
     }
 }
+
 if(!function_exists('csrf_check')){
-    function csrf_check($t){ return hash_equals($_SESSION['csrf']??'', $t); }
+    function csrf_check($t){
+
+        return !empty($_SESSION['csrf'])
+            && !empty($t)
+            && hash_equals($_SESSION['csrf'], $t);
+    }
 }
 
-// 1. PROTEKSI ROLE PUSAT
-if(!isset($_SESSION['role']) || $_SESSION['role']!= 'pusat'){
-    header("Location:../login"); exit;
+// ==========================================================
+// PROTEKSI ROLE PUSAT
+// ==========================================================
+
+if(
+    !isset($_SESSION['role']) ||
+    $_SESSION['role'] != 'pusat'
+){
+    header("Location: ../login");
+    exit;
 }
 
-// 1. Pindahkan inisialisasi filter ke atas agar bisa dipakai di proses POST maupun GET
-$filter = $_GET['filter']?? 'harian';
-$tgl_awal = $_GET['tgl_awal']?? date('Y-m-01');
-$tgl_akhir = $_GET['tgl_akhir']?? date('Y-m-d');
-$id_cabang = $_GET['id_cabang']?? '';
-$page = isset($_GET['page'])? (int)$_GET['page'] : 1;
-$page = $page < 1? 1 : $page;
+// ==========================================================
+// FILTER
+// ==========================================================
+
+$filter = $_GET['filter'] ?? 'harian';
+
+$tgl_awal = $_GET['tgl_awal']
+    ?? date('Y-m-01');
+
+$tgl_akhir = $_GET['tgl_akhir']
+    ?? date('Y-m-d');
+
+$id_cabang = $_GET['id_cabang'] ?? '';
+
+$page = isset($_GET['page'])
+    ? (int)$_GET['page']
+    : 1;
+
+if($page < 1){
+    $page = 1;
+}
+
 $limit = 10;
+
 $offset = ($page - 1) * $limit;
 
-// BARU: Proses Hapus Laporan
-if(isset($_POST['hapus_laporan'])){
-    if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
 
-    $id = (int)$_POST['id'];
+// ==========================================================
+// FUNGSI REDIRECT SETELAH PROSES
+// ==========================================================
 
-    // Ambil data dulu buat hapus foto
-    $q = $conn->prepare("SELECT foto_nota1, foto_nota2, foto_nota3, foto_nota4 FROM laporan_cabang WHERE id=?");
-    $q->bind_param("i", $id);
-    $q->execute();
-    $res = $q->get_result();
-    if($res->num_rows > 0){
-        $foto = $res->fetch_assoc();
-        for($i=1; $i<=4; $i++){
-            if(!empty($foto["foto_nota$i"]) && file_exists('../uploads/nota/'.$foto["foto_nota$i"])){
-                @unlink('../uploads/nota/'.$foto["foto_nota$i"]);
-            }
-        }
-    }
-    $q->close();
+function redirectLaporan(
+    $filter,
+    $tgl_awal,
+    $tgl_akhir,
+    $id_cabang,
+    $page
+){
 
-    $del = $conn->prepare("DELETE FROM laporan_cabang WHERE id=?");
-    $del->bind_param("i", $id);
-    if($del->execute()){
-        $param = http_build_query(['filter'=>$filter, 'tgl_awal'=>$tgl_awal, 'tgl_akhir'=>$tgl_akhir, 'id_cabang'=>$id_cabang, 'page'=>$page]);
-        echo "<script>alert('Data laporan berhasil dihapus'); window.location='laporan?$param';</script>";
-        exit;
-    } else {
-        echo "<script>alert('Gagal hapus: ".$del->error."');</script>";
-    }
+    $param = http_build_query([
+        'filter'    => $filter,
+        'tgl_awal'  => $tgl_awal,
+        'tgl_akhir' => $tgl_akhir,
+        'id_cabang' => $id_cabang,
+        'page'      => $page
+    ]);
+
+    echo "<script>
+        window.location.href = 'laporan?$param';
+    </script>";
+
+    exit;
 }
 
-// Proses update - RUMUS SAMA DENGAN CABANG
-if(isset($_POST['update_laporan'])){
-    if(!csrf_check($_POST['csrf']?? '')){ die("<script>alert('Token tidak valid!'); history.back();</script>"); }
 
-    $id = (int)$_POST['id'];
 
-    $tunai = (int)($_POST['tunai']?? 0);
-    $qris = (int)($_POST['qris']?? 0);
-    $grab_food = (int)($_POST['grab_food']?? 0);
-    $go_food = (int)($_POST['go_food']?? 0);
-    $pencairan_qris = (int)($_POST['pencairan_qris']?? 0);
+// Handler POST (hapus + update laporan) — dipisah ke file sendiri, lihat _laporan_handlers.php
+require __DIR__ . '/_laporan_handlers.php';
 
-    $belanja_pasar = (int)($_POST['belanja_pasar']?? 0);
-    $belanja_sembako = (int)($_POST['belanja_sembako']?? 0);
-    $belanja_beras = (int)($_POST['belanja_beras']?? 0);
-    $belanja_toko = (int)($_POST['belanja_toko']?? 0);
-    $sewa = (int)($_POST['sewa']?? 0);
-    $gaji = (int)($_POST['gaji']?? 0);
-    $listrik = (int)($_POST['listrik']?? 0);
-    $air = (int)($_POST['air']?? 0);
-    $sampah = (int)($_POST['sampah']?? 0);
-    $keamanan = (int)($_POST['keamanan']?? 0);
-    $internet = (int)($_POST['internet']?? 0);
-    $gas = (int)($_POST['gas']?? 0);
-    $mingguan_karyawan = (int)($_POST['mingguan_karyawan']?? 0);
-    $es_batu = (int)($_POST['es_batu']?? 0);
-    $bensin = (int)($_POST['bensin']?? 0);
-    $lain_lain = (int)($_POST['lain_lain']?? 0);
-    $keterangan = $_POST['keterangan']?? '';
 
-    // ========== RUMUS 100% SAMA DENGAN INPUT CABANG ==========
-    $total_rutin = $belanja_pasar + $belanja_sembako + $belanja_beras + $belanja_toko;
-    $total_operasional = $sewa + $gaji + $listrik + $air + $sampah + $keamanan + $internet + $gas + $mingguan_karyawan + $es_batu + $bensin + $lain_lain;
-    $total_pengeluaran = $total_rutin + $total_operasional;
 
-    $total_omset = $tunai + $qris + $grab_food + $go_food - $pencairan_qris; // SUDAH DIKURANGI PENCAIRAN
-    
-    $sisa_tunai = $tunai - $total_pengeluaran;
-    $sisa_qris = $qris - $pencairan_qris;
-    
-    // RUMUS KUNCI SESUAI EXCEL: Net = Sisa QRIS + Sisa Tunai + GoFood + GrabFood
-    $net_profit = $sisa_qris + $sisa_tunai + $go_food + $grab_food; 
-    $persentase = $total_omset > 0? round(($net_profit / $total_omset) * 100, 2) : 0;
+// ==========================================================
+// QUERY DATA
+// FILTER TANGGAL + CABANG
+// ==========================================================
 
-    $sql = "UPDATE laporan_cabang SET
-            tunai=?, qris=?, grab_food=?, go_food=?, pencairan_qris=?, total_omset=?,
-            belanja_pasar=?, belanja_sembako=?, belanja_beras=?, belanja_toko=?, total_rutin=?,
-            sewa=?, gaji=?, listrik=?, air=?, sampah=?, keamanan=?, internet=?, gas=?, mingguan_karyawan=?, es_batu=?, bensin=?, lain_lain=?, total_operasional=?,
-            total_pengeluaran=?, sisa_tunai=?, sisa_qris=?, net_profit=?, persentase=?, keterangan=?
-            WHERE id=?";
+$where_sql = "
+    WHERE l.tanggal BETWEEN ? AND ?
+";
 
-   $stmt = $conn->prepare($sql);
+$params = [
+    $tgl_awal,
+    $tgl_akhir
+];
 
-// Generate 31 "s" otomatis biar pasti pas
-    $types = str_repeat("s", 31);
-
-    $stmt->bind_param(
-        $types,
-        $tunai, $qris, $grab_food, $go_food, $pencairan_qris, $total_omset,
-        $belanja_pasar, $belanja_sembako, $belanja_beras, $belanja_toko, $total_rutin,
-        $sewa, $gaji, $listrik, $air, $sampah, $keamanan, $internet, $gas, $mingguan_karyawan, $es_batu, $bensin, $lain_lain, $total_operasional,
-        $total_pengeluaran, $sisa_tunai, $sisa_qris, $net_profit, $persentase, $keterangan, $id
-    );
-
-    if($stmt->execute()){
-        $param = http_build_query(['filter'=>$filter, 'tgl_awal'=>$tgl_awal, 'tgl_akhir'=>$tgl_akhir, 'id_cabang'=>$id_cabang, 'page'=>$page]);
-        echo "<script>alert('Data berhasil diupdate'); window.location='laporan?$param';</script>";
-        exit;
-    } else {
-        echo "<script>alert('Gagal update: ".$stmt->error."');</script>";
-    }
-}
-
-// 2. Query Data Otomatis PAKAI PREPARED - AMBIL LANGSUNG DARI DB
-$where_sql = "WHERE l.tanggal BETWEEN ? AND ?";
-$params = [$tgl_awal, $tgl_akhir];
 $types = "ss";
-if($id_cabang!= '') {
-    $where_sql.= " AND l.id_cabang =?";
+
+
+if($id_cabang != ''){
+
+    $where_sql .= "
+        AND l.id_cabang = ?
+    ";
+
     $params[] = (int)$id_cabang;
-    $types.= "i";
+
+    $types .= "i";
 }
 
-// Hitung total data untuk pagination
-$sql_count = "SELECT COUNT(*) as total FROM laporan_cabang l $where_sql";
-$stmt_count = $conn->prepare($sql_count);
-$stmt_count->bind_param($types,...$params);
-$stmt_count->execute();
-$total_data = $stmt_count->get_result()->fetch_assoc()['total'];
-$total_pages = ceil($total_data / $limit);
 
-// Query utama + LIMIT - AMBIL LANGSUNG DARI KOLOM DB BIAR SINKRON
-$query = "SELECT l.*, c.nama_cabang 
-          FROM laporan_cabang l 
-          JOIN cabang c ON l.id_cabang = c.id_cabang 
-          $where_sql 
-          ORDER BY l.tanggal DESC LIMIT ? OFFSET ?";
+
+// ==========================================================
+// HITUNG TOTAL DATA
+// ==========================================================
+
+$sql_count = "
+    SELECT COUNT(*) AS total
+    FROM laporan_cabang l
+    $where_sql
+";
+
+$stmt_count = $conn->prepare($sql_count);
+
+if(!$stmt_count){
+
+    die(
+        "Prepare COUNT gagal: " .
+        h($conn->error)
+    );
+}
+
+$stmt_count->bind_param(
+    $types,
+    ...$params
+);
+
+$stmt_count->execute();
+
+$result_count =
+    $stmt_count->get_result();
+
+$row_count =
+    $result_count->fetch_assoc();
+
+$total_data =
+    (int)($row_count['total'] ?? 0);
+
+$total_pages =
+    $limit > 0
+        ? (int)ceil($total_data / $limit)
+        : 1;
+
+
+
+// ==========================================================
+// QUERY UTAMA
+// ==========================================================
+
+$query = "
+    SELECT
+        l.*,
+        c.nama_cabang
+
+    FROM laporan_cabang l
+
+    JOIN cabang c
+        ON l.id_cabang = c.id_cabang
+
+    $where_sql
+
+    ORDER BY l.tanggal DESC
+
+    LIMIT ? OFFSET ?
+";
+
 $stmt = $conn->prepare($query);
-$types_limit = $types."ii";
-$params_limit = array_merge($params, [$limit, $offset]);
-$stmt->bind_param($types_limit,...$params_limit);
+
+if(!$stmt){
+
+    die(
+        "Prepare query utama gagal: " .
+        h($conn->error)
+    );
+}
+
+
+$types_limit =
+    $types . "ii";
+
+
+$params_limit = array_merge(
+    $params,
+    [
+        (int)$limit,
+        (int)$offset
+    ]
+);
+
+
+$stmt->bind_param(
+    $types_limit,
+    ...$params_limit
+);
+
+
 $stmt->execute();
+
+$data =
+    $stmt->get_result();
+
+
+
+// ==========================================================
+// TOTAL OMZET
+// ==========================================================
+
+$sql_omset = "
+    SELECT
+        COALESCE(SUM(l.total_omset), 0) AS total
+
+    FROM laporan_cabang l
+
+    $where_sql
+";
+
+$stmt_omset =
+    $conn->prepare($sql_omset);
+
+if(!$stmt_omset){
+
+    die(
+        "Prepare total omzet gagal: " .
+        h($conn->error)
+    );
+}
+
+$stmt_omset->bind_param(
+    $types,
+    ...$params
+);
+
+$stmt_omset->execute();
+
+$result_omset =
+    $stmt_omset->get_result();
+
+$row_omset =
+    $result_omset->fetch_assoc();
+
+$total_omset =
+    $row_omset['total'] ?? 0;
+
+
+
+// ==========================================================
+// TOTAL NET PROFIT
+// ==========================================================
+
+$sql_net_profit = "
+    SELECT
+        COALESCE(SUM(l.net_profit), 0) AS total
+
+    FROM laporan_cabang l
+
+    $where_sql
+";
+
+$stmt_net =
+    $conn->prepare($sql_net_profit);
+
+if(!$stmt_net){
+
+    die(
+        "Prepare total net profit gagal: " .
+        h($conn->error)
+    );
+}
+
+$stmt_net->bind_param(
+    $types,
+    ...$params
+);
+
+$stmt_net->execute();
+
+$result_net =
+    $stmt_net->get_result();
+
+$row_net =
+    $result_net->fetch_assoc();
+
+$net_profit =
+    $row_net['total'] ?? 0;
+
+
+
+// ==========================================================
+// DATA CABANG
+// ==========================================================
+
+$cabang = $conn->query("
+    SELECT *
+    FROM cabang
+    ORDER BY nama_cabang
+");
+
+if(!$cabang){
+
+    die(
+        "Query cabang gagal: " .
+        h($conn->error)
+    );
+}
+
+
+
+// ==========================================
+// PARAMETER QUERY UTAMA
+// ==========================================
+
+$types_limit = $types . "ii";
+
+$params_limit = array_merge(
+    $params,
+    [
+        (int)$limit,
+        (int)$offset
+    ]
+);
+
+$stmt->bind_param(
+    $types_limit,
+    ...$params_limit
+);
+
+$stmt->execute();
+
 $data = $stmt->get_result();
 
 // Total Omzet - AMBIL DARI KOLOM DB
@@ -294,17 +492,19 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                             <th class="py-3">Pengelola</th>
                             <th class="py-3">Omzet Bersih</th>
                             <th class="py-3">Pengeluaran</th>
+                            <th class="py-3">Operasional</th>
+                            <th class="py-3">Sisa Tunai</th>
+                            <th class="py-3">Pencairan QRIS</th>
+                            <th class="py-3">Sisa QRIS</th>
                             <th class="py-3">Net Profit</th>
                             <th class="py-3">Margin</th>
-                            <th class="py-3">Pencairan QRIS</th>
-                            <th class="py-3 text-center">Foto Nota</th>
                             <th class="py-3 text-center" width="15%">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if(!isset($data) || $data->num_rows == 0): ?>
                         <tr>
-                            <td colspan="11" class="text-center py-5 text-muted">Belum ada data laporan pada periode ini</td>
+                            <td colspan="13" class="text-center py-5 text-muted">Belum ada data laporan pada periode ini</td>
                         </tr>
                         <?php else: ?>
                         <?php 
@@ -314,226 +514,128 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                             $id = $row['id'];
                         ?>
                         <tr>
-                            <td class="text-center px-4 text-muted fw-bold"><?= $no++ ?></td>
-                            <td><span class="badge bg-light text-dark border p-2"><i class="bi bi-calendar3 me-1 text-muted"></i> <?= date('d/m/Y', strtotime($row['tanggal'])) ?></span></td>
-                            <td class="fw-semibold text-dark"><?= h($row['nama_cabang']) ?></td>
-                            <td class="text-muted"><?= h($row['nama_pengelola']) ?></td>
-                            <td><span class="text-dark fw-medium">Rp <?= number_format($row['total_omset'] ?? 0, 0, ',', '.') ?></span></td>
-                            <td><span class="text-secondary">Rp <?= number_format($row['total_pengeluaran'] ?? 0, 0, ',', '.') ?></span></td>
+                            <tr>
+                            <td class="text-center px-4 text-muted fw-bold">
+                                <?= $no++ ?>
+                            </td>
+
                             <td>
-                                <span class="fw-bold <?= ($row['net_profit'] ?? 0) >= 0 ? 'text-success' : 'text-danger' ?>">
-                                    Rp <?= number_format($row['net_profit'] ?? 0, 0, ',', '.') ?>
+                                <span class="badge bg-light text-dark border p-2 d-block mb-1">
+                                    <i class="bi bi-calendar3 me-1 text-muted"></i>
+                                    <?= date('d/m/Y', strtotime($row['tanggal'])) ?>
+                                </span>
+                                <?php if (($row['status_laporan'] ?? 'lengkap') === 'lengkap'): ?>
+                                    <span class="badge bg-success-subtle text-success">Selesai</span>
+                                <?php else: ?>
+                                    <span class="badge bg-warning-subtle text-warning">Menunggu PIC</span>
+                                <?php endif; ?>
+                            </td>
+
+                            <td class="fw-semibold text-dark">
+                                <?= h($row['nama_cabang']) ?>
+                            </td>
+
+                            <td class="text-muted">
+                                <?= h($row['nama_pengelola']) ?>
+                            </td>
+
+                            <!-- OMZET BERSIH -->
+                            <td>
+                                <span class="text-dark fw-bold">
+                                    Rp <?= number_format($row['total_omset'] ?? 0, 0, ',', '.') ?>
                                 </span>
                             </td>
+
+                            <!-- TOTAL PENGELUARAN -->
                             <td>
-                                <span class="badge <?= $margin >= 20 ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' ?> px-2 py-1.5 rounded">
-                                    <?= number_format($margin, 2) ?>%
+                                <span class="text-secondary fw-semibold">
+                                    Rp <?= number_format($row['total_pengeluaran'] ?? 0, 0, ',', '.') ?>
                                 </span>
                             </td>
+
+                            <!-- OPERASIONAL -->
+                            <td>
+                                <span class="text-danger fw-semibold">
+                                    Rp <?= number_format($row['total_operasional'] ?? 0, 0, ',', '.') ?>
+                                </span>
+                            </td>
+
+                            <!-- SISA TUNAI -->
+                            <td>
+                                <span class="fw-bold text-success">
+                                    Rp <?= number_format($row['sisa_tunai'] ?? 0, 0, ',', '.') ?>
+                                </span>
+                            </td>
+
+                            <!-- PENCAIRAN QRIS -->
                             <td>
                                 <span class="fw-semibold text-primary">
                                     Rp <?= number_format($row['pencairan_qris'] ?? 0, 0, ',', '.') ?>
                                 </span>
                             </td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-1">
-                                    <?php for($i = 1; $i <= 4; $i++):
-                                        if(!empty($row["foto_nota$i"])): ?>
-                                        <a href="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" target="_blank" class="d-inline-block">
-                                            <img src="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" width="38" height="38" class="img-thumbnail rounded-2 shadow-sm object-fit-cover" style="transition: transform .2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                                        </a>
-                                    <?php endif; endfor; ?>
-                                </div>
+
+                            <!-- SISA QRIS -->
+                            <td>
+                                <span class="fw-bold text-info">
+                                    Rp <?= number_format($row['sisa_qris'] ?? 0, 0, ',', '.') ?>
+                                </span>
                             </td>
+
+                            <!-- NET PROFIT -->
+                            <td>
+                                <span class="fw-bold <?= ($row['net_profit'] ?? 0) >= 0 ? 'text-success' : 'text-danger' ?>">
+                                    Rp <?= number_format($row['net_profit'] ?? 0, 0, ',', '.') ?>
+                                </span>
+                            </td>
+
+                            <!-- MARGIN -->
+                            <td>
+                                <span class="badge <?= $margin >= 20 ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' ?> px-2 py-1 rounded">
+                                    <?= number_format($margin, 2) ?>%
+                                </span>
+                            </td>
+
+                            <!-- AKSI -->
                             <td class="text-center px-4">
                                 <div class="d-inline-flex gap-2 justify-content-center">
-                                    <button class="btn btn-sm btn-outline-primary px-3 rounded-pill fw-medium" data-bs-toggle="modal" data-bs-target="#detailModal<?= $id ?>">
-                                        <i class="bi bi-pencil-square me-1"></i> Edit
+
+                                    <button
+                                        class="btn btn-sm btn-outline-primary px-3 rounded-pill fw-medium"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#detailModal<?= $id ?>">
+                                        <i class="bi bi-pencil-square me-1"></i>
+                                        Edit
                                     </button>
 
-                                    <form method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus laporan tanggal <?= date('d/m/Y', strtotime($row['tanggal'])) ?> cabang <?= h($row['nama_cabang']) ?>?')">
-                                        <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
-                                        <input type="hidden" name="id" value="<?= $id ?>">
-                                        <button type="submit" name="hapus_laporan" class="btn btn-sm btn-action-delete">
-                                            <i class="bi bi-trash-fill me-1"></i> Hapus
+                                    <form
+                                        method="POST"
+                                        class="d-inline"
+                                        onsubmit="return confirm('Yakin hapus laporan tanggal <?= date('d/m/Y', strtotime($row['tanggal'])) ?> cabang <?= h($row['nama_cabang']) ?>?')">
+
+                                        <input
+                                            type="hidden"
+                                            name="csrf"
+                                            value="<?= csrf_token() ?>">
+
+                                        <input
+                                            type="hidden"
+                                            name="id"
+                                            value="<?= $id ?>">
+
+                                        <button
+                                            type="submit"
+                                            name="hapus_laporan"
+                                            class="btn btn-sm btn-action-delete">
+
+                                            <i class="bi bi-trash-fill me-1"></i>
+                                            Hapus
                                         </button>
+
                                     </form>
+
                                 </div>
 
-                                <div class="modal fade text-start" id="detailModal<?= $id ?>" tabindex="-1" aria-hidden="true">
-                                    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered m-2 m-sm-auto">
-                                        <form method="POST" class="w-100">
-                                            <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
-                                            <input type="hidden" name="id" value="<?= $id ?>">
-                                            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
-                                                <div class="modal-header bg-dark text-white p-3 p-sm-4">
-                                                    <div>
-                                                        <h5 class="modal-title fw-bold mb-1 fs-6 fs-sm-5">Detail & Koreksi Laporan</h5>
-                                                        <small class="text-white-50 d-block" style="font-size: 0.75rem;">
-                                                            <i class="bi bi-shop me-1"></i> <?= h($row['nama_cabang']) ?>
-                                                            <span class="mx-1">|</span>
-                                                            <i class="bi bi-calendar3 me-1"></i> <?= date('d/m/Y', strtotime($row['tanggal'])) ?>
-                                                        </small>
-                                                    </div>
-                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-
-                                                <div class="modal-body p-3 p-sm-4 bg-light">
-                                                    <div class="row g-3">
-                                                        <div class="col-lg-6">
-                                                            <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
-                                                                <div class="card-header bg-primary bg-opacity-10 text-primary border-0 py-2.5 px-3 fw-bold small">
-                                                                    <i class="bi bi-currency-dollar me-1"></i> 1. Pendapatan (Omzet)
-                                                                </div>
-                                                                <div class="card-body p-3">
-                                                                    <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded mb-3 border">
-                                                                        <span class="fw-semibold text-secondary small">Total Omzet Bersih</span>
-                                                                        <span class="text-primary fw-bold small">Rp <?= number_format($row['total_omset'] ?? 0, 0, ',', '.') ?></span>
-                                                                    </div>
-                                                                    <div class="row g-2">
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Tunai</label>
-                                                                            <input type="number" name="tunai" class="form-control form-control-sm border-2" value="<?= $row['tunai'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">QRIS</label>
-                                                                            <input type="number" name="qris" class="form-control form-control-sm border-2" value="<?= $row['qris'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Grab Food</label>
-                                                                            <input type="number" name="grab_food" class="form-control form-control-sm border-2" value="<?= $row['grab_food'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Go Food</label>
-                                                                            <input type="number" name="go_food" class="form-control form-control-sm border-2" value="<?= $row['go_food'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-12 mt-2">
-                                                                            <label class="small text-warning fw-semibold mb-1" style="font-size: 0.75rem;">Pencairan QRIS</label>
-                                                                            <input type="number" name="pencairan_qris" class="form-control form-control-sm border-2" value="<?= $row['pencairan_qris'] ?? 0 ?>">
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="col-lg-6">
-                                                            <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
-                                                                <div class="card-header bg-danger bg-opacity-10 text-danger border-0 py-2.5 px-3 fw-bold small">
-                                                                    <i class="bi bi-cart3 me-1"></i> 2. Pengeluaran / Belanja
-                                                                </div>
-                                                                <div class="card-body p-3">
-                                                                    <div class="row g-2">
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Belanja Pasar</label>
-                                                                            <input type="number" name="belanja_pasar" class="form-control form-control-sm border-2" value="<?= $row['belanja_pasar'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Belanja Sembako</label>
-                                                                            <input type="number" name="belanja_sembako" class="form-control form-control-sm border-2" value="<?= $row['belanja_sembako'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Belanja Beras</label>
-                                                                            <input type="number" name="belanja_beras" class="form-control form-control-sm border-2" value="<?= $row['belanja_beras'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Belanja Toko</label>
-                                                                            <input type="number" name="belanja_toko" class="form-control form-control-sm border-2" value="<?= $row['belanja_toko'] ?? 0 ?>">
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="col-lg-6">
-                                                            <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
-                                                                <div class="card-header bg-secondary bg-opacity-10 text-dark border-0 py-2.5 px-3 fw-bold small">
-                                                                    <i class="bi bi-building-gear me-1"></i> 3. Beban Operasional
-                                                                </div>
-                                                                <div class="card-body p-3">
-                                                                    <div class="row g-2">
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Sewa</label>
-                                                                            <input type="number" name="sewa" class="form-control form-control-sm border-2" value="<?= $row['sewa'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Gaji</label>
-                                                                            <input type="number" name="gaji" class="form-control form-control-sm border-2" value="<?= $row['gaji'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Listrik</label>
-                                                                            <input type="number" name="listrik" class="form-control form-control-sm border-2" value="<?= $row['listrik'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Air</label>
-                                                                            <input type="number" name="air" class="form-control form-control-sm border-2" value="<?= $row['air'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Sampah</label>
-                                                                            <input type="number" name="sampah" class="form-control form-control-sm border-2" value="<?= $row['sampah'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Keamanan</label>
-                                                                            <input type="number" name="keamanan" class="form-control form-control-sm border-2" value="<?= $row['keamanan'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Internet</label>
-                                                                            <input type="number" name="internet" class="form-control form-control-sm border-2" value="<?= $row['internet'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Gas</label>
-                                                                            <input type="number" name="gas" class="form-control form-control-sm border-2" value="<?= $row['gas'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Mingguan Karyawan</label>
-                                                                            <input type="number" name="mingguan_karyawan" class="form-control form-control-sm border-2" value="<?= $row['mingguan_karyawan'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Es Batu</label>
-                                                                            <input type="number" name="es_batu" class="form-control form-control-sm border-2" value="<?= $row['es_batu'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Bensin</label>
-                                                                            <input type="number" name="bensin" class="form-control form-control-sm border-2" value="<?= $row['bensin'] ?? 0 ?>">
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <label class="small text-muted mb-1" style="font-size: 0.75rem;">Lain-lain</label>
-                                                                            <input type="number" name="lain_lain" class="form-control form-control-sm border-2" value="<?= $row['lain_lain'] ?? 0 ?>">
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="col-lg-6">
-                                                            <div class="card border-0 shadow-sm h-100" style="border-radius: 10px;">
-                                                                <div class="card-header bg-success bg-opacity-10 text-success border-0 py-2.5 px-3 fw-bold small">
-                                                                    <i class="bi bi-chat-left-text me-1"></i> 4. Catatan / Keterangan
-                                                                </div>
-                                                                <div class="card-body p-3 d-flex flex-column justify-content-between">
-                                                                    <div>
-                                                                        <textarea name="keterangan" class="form-control border-2 mb-2 small" rows="3" placeholder="Tulis rincian tambahan di sini..."><?= h($row['keterangan'] ?? '') ?></textarea>
-                                                                        <div class="text-muted d-block" style="font-size: 0.7rem;">
-                                                                            <span class="fw-semibold">Petunjuk:</span> Rincian pengeluaran darurat/tidak terduga.
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                    </div>
-                                                </div>
-
-                                                <div class="modal-footer bg-white border-top p-3 justify-content-end gap-2">
-                                                    <button type="button" class="btn btn-sm btn-light border fw-semibold px-3" data-bs-dismiss="modal">Batal</button>
-                                                    <button type="submit" name="update_laporan" class="btn btn-sm btn-primary fw-semibold px-3">
-                                                        <i class="bi bi-check-circle-fill me-1"></i> Simpan
-                                                    </button>
-                                                </div>
-
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
+                                <?php include __DIR__ . '/_edit_laporan_modal.php'; ?>
                             </td>
                         </tr>
                         <?php endwhile; endif; ?>
@@ -544,39 +646,67 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
     </div>
 </div>
             
-            <!-- PAGINATION -->
-            <?php if($total_pages > 1):?>
-            <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
-                <small class="text-muted">Menampilkan <?= $offset+1?> - <?= min($offset+$limit, $total_data)?> dari <?= $total_data?> data</small>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0">
-                        <?php
-                        $base_url = "?filter=".urlencode($filter)."&tgl_awal=".urlencode($tgl_awal)."&tgl_akhir=".urlencode($tgl_akhir)."&id_cabang=".urlencode($id_cabang);
-                       ?>
-                        <?php if($page > 1):?>
-                        <li class="page-item">
-                            <a class="page-link" href="<?= $base_url?>&page=<?= $page-1?>">Prev</a>
-                        </li>
-                        <?php endif;?>
-
-                        <?php for($i=1; $i<=$total_pages; $i++):?>
-                        <li class="page-item <?= $i==$page? 'active' : ''?>">
-                            <a class="page-link" href="<?= $base_url?>&page=<?= $i?>"><?= $i?></a>
-                        </li>
-                        <?php endfor;?>
-
-                        <?php if($page < $total_pages):?>
-                        <li class="page-item">
-                            <a class="page-link" href="<?= $base_url?>&page=<?= $page+1?>">Next</a>
-                        </li>
-                        <?php endif;?>
-                    </ul>
-                </nav>
-            </div>
-            <?php endif;?>
+            <?php render_pagination($page, $total_pages, ['from' => $offset + 1, 'to' => min($offset + $limit, $total_data), 'total' => $total_data, 'label' => 'laporan']); ?>
         </div>
     </div>
 </div>
+
+<!-- ===== Aset modal "Koreksi Laporan Harian" (sekali pakai) ===== -->
+<style>
+.ed-content{border:0;border-radius:14px;overflow:hidden}
+.ed-modal .modal-dialog:not(.modal-fullscreen){max-width:1160px}
+.ed-head{background:#1e293b;color:#fff;padding:14px 18px;align-items:flex-start}
+.ed-head .modal-title{font-size:1rem;color:#fff}
+.ed-head-sub{display:flex;flex-wrap:wrap;gap:3px 14px;font-size:.78rem;color:#cbd5e1}
+.ed-body{background:#f1f5f9;padding:16px}
+.ed-sec{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px}
+.ed-sec-h{font-weight:700;font-size:.8rem;letter-spacing:.02em;text-transform:uppercase;color:#334155;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ed-sec-h i{font-size:1rem}
+.ed-h-green{color:#059669}.ed-h-red{color:#dc2626}.ed-h-amber{color:#d97706}.ed-h-blue{color:#2563eb}
+.ed-auto{margin-left:auto;font-weight:600;font-size:.68rem;background:#eef2ff;color:#4338ca;padding:2px 8px;border-radius:999px;text-transform:none;letter-spacing:0}
+.ed-lbl{font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:3px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ed-ig .input-group-text{background:#f8fafc;border-color:#e2e8f0;color:#94a3b8;font-size:.75rem;padding:.2rem .5rem}
+.ed-num{border-color:#e2e8f0;font-weight:600;text-align:right;font-size:.9rem}
+.ed-num:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.ed-side{position:sticky;top:0;display:flex;flex-direction:column;gap:16px}
+.ed-sum-list{display:flex;flex-direction:column;gap:1px;background:#e2e8f0;border-radius:10px;overflow:hidden}
+.ed-sum-list>div{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;padding:9px 12px;font-size:.85rem}
+.ed-sum-list>div span{color:#64748b}
+.ed-sum-list>div b{color:#0f172a;font-weight:700}
+.ed-sum-hi{background:#f0fdf4!important}
+.ed-sum-hi b{color:#047857!important;font-size:.95rem}
+.ed-notas{display:flex;flex-direction:column;gap:14px}
+.ed-nota{margin:0}
+.ed-nota-img{width:100%;height:auto;max-height:72vh;object-fit:contain;background:#0f172a;border-radius:10px;border:1px solid #e2e8f0;cursor:zoom-in;display:block}
+.ed-nota figcaption{text-align:center;font-size:.72rem;color:#94a3b8;margin-top:5px;font-weight:600}
+.ed-nota-empty{text-align:center;color:#94a3b8;padding:26px 0}
+.ed-nota-empty i{font-size:2rem;display:block;margin-bottom:6px}
+.ed-foot{background:#fff;border-top:1px solid #e2e8f0;padding:12px 16px}
+@media (max-width:1199.98px){.ed-side{position:static}}
+@media (max-width:575.98px){.ed-body{padding:12px}.ed-sec{padding:12px}.ed-nota-img{max-height:60vh}}
+#edZoomOverlay{position:fixed;inset:0;z-index:3000;background:rgba(2,6,23,.93);display:none;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
+#edZoomOverlay.show{display:flex}
+#edZoomOverlay img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+#edZoomOverlay .ed-zoom-x{position:absolute;top:12px;right:18px;color:#fff;font-size:2.2rem;line-height:1;background:none;border:0;cursor:pointer}
+#edZoomOverlay .ed-zoom-dl{position:absolute;top:16px;right:70px;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:8px 16px;text-decoration:none;display:flex;align-items:center;gap:8px;font-size:.95rem;font-weight:600}
+#edZoomOverlay .ed-zoom-dl:hover{background:rgba(255,255,255,.22);color:#fff}
+</style>
+<div id="edZoomOverlay" onclick="edZoomClose()">
+  <a id="edZoomDownload" href="" download class="ed-zoom-dl" title="Unduh foto ini" onclick="event.stopPropagation()"><i class="bi bi-download"></i> Unduh</a>
+  <button type="button" class="ed-zoom-x" aria-label="Tutup">&times;</button>
+  <img id="edZoomImg" src="" alt="Nota">
+</div>
+<script>
+function edZoom(src){
+  document.getElementById('edZoomImg').src = src;
+  document.getElementById('edZoomDownload').href = src;
+  document.getElementById('edZoomOverlay').classList.add('show');
+}
+function edZoomClose(){
+  document.getElementById('edZoomOverlay').classList.remove('show');
+}
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') edZoomClose(); });
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -618,5 +748,161 @@ document.addEventListener('DOMContentLoaded', function(){
         document.getElementById('tgl_awal').value = awal;
         document.getElementById('tgl_akhir').value = akhir;
     });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    function formatRupiah(angka) {
+        return 'Rp ' + Number(angka || 0).toLocaleString('id-ID');
+    }
+
+    function angka(input) {
+        return parseFloat(input?.value || 0) || 0;
+    }
+
+    document.querySelectorAll('[id^="detailModal"]').forEach(function(modal) {
+
+        const id = modal.id.replace('detailModal', '');
+
+        function hitungLaporan() {
+
+            // =========================
+            // PENDAPATAN
+            // =========================
+
+            const tunai = angka(modal.querySelector('[name="tunai"]'));
+            const qris = angka(modal.querySelector('[name="qris"]'));
+            const grabFood = angka(modal.querySelector('[name="grab_food"]'));
+            const goFood = angka(modal.querySelector('[name="go_food"]'));
+            const pencairanQris = angka(modal.querySelector('[name="pencairan_qris"]'));
+
+
+            // =========================
+            // BELANJA RUTIN
+            // =========================
+
+            const belanjaPasar = angka(modal.querySelector('[name="belanja_pasar"]'));
+            const belanjaSembako = angka(modal.querySelector('[name="belanja_sembako"]'));
+            const belanjaBeras = angka(modal.querySelector('[name="belanja_beras"]'));
+            const belanjaToko = angka(modal.querySelector('[name="belanja_toko"]'));
+
+            const totalRutin =
+                belanjaPasar +
+                belanjaSembako +
+                belanjaBeras +
+                belanjaToko;
+
+
+            // =========================
+            // OPERASIONAL
+            // =========================
+
+            const sewa = angka(modal.querySelector('[name="sewa"]'));
+            const gaji = angka(modal.querySelector('[name="gaji"]'));
+            const listrik = angka(modal.querySelector('[name="listrik"]'));
+            const air = angka(modal.querySelector('[name="air"]'));
+            const sampah = angka(modal.querySelector('[name="sampah"]'));
+            const keamanan = angka(modal.querySelector('[name="keamanan"]'));
+            const internet = angka(modal.querySelector('[name="internet"]'));
+            const gas = angka(modal.querySelector('[name="gas"]'));
+            const mingguanKaryawan = angka(modal.querySelector('[name="mingguan_karyawan"]'));
+            const esBatu = angka(modal.querySelector('[name="es_batu"]'));
+            const bensin = angka(modal.querySelector('[name="bensin"]'));
+            const lainLain = angka(modal.querySelector('[name="lain_lain"]'));
+
+            const totalOperasional =
+                sewa +
+                gaji +
+                listrik +
+                air +
+                sampah +
+                keamanan +
+                internet +
+                gas +
+                mingguanKaryawan +
+                esBatu +
+                bensin +
+                lainLain;
+
+
+            // =========================
+            // TOTAL PENGELUARAN
+            // =========================
+
+            const totalPengeluaran =
+                totalRutin +
+                totalOperasional;
+
+
+            // =========================
+            // TOTAL OMZET
+            // =========================
+
+            const totalOmzet =
+                tunai +
+                qris +
+                grabFood +
+                goFood -
+                pencairanQris;
+
+
+            // =========================
+            // SISA TUNAI
+            // =========================
+
+            const sisaTunai =
+                tunai - totalPengeluaran;
+
+
+            // =========================
+            // SISA QRIS
+            // =========================
+
+            const sisaQris =
+                qris - pencairanQris;
+
+
+            // =========================
+            // UPDATE TAMPILAN
+            // =========================
+
+            // NET PROFIT + MARGIN — rumus sama dengan handler PHP (update_laporan)
+            const netProfit = sisaTunai + sisaQris + goFood + grabFood;
+            const margin = totalOmzet > 0 ? (netProfit / totalOmzet) * 100 : 0;
+
+            const setTxt = function (sel, val) {
+                const el = modal.querySelector(sel + id);
+                if (el) el.textContent = val;
+            };
+
+            setTxt('#summaryOmzet', formatRupiah(totalOmzet));
+            setTxt('#summaryRutin', formatRupiah(totalRutin));
+            setTxt('#summaryOperasional', formatRupiah(totalOperasional));
+            setTxt('#summaryPengeluaran', formatRupiah(totalPengeluaran));
+            setTxt('#summaryTunai', formatRupiah(sisaTunai));
+            setTxt('#summaryQris', formatRupiah(sisaQris));
+            setTxt('#summaryNet', formatRupiah(netProfit));
+            setTxt('#summaryMargin', margin.toFixed(2) + '%');
+        }
+
+
+        // Jalankan ketika modal pertama kali dibuka
+        modal.addEventListener('shown.bs.modal', function () {
+            hitungLaporan();
+        });
+
+
+        // Jalankan setiap input berubah
+        modal.querySelectorAll('input[type="number"]').forEach(function(input) {
+
+            input.addEventListener('input', function() {
+                hitungLaporan();
+            });
+
+        });
+
+    });
+
 });
 </script>

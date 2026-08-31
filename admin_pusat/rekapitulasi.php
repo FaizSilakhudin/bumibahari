@@ -1,5 +1,4 @@
 <?php
-require '../vendor/autoload.php';
 require '../config/koneksi.php';
 include 'sidebar_pusat.php';
 
@@ -10,8 +9,11 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 'pusat') {
 }
 
 $periode = $_GET['periode'] ?? 'bulanan';
-$tahun = $_GET['tahun'] ?? date('Y');
-$bulan = $_GET['bulan'] ?? date('m');
+$tahun = (int) ($_GET['tahun'] ?? date('Y'));
+$bulan = (int) ($_GET['bulan'] ?? date('m'));
+if ($tahun < 2000 || $tahun > 2100) $tahun = (int) date('Y');
+if ($bulan < 1 || $bulan > 12)      $bulan = (int) date('m');
+$bulan = str_pad((string) $bulan, 2, '0', STR_PAD_LEFT);
 $id_cabang = $_GET['id_cabang'] ?? '';
 
 // Ambil nama cabang yang kepilih biar input keisi
@@ -30,18 +32,19 @@ $where_sql = "";
 $params = [];
 $types = "";
 
+// Rekap hanya menghitung laporan yang sudah difinalisasi PIC.
 if ($periode == 'mingguan') {
-    $where_sql = "WHERE YEAR(l.tanggal)=? AND WEEK(l.tanggal,1) = WEEK(CURDATE(),1)";
+    $where_sql = "WHERE l.status_laporan = 'lengkap' AND YEAR(l.tanggal)=? AND WEEK(l.tanggal,1) = WEEK(CURDATE(),1)";
     $params[] = $tahun;
     $types .= "i";
     $judul = "Rekap Mingguan - Minggu " . date('W');
 } elseif ($periode == 'tahunan') {
-    $where_sql = "WHERE YEAR(l.tanggal)=?";
+    $where_sql = "WHERE l.status_laporan = 'lengkap' AND YEAR(l.tanggal)=?";
     $params[] = $tahun;
     $types .= "i";
     $judul = "Rekap Tahunan - Tahun $tahun";
 } else {
-    $where_sql = "WHERE YEAR(l.tanggal)=? AND MONTH(l.tanggal)=?";
+    $where_sql = "WHERE l.status_laporan = 'lengkap' AND YEAR(l.tanggal)=? AND MONTH(l.tanggal)=?";
     $params[] = $tahun;
     $params[] = $bulan;
     $types .= "ii";
@@ -57,18 +60,22 @@ if ($id_cabang != '') {
     $types .= "i";
 
     $stmt = $conn->prepare("
-    SELECT 
+    SELECT
         c.nama_cabang,
         IFNULL(i.nama_investor, '-') AS investor,
-        IFNULL(i.atas_nama_rekening, '-') AS atas_nama_rekening,
-        IFNULL(i.no_rekening, '-') AS no_rekening,
-        IFNULL(i.nama_bank, '-') AS nama_bank
+        IFNULL(c.atas_nama_cabang, '-') AS atas_nama_rekening,
+        IFNULL(c.no_rekening_cabang, '-') AS no_rekening,
+        IFNULL(c.nama_bank_cabang, '-') AS nama_bank
     FROM cabang c
-    LEFT JOIN cabang_investor ci 
+    LEFT JOIN cabang_investor ci
         ON ci.id_cabang = c.id_cabang
-    LEFT JOIN investor i 
+        AND ci.tgl_mulai <= CURDATE()
+        AND (ci.tgl_selesai IS NULL OR ci.tgl_selesai >= CURDATE())
+    LEFT JOIN investor i
         ON ci.id_investor = i.id_investor
     WHERE c.id_cabang = ?
+    ORDER BY ci.tgl_mulai DESC
+    LIMIT 1
 ");
     $stmt->bind_param("i", $id_cabang);
     $stmt->execute();
@@ -79,7 +86,17 @@ if ($id_cabang != '') {
 }
 
 // 3. QUERY DATA UTAMA PAKAI PREPARED
-$query = "SELECT c.nama_cabang, i.nama_investor as investor, i.no_rekening, c.nama_bank,
+$query = "SELECT c.nama_cabang,
+          (SELECT i.nama_investor
+             FROM cabang_investor ci
+             JOIN investor i ON i.id_investor = ci.id_investor
+            WHERE ci.id_cabang = c.id_cabang
+              AND ci.tgl_mulai <= CURDATE()
+              AND (ci.tgl_selesai IS NULL OR ci.tgl_selesai >= CURDATE())
+            ORDER BY ci.tgl_mulai DESC
+            LIMIT 1) as investor,
+          c.no_rekening_cabang as no_rekening,
+          c.nama_bank_cabang as nama_bank,
           SUM(l.tunai) as tunai,
           SUM(l.qris) as qris,
           SUM(l.pencairan_qris) as pencairan_qris,
@@ -110,8 +127,6 @@ $query = "SELECT c.nama_cabang, i.nama_investor as investor, i.no_rekening, c.na
           SUM(l.net_profit) as laba_bersih
           FROM laporan_cabang l
           JOIN cabang c ON l.id_cabang = c.id_cabang
-          LEFT JOIN cabang_investor ci ON ci.id_cabang = c.id_cabang
-          LEFT JOIN investor i ON i.id_investor = ci.id_investor
           $where_sql
           GROUP BY l.id_cabang";
 
@@ -178,12 +193,13 @@ if ($id_cabang != '') {
     $stmt = $conn->prepare("
         SELECT
             nama_pengelola,
-            no_rekening,
-            nama_bank,
-            atas_nama_rekening
-        FROM users
+            no_rekening_pengelola AS no_rekening,
+            nama_bank_pengelola   AS nama_bank,
+            atas_nama_pengelola   AS atas_nama_rekening
+        FROM pengelola
         WHERE id_cabang=?
-        AND role='cabang'
+        AND status='aktif'
+        ORDER BY tgl_mulai DESC
         LIMIT 1
     ");
 
@@ -192,190 +208,26 @@ if ($id_cabang != '') {
     $pengelola = $stmt->get_result()->fetch_assoc() ?? $pengelola;
 }
 
+// PIC yang menginput/memfinalisasi laporan bulan ini untuk cabang terpilih.
+$nama_pic = '-';
+if ($id_cabang != '') {
+    $stmt = $conn->prepare("
+        SELECT GROUP_CONCAT(DISTINCT u.username ORDER BY u.username SEPARATOR ', ') AS pic
+        FROM laporan_cabang lc
+        JOIN users u ON u.id = lc.id_user_laporan
+        WHERE lc.id_cabang = ? AND YEAR(lc.tanggal) = ? AND MONTH(lc.tanggal) = ?
+          AND lc.status_laporan = 'lengkap' AND lc.id_user_laporan IS NOT NULL
+    ");
+    $stmt->bind_param("iii", $id_cabang, $tahun, $bulan);
+    $stmt->execute();
+    $nama_pic = $stmt->get_result()->fetch_assoc()['pic'] ?? null;
+    $nama_pic = $nama_pic ?: '-';
+}
+
 // Format nama file export
 $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_" . $tahun . $bulan;
 ?>
 
-<!-- HTML / JS PERHITUNGAN DINAMIS & EKSPOR PDF -->
-<script>
-    // Global variable basis laba bersih dasar
-    const labaBersihDasar = <?= (float)$laba_bersih_dasar ?>;
-
-    // Helper Parse Angka: Kebal terhadap format Rupiah ("Rp 412.973" -> 412973)
-    function parseAngka(val) {
-        if (typeof val === 'number') return isNaN(val) ? 0 : val;
-        if (!val) return 0;
-        let str = String(val)
-            .replace(/[^0-9,.-]+/g, "")
-            .replace(/\./g, "")
-            .replace(",", ".");
-        let num = parseFloat(str);
-        return isNaN(num) ? 0 : num;
-    }
-
-    function formatRupiah(angka) {
-        return 'Rp ' + Math.round(angka || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    }
-
-    // Script untuk datalist cabang -> hidden ID
-    const inputCabang = document.getElementById('inputCabang');
-    const idCabang = document.getElementById('idCabang');
-    const datalist = document.getElementById('listCabang');
-
-    if (inputCabang) {
-        inputCabang.addEventListener('input', function() {
-            let val = this.value;
-            let options = datalist.querySelectorAll('option');
-            let found = false;
-
-            options.forEach(opt => {
-                if (opt.value === val) {
-                    idCabang.value = opt.getAttribute('data-id');
-                    found = true;
-                }
-            });
-
-            if (!found && val !== '') {
-                idCabang.value = '';
-            }
-        });
-    }
-
-    const formFilter = document.getElementById('formFilter');
-    if (formFilter) {
-        formFilter.addEventListener('submit', function(e) {
-            if (idCabang.value === '') {
-                e.preventDefault();
-                alert('Pilih cabang dari daftar, jangan ketik manual yang tidak ada di list!');
-                inputCabang.focus();
-            }
-        });
-    }
-
-    // =========================================================
-    // HITUNG BEBAN OPERASIONAL
-    // =========================================================
-    function hitungBO() {
-        let totalBO = 0;
-
-        document.querySelectorAll('.jumlah').forEach(function(el) {
-            let no = el.dataset.no;
-            let harian = parseFloat(document.querySelector('.harian[data-no="' + no + '"]')?.value) || 0;
-            let bulanan = parseFloat(document.querySelector('.bulanan[data-no="' + no + '"]')?.value) || 0;
-            let tahunan = parseFloat(document.querySelector('.tahunan[data-no="' + no + '"]')?.value) || 0;
-            let dibayarkan = parseFloat(document.querySelector('.dibayarkan[data-no="' + no + '"]')?.value) || 0;
-            let jumlah = harian + bulanan + tahunan - dibayarkan;
-            el.innerText = formatRupiah(jumlah);
-            totalBO += jumlah;
-        });
-
-        if (document.getElementById('total_bo')) document.getElementById('total_bo').innerText = formatRupiah(totalBO);
-        if (document.getElementById('bo_akumulasi')) document.getElementById('bo_akumulasi').innerText = formatRupiah(totalBO);
-
-        // Jalankan kalkulasi investor & pengelola
-        hitungInvestor();
-    }
-
-    // =========================================================
-    // UPDATE REKAP AKHIR (MANAGEMENT PUSAT 3% + SERVICE FEE)
-    // =========================================================
-    function updateFinalRekap(serviceFee = 0) {
-        // 1. Ambil Total Net Investor
-        let final_inv = parseAngka(document.getElementById('inv_total')?.innerText || 0);
-
-        // 2. Ambil Total Net Pengelola
-        let final_pgl = parseAngka(document.getElementById('pgl_total_profit')?.innerText || 0);
-
-        // 3. HITUNG MANAGEMENT PUSAT 3% DARI NET PROFIT (SESUAI TABEL POIN 5)
-        const persenAdmin = parseFloat("<?= floatval($persen_admin ?? 3) ?>") || 3;
-        
-        // Komponen 1: Management Pusat 3% dari Net Profit Dasar
-        let admin3Persen = (labaBersihDasar * persenAdmin) / 100;
-        
-        // Komponen 2: Service Fee dari Pengelola (dioper dari hitungPengelola)
-        
-        // TOTAL AKHIR ADMIN PUSAT = 3% Net Profit + Service Fee Pengelola
-        let totalAdminGabungan = admin3Persen + serviceFee;
-
-        // Render ke Tampilan
-        if (document.getElementById('final_inv')) {
-            document.getElementById('final_inv').innerText = formatRupiah(final_inv);
-        }
-        if (document.getElementById('final_pgl')) {
-            document.getElementById('final_pgl').innerText = formatRupiah(final_pgl);
-        }
-        if (document.getElementById('final_admin')) {
-            // Gabungan 2 Keuntungan Admin Pusat
-            document.getElementById('final_admin').innerText = formatRupiah(totalAdminGabungan);
-        }
-    }
-
-    // =========================================================
-    // KOREKSI DIVIDEN - INVESTOR
-    // =========================================================
-    function hitungInvestor() {
-        let profit = parseFloat(document.getElementById('inv_profit')?.value) || 0;
-        let sewa = parseFloat(document.getElementById('inv_sewa')?.value) || 0;
-        let modal = parseFloat(document.getElementById('inv_modal')?.value) || 0;
-        let kasbon = parseFloat(document.getElementById('inv_kasbon')?.value) || 0;
-        let operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
-
-        let total = profit;
-
-        if (operatorSewa === 'plus') {
-            total += sewa;
-        } else {
-            total -= sewa;
-        }
-
-        total += modal;
-        total += kasbon;
-        total = Math.max(0, total);
-
-        const invTotal = document.getElementById('inv_total');
-        if (invTotal) {
-            invTotal.innerText = formatRupiah(total);
-        }
-
-        hitungPengelola();
-    }
-
-    // =========================================================
-    // KOREKSI DIVIDEN - PENGELOLA
-    // =========================================================
-    function hitungPengelola() {
-        let profit = parseFloat(document.getElementById('pgl_profit')?.value) || 0;
-        let adminPersen = parseFloat(document.getElementById('pgl_admin_persen')?.value) || 0;
-        let kasbon = parseFloat(document.getElementById('inv_kasbon')?.value) || 0;
-
-        // Service Fee yang dipotong dari Pengelola (3%, 5%, atau 7.5%)
-        let serviceFee = (profit * adminPersen) / 100;
-
-        // Net Profit Pengelola setelah dipotong Service Fee & Kasbon
-        let profitBersih = profit - serviceFee - kasbon;
-        profitBersih = Math.max(0, profitBersih);
-
-        const totalProfit = document.getElementById('pgl_total_profit');
-        if (totalProfit) {
-            totalProfit.innerText = formatRupiah(profitBersih);
-        }
-
-        const totalAdmin = document.getElementById('pgl_total_admin');
-        if (totalAdmin) {
-            totalAdmin.innerText = formatRupiah(serviceFee);
-        }
-
-        // Kirim Service Fee ke Rekap Akhir untuk dijumlahkan dengan Management Pusat 3%
-        updateFinalRekap(serviceFee);
-    }
-
-    // =========================================================
-    // JALANKAN SAAT HALAMAN SELESAI DIMUAT
-    // =========================================================
-    document.addEventListener('DOMContentLoaded', function() {
-        hitungBO();
-    });
-</script>
 
 <!-- Link tambahan stylesheet icons -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -526,13 +378,13 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
     </div>
 </div>
     <?php if (empty($id_cabang)): ?>
-        <div class="alert alert-warning border-0 p-4 d-flex align-items-center" role="alert" style="border-radius: 12px; background-color: #fffbeb; border: 1px solid #fde68a!important;">
-            <i class="bi bi-exclamation-circle-fill fs-4 me-3 text-warning"></i>
-            <div>
-                <h6 class="fw-bold text-warning-emphasis mb-1">Pilih Cabang Terlebih Dahulu</h6>
-                <span class="text-secondary small">Gunakan form pencarian di atas untuk memuat data transaksi, rincian biaya, dan grafik pembagian hasil.</span>
-            </div>
+    <div class="alert alert-warning border-0 p-4 d-flex align-items-center" role="alert" style="border-radius: 12px; background-color: #fffbeb; border: 1px solid #fde68a!important;">
+        <i class="bi bi-exclamation-circle-fill fs-4 me-3 text-warning"></i>
+        <div>
+            <h6 class="fw-bold text-warning-emphasis mb-1">Pilih Cabang Terlebih Dahulu</h6>
+            <span class="text-secondary small">Gunakan form pencarian di atas untuk memuat data transaksi, rincian biaya, dan grafik pembagian hasil.</span>
         </div>
+    </div>
     <?php else: ?>
 
         <!-- 1. Rekap Cabang Overview Widgets -->
@@ -599,170 +451,40 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 text-nowrap" id="tabelRekapHarian">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="text-center" width="3%">No</th>
-                                <th width="7%">Tanggal</th>
-                                <th class="text-end" width="6%">Tunai</th>
-                                <th colspan="3" class="text-center" width="15%">Non-Tunai</th>
-                                <th class="text-end" width="7%">OMZET</th>
-                                <th colspan="4" class="text-center" width="20%">Pengeluaran Belanja</th>
-                                <th colspan="3" class="text-center" width="15%">Beban Operasional</th>
-                                <th class="text-end" width="8%">Total Pengeluaran</th>
-                                <th class="text-end" width="8%">Net Profit</th>
-                                <th class="text-center" width="4%">Margin (%)</th>
-                            </tr>
-                            <tr class="table-secondary" style="font-size: 0.8rem;">
-                                <th></th>
-                                <th></th>
-                                <th></th>
-                                <th class="text-end">QRIS</th>
-                                <th class="text-end">Go-Food</th>
-                                <th class="text-end">Grab-Food</th>
-                                <th></th>
-                                <th class="text-end">Pasar</th>
-                                <th class="text-end">Beras</th>
-                                <th class="text-end">Sembako</th>
-                                <th class="text-end">Toko</th>
-                                <th class="text-end">Sewa Ruko</th>
-                                <th class="text-end">Gaji Karyawan</th>
-                                <th class="text-end">Lain-Lain</th>
-                                <th></th>
-                                <th></th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php
-                            $query_harian = "SELECT l.tanggal, l.tunai, l.qris, l.go_food, l.grab_food, 
-                    l.total_omset, l.total_pengeluaran, 
-                    l.belanja_pasar, l.belanja_beras, l.belanja_sembako, l.belanja_toko,
-                    l.sewa, l.gaji, l.listrik, l.air, l.sampah, l.keamanan, l.internet, l.gas, l.mingguan_karyawan, l.es_batu, l.bensin, l.lain_lain,
-                    l.net_profit, l.persentase 
-                    FROM laporan_cabang l
-                    JOIN cabang c ON l.id_cabang = c.id_cabang
-                    WHERE YEAR(l.tanggal) = ? 
-                    AND MONTH(l.tanggal) = ?
-                    AND l.id_cabang = ?
-                    ORDER BY l.tanggal ASC";
+                    <?php
+                    $rk_th = (int) $tahun;
+                    $rk_bl = (int) $bulan;
+                    $rk_id_cabang = (int) $id_cabang;
+                    $rk_tabel_id = 'tabelRekapHarian';
+                    include '_rekap_tabel_harian.php';
 
-                            $stmt = $conn->prepare($query_harian);
-                            $stmt->bind_param("iii", $tahun, $bulan, $id_cabang);
-                            $stmt->execute();
-                            $data_harian = $stmt->get_result();
-
-                            $total_tunai = $total_qris = $total_gofood = $total_grab = 0;
-                            $total_omzet = $total_belanja = $total_pasar = $total_beras = $total_sembako = $total_toko = 0;
-                            $total_sewa = $total_gaji = $total_lain_bo = 0;
-                            $total_pengeluaran = $total_sisa_tunai = $total_laba = 0;
-                            $no = 1;
-
-                            if ($data_harian->num_rows > 0):
-                                while ($h = $data_harian->fetch_assoc()):
-                                    $tunai         = (float)($h['tunai'] ?? 0);
-                                    $qris          = (float)($h['qris'] ?? 0);
-                                    $go_food       = (float)($h['go_food'] ?? 0);
-                                    $grab_food     = (float)($h['grab_food'] ?? 0);
-                                    $omzet         = (float)($h['total_omset'] ?? 0);
-                                    $pasar         = (float)($h['belanja_pasar'] ?? 0);
-                                    $beras         = (float)($h['belanja_beras'] ?? 0);
-                                    $sembako       = (float)($h['belanja_sembako'] ?? 0);
-                                    $toko          = (float)($h['belanja_toko'] ?? 0);
-                                    $sewa          = (float)($h['sewa'] ?? 0);
-                                    $gaji          = (float)($h['gaji'] ?? 0);
-                                    $laba_harian   = (float)($h['net_profit'] ?? 0);
-                                    $persentase    = (float)($h['persentase'] ?? 0);
-
-                                    $lain_lain_operasional = (float)($h['listrik'] ?? 0)
-                                        + (float)($h['air'] ?? 0)
-                                        + (float)($h['sampah'] ?? 0)
-                                        + (float)($h['keamanan'] ?? 0)
-                                        + (float)($h['internet'] ?? 0)
-                                        + (float)($h['gas'] ?? 0)
-                                        + (float)($h['mingguan_karyawan'] ?? 0)
-                                        + (float)($h['es_batu'] ?? 0)
-                                        + (float)($h['bensin'] ?? 0)
-                                        + (float)($h['lain_lain'] ?? 0);
-
-                                    $total_pengeluaran_harian = $pasar + $beras + $sembako + $toko + $sewa + $gaji + $lain_lain_operasional;
-                                    $sisa_tunai_harian = $tunai - $total_pengeluaran_harian;
-
-                                    $total_tunai += $tunai;
-                                    $total_qris += $qris;
-                                    $total_gofood += $go_food;
-                                    $total_grab += $grab_food;
-                                    $total_omzet += $omzet;
-                                    $total_pasar += $pasar;
-                                    $total_beras += $beras;
-                                    $total_sembako += $sembako;
-                                    $total_toko += $toko;
-                                    $total_sewa += $sewa;
-                                    $total_gaji += $gaji;
-                                    $total_lain_bo += $lain_lain_operasional;
-                                    $total_laba += $laba_harian;
-                                    $total_pengeluaran += $total_pengeluaran_harian;
-                                    $total_sisa_tunai += $sisa_tunai_harian;
-                            ?>
-                                    <tr>
-                                        <td class="text-center text-muted"><?= $no++ ?></td>
-                                        <td class="fw-medium"><?= date('d/m/Y', strtotime($h['tanggal'])) ?></td>
-                                        <td class="text-end"><?= number_format($tunai, 0, ',', '.') ?></td>
-                                        <td class="text-end"><?= $qris > 0 ? number_format($qris, 0, ',', '.') : '-' ?></td>
-                                        <td class="text-end"><?= $go_food > 0 ? number_format($go_food, 0, ',', '.') : '-' ?></td>
-                                        <td class="text-end"><?= $grab_food > 0 ? number_format($grab_food, 0, ',', '.') : '-' ?></td>
-                                        <td class="text-end fw-semibold"><?= number_format($omzet, 0, ',', '.') ?></td>
-                                        <td class="text-end"><?= number_format($pasar, 0, ',', '.') ?></td>
-                                        <td class="text-end"><?= number_format($beras, 0, ',', '.') ?></td>
-                                        <td class="text-end"><?= number_format($sembako, 0, ',', '.') ?></td>
-                                        <td class="text-end"><?= number_format($toko, 0, ',', '.') ?></td>
-                                        <td class="text-end"><?= number_format($sewa, 0, ',', '.') ?></td>
-                                        <td class="text-end"><?= number_format($gaji, 0, ',', '.') ?></td>
-                                        <td class="text-end"><?= number_format($lain_lain_operasional, 0, ',', '.') ?></td>
-                                        <td class="text-end fw-semibold text-danger"><?= number_format($total_pengeluaran_harian, 0, ',', '.') ?></td>
-                                        <td class="text-end fw-bold text-success"><?= number_format($laba_harian, 0, ',', '.') ?></td>
-                                        <td class="text-center fw-semibold"><?= number_format($persentase, 2) ?>%</td>
-                                    </tr>
-                                <?php
-                                endwhile;
-                                $margin_total = $total_omzet > 0 ? ($total_laba / $total_omzet) * 100 : 0;
-                            else: ?>
-                                <tr>
-                                    <td colspan="17" class="text-center text-muted py-5">
-                                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
-                                        Belum ada data laporan untuk periode ini
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                        <?php if ($data_harian->num_rows > 0): ?>
-                            <tfoot class="table-dark">
-                                <tr class="fw-bold">
-                                    <td colspan="2" class="text-center">JUMLAH</td>
-                                    <td class="text-end"><?= number_format($total_tunai, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_qris, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_gofood, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_grab, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_omzet, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_pasar, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_beras, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_sembako, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_toko, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_sewa, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_gaji, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_lain_bo, 0, ',', '.') ?></td>
-                                    <td class="text-end text-danger"><?= number_format($total_pengeluaran, 0, ',', '.') ?></td>
-                                    <td class="text-end"><?= number_format($total_laba, 0, ',', '.') ?></td>
-                                    <td class="text-center"><?= number_format($margin_total, 2) ?>%</td>
-                                </tr>
-                            </tfoot>
-                        <?php endif; ?>
-                    </table>
+                    // Angka yang dipakai bagian lain (Matrik Akumulasi, tombol export, dll.)
+                    $jumlah_hari_data = $rk_num_rows;
+                    $total_pasar   = $rk_t_pasar;
+                    $total_beras   = $rk_t_beras;
+                    $total_sembako = $rk_t_sembako;
+                    $total_toko    = $rk_t_toko;
+                    ?>
                 </div>
             </div>
         </div>
-    <?php endif; ?>
-</div>
+
+        <!-- (tersembunyi) tabel harian BULAN SEBELUMNYA — sumber Export PDF Harian -->
+        <?php
+        $rk_prev    = strtotime(sprintf('%04d-%02d-01 -1 month', (int) $tahun, (int) $bulan));
+        $bulan_prev = (int) date('n', $rk_prev);
+        $tahun_prev = (int) date('Y', $rk_prev);
+        ?>
+        <div aria-hidden="true" style="position:absolute; left:-99999px; top:0; width:1600px; pointer-events:none;">
+            <?php
+            $rk_th = $tahun_prev;
+            $rk_bl = $bulan_prev;
+            $rk_id_cabang = (int) $id_cabang;
+            $rk_tabel_id = 'tabelRekapHarianPrev';
+            include '_rekap_tabel_harian.php';
+            ?>
+        </div>
+
 
 <!-- 2. Rincian Beban Operasional -->
 <div class="card border-0 mb-4" style="overflow: hidden;">
@@ -788,7 +510,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                 <tbody>
                     <?php
                     // Hitung jumlah hari ada data untuk dapat rata2 harian
-                    $jumlah_hari = (isset($data_harian) && $data_harian->num_rows > 0) ? $data_harian->num_rows : 1;
+                    $jumlah_hari = (($jumlah_hari_data ?? 0) > 0) ? $jumlah_hari_data : 1;
 
                     $uraian_bo = [
                         1 => ['nama' => 'Sewa Ruko', 'field' => 'sewa', 'harian' => true, 'tahunan' => true],
@@ -873,7 +595,6 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                         $bo_akumulasi = $total_bo_all ?? 0;
                         $pengeluaran_akumulasi = $belanja_akumulasi + $bo_akumulasi;
                         $laba_akumulasi = $laba_bersih_dasar ?? ($omzet_akumulasi - $pengeluaran_akumulasi);
-                        $modal_awal = 0;
                         ?>
                         <tr>
                             <td class="px-3 fw-medium text-dark"><i class="bi bi-cash-stack text-primary me-2"></i>1. Omzet Penjualan</td>
@@ -893,7 +614,14 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                         </tr>
                         <tr>
                             <td class="px-3 fw-medium text-dark"><i class="bi bi-wallet2 text-warning me-2"></i>4. Modal Awal</td>
-                            <td class="text-end fw-bold text-warning px-3">Rp <?= number_format($modal_awal, 0, ',', '.') ?></td>
+                            <td class="text-end px-3">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-transparent border-0 text-warning fw-bold pe-1">Rp</span>
+                                    <input type="number" id="matrik_modal_awal"
+                                           class="form-control text-end fw-bold text-warning border-0 bg-transparent p-0"
+                                           value="0" min="0" step="1000" oninput="hitungCascade()">
+                                </div>
+                            </td>
                         </tr>
                         <tr class="table-success">
                             <td class="px-3 fw-bold text-dark"><i class="bi bi-graph-up-arrow text-success me-2"></i>5. Laba Bersih</td>
@@ -902,7 +630,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     </tbody>
                 </table>
                 <div class="p-3 bg-light text-muted border-top" style="font-size: 0.8rem; line-height: 1.4;">
-                    <i class="bi bi-info-circle me-1 text-primary"></i> Data otomatis diambil dari rekapitulasi harian bulan <?= date('F Y', strtotime("$tahun-$bulan-01")) ?>. Tidak dapat diubah manual.
+                    <i class="bi bi-info-circle me-1 text-primary"></i> Angka lain diambil otomatis dari rekapitulasi harian bulan <?= date('F Y', strtotime("$tahun-$bulan-01")) ?>. <strong>Modal Awal</strong> diisi manual &mdash; nilainya mengurangi Net Profit awal 100% (sebelum potong admin 3%).
                 </div>
             </div>
         </div>
@@ -1051,7 +779,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Sewa Ruko</label>
                         <div class="input-group">
-                            <select id="inv_sewa_operator" class="form-select border-2" style="max-width: 70px; border-radius: 8px 0 0 8px;" onchange="hitungInvestor()">
+                            <select id="inv_sewa_operator" class="form-select border-2" style="max-width: 70px; border-radius: 8px 0 0 8px;" onchange="hitungCascade()">
                                 <option value="minus" selected>−</option>
                                 <option value="plus">+</option>
                             </select>
@@ -1062,7 +790,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     <!-- DROPDOWN ASAL DANA TALANGAN -->
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Asal Dana Talangan</label>
-                        <select id="inv_sumber_talangan" class="form-select border-2" style="border-radius: 8px;" onchange="hitungInvestor()">
+                        <select id="inv_sumber_talangan" class="form-select border-2" style="border-radius: 8px;" onchange="hitungCascade()">
                             <option value="investor" selected>Dana Investor</option>
                             <option value="warung">Dana Warung</option>
                         </select>
@@ -1070,17 +798,13 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
 
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Pengembalian Dana Talangan</label>
-                        <input type="number" id="inv_modal" class="form-control border-2" style="border-radius: 8px;" value="0" oninput="hitungInvestor()">
+                        <input type="number" id="inv_modal" class="form-control border-2 mb-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungCascade()">
+                        <input type="text" id="inv_modal_ket" class="form-control form-control-sm border-2" style="border-radius: 8px;" placeholder="Keterangan dana talangan...">
                     </div>
 
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Kasbon Pengelola</label>
-                        <input type="number" id="inv_kasbon" class="form-control border-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungInvestor()">
-                    </div>
-
-                    <div class="col-sm-6">
-                        <label class="form-label text-muted small fw-semibold">Potongan Admin</label>
-                        <input type="number" id="inv_admin" class="form-control border-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungInvestor()">
+                        <input type="number" id="inv_kasbon" class="form-control border-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungCascade()">
                     </div>
                 </div>
 
@@ -1093,51 +817,51 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
     </div>
 
     <!-- Pengelola Form Card -->
-    <div class="col-lg-6">
-        <div class="card border-0 border-top border-4 border-success h-100">
-            <div class="card-header bg-white border-bottom py-3">
-                <span class="fw-bold text-success">
-                    <i class="bi bi-pencil-square me-2"></i>Koreksi Dividen: Sisi Pengelola
-                </span>
-            </div>
-            <div class="card-body p-4 d-flex flex-column justify-content-between">
-                <div class="row g-3 mb-3">
-                    <div class="col-sm-6">
-                        <label class="form-label text-muted small fw-semibold">Profit Pengelola</label>
-                        <input type="text" id="pgl_profit_display" class="form-control border-2 bg-light fw-bold text-success" style="border-radius: 8px;" value="Rp <?= number_format($share_pengelola ?? 0, 0, ',', '.') ?>" readonly>
-                        <!-- Raw Value untuk JS -->
-                        <input type="hidden" id="pgl_profit" value="<?= (float)($share_pengelola ?? 0) ?>">
-                    </div>
-
-                    <div class="col-sm-6">
-                        <label class="form-label text-muted small fw-semibold">Service Fee</label>
-                        <select id="pgl_admin_persen" class="form-select border-2" style="border-radius: 8px;" onchange="hitungPengelola()">
-                            <option value="7.5">7,5%</option>
-                            <option value="5">5%</option>
-                            <option value="3" selected>3%</option>
-                        </select>
-                    </div>
-
-
-                <div class="table-responsive bg-light p-3 rounded-3 border mt-auto">
-                    <table class="table table-sm table-borderless align-middle mb-0 text-center text-nowrap" style="font-size: 0.85rem;">
-                        <thead>
-                            <tr class="text-secondary border-bottom">
-                                <th class="pb-2 fw-semibold">Net Profit</th>
-                                <th class="pb-2 fw-semibold">Service Fee</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="fw-bold text-dark pt-2">
-                                <td class="pt-2"><span id="pgl_total_profit" class="text-success">Rp 0</span></td>
-                                <td class="pt-2"><span id="pgl_total_admin" class="text-dark">Rp 0</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
+   <div class="col-lg-6">
+    <div class="card border-0 border-top border-4 border-success h-100">
+        <div class="card-header bg-white border-bottom py-3">
+            <span class="fw-bold text-success">
+                <i class="bi bi-pencil-square me-2"></i>Koreksi Dividen: Sisi Pengelola
+            </span>
+        </div>
+        <div class="card-body p-4 d-flex flex-column justify-content-between">
+            <div class="row g-3 mb-3">
+                <div class="col-sm-6">
+                    <label class="form-label text-muted small fw-semibold">Profit Pengelola</label>
+                    <input type="text" id="pgl_profit_display" class="form-control border-2 bg-light fw-bold text-success" style="border-radius: 8px;" value="Rp <?= number_format($share_pengelola ?? 0, 0, ',', '.') ?>" readonly>
+                    <!-- Raw Value untuk JS -->
+                    <input type="hidden" id="pgl_profit" value="<?= (float)($share_pengelola ?? 0) ?>">
                 </div>
+
+                <div class="col-sm-6">
+                    <label class="form-label text-muted small fw-semibold">Service Fee</label>
+                    <select id="pgl_admin_persen" class="form-select border-2" style="border-radius: 8px;" onchange="hitungPengelola()">
+                        <option value="7.5">7,5%</option>
+                        <option value="5">5%</option>
+                        <option value="3" selected>3%</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive bg-light p-3 rounded-3 border mt-auto">
+                <table class="table table-sm table-borderless align-middle mb-0 text-center text-nowrap" style="font-size: 0.85rem;">
+                    <thead>
+                        <tr class="text-secondary border-bottom">
+                            <th class="pb-2 fw-semibold">Net Profit</th>
+                            <th class="pb-2 fw-semibold">Service Fee</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="fw-bold text-dark pt-2">
+                            <td class="pt-2"><span id="pgl_total_profit" class="text-success">Rp 0</span></td>
+                            <td class="pt-2"><span id="pgl_total_admin" class="text-dark">Rp 0</span></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+</div>
 </div>
 <!-- 6. Rekapan Hasil Keseluruhan Keuntungan Final -->
 <div class="card border-0 mb-5" style="overflow: hidden;">
@@ -1169,7 +893,7 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     </tr>
                     <tr>
                         <td class="px-4 fw-semibold text-dark"><?= isset($pengelola['nama_pengelola']) ? htmlspecialchars($pengelola['nama_pengelola'], ENT_QUOTES, 'UTF-8') : '-' ?></td>
-                        <td><span class="badge bg-success bg-opacity-10 text-success px-2.5 py-1.5 fw-bold" style="font-size: 0.75rem;">Pengelola Lapangan</span></td>
+                        <td><span class="badge bg-success bg-opacity-10 text-success px-2.5 py-1.5 fw-bold" style="font-size: 0.75rem;">Pengelola Cabang</span></td>
                         <td class="font-monospace text-secondary" style="font-size: 0.85rem; letter-spacing: 0.5px;"><?= isset($pengelola['no_rekening']) ? htmlspecialchars($pengelola['no_rekening'], ENT_QUOTES, 'UTF-8') : '-' ?></td>
                         <td class="fw-medium text-dark"><?= isset($pengelola['atas_nama_rekening']) ? htmlspecialchars($pengelola['atas_nama_rekening'], ENT_QUOTES, 'UTF-8') : '-' ?></td>
                         <td><span class="badge bg-light text-dark border px-2.5 py-1 fw-medium"><?= isset($pengelola['nama_bank']) ? htmlspecialchars($pengelola['nama_bank'], ENT_QUOTES, 'UTF-8') : '-' ?></span></td>
@@ -1178,9 +902,9 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     <tr class="table-light">
                         <td class="px-4 fw-semibold text-dark">Admin Management Pusat</td>
                         <td><span class="badge bg-danger bg-opacity-10 text-danger px-2.5 py-1.5 fw-bold" style="font-size: 0.75rem;">Internal Admin</span></td>
-                        <td class="font-monospace text-muted" style="font-size: 0.85rem; letter-spacing: 0.5px;">080808080</td>
-                        <td class="fw-medium text-dark">PT WARTEG BUMI BAHARI</td>
-                        <td><span class="badge bg-light text-dark border px-2.5 py-1 fw-medium">BRI</span></td>
+                        <td class="font-monospace text-muted" style="font-size: 0.85rem; letter-spacing: 0.5px;">1662598199</td>
+                        <td class="fw-medium text-dark">WARDOYO</td>
+                        <td><span class="badge bg-light text-dark border px-2.5 py-1 fw-medium">BCA</span></td>
                         <td class="text-end px-4 fw-bold text-danger">
                             <span id="final_admin" class="fs-6">Rp <?= number_format($share_admin ?? 0, 0, ',', '.') ?></span>
                         </td>
@@ -1192,401 +916,43 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
 </div>
 
 <!-- Tombol Export -->
-<?php if (isset($data_harian) && $data_harian instanceof mysqli_result && $data_harian->num_rows > 0): ?>
+<?php if (($jumlah_hari_data ?? 0) > 0): ?>
     <div class="row g-3 mt-4 mb-5">
         <div class="col-md-6">
-            <button onclick="exportExcel()" class="btn btn-success w-100 py-3 fw-semibold" style="border-radius: 10px; font-size: 1rem;">
-                <i class="bi bi-file-earmark-excel me-2"></i>Export Excel
-            </button>
+            <div class="d-flex gap-2">
+                <button onclick="exportPdfHarian('save')" class="btn btn-success flex-fill py-3 fw-semibold" style="border-radius: 10px; font-size: 1rem;">
+                    <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF Harian
+                </button>
+                <button onclick="exportPdfHarian('share')" class="btn btn-outline-success py-3 fw-semibold px-3" style="border-radius: 10px;" title="Bagikan ke WhatsApp">
+                    <i class="bi bi-whatsapp"></i>
+                </button>
+            </div>
         </div>
         <div class="col-md-6">
-            <button onclick="exportPDF()" class="btn btn-danger w-100 py-3 fw-semibold" style="border-radius: 10px; font-size: 1rem;">
-                <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF
-            </button>
+            <div class="d-flex gap-2">
+                <button onclick="exportPDF('save')" class="btn btn-danger flex-fill py-3 fw-semibold" style="border-radius: 10px; font-size: 1rem;">
+                    <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF
+                </button>
+                <button onclick="exportPDF('share')" class="btn btn-outline-danger py-3 fw-semibold px-3" style="border-radius: 10px;" title="Bagikan ke WhatsApp">
+                    <i class="bi bi-whatsapp"></i>
+                </button>
+            </div>
         </div>
     </div>
 <?php endif; ?>
 
+<?php endif; ?>
+</div>
 
 
 <!-- Library Export -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
-        <script>
-            function formatRupiah(angka) {
-                return 'Rp ' + Math.round(angka || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-            }
+        <?php include __DIR__ . '/_rekap_script_matrix.php'; ?>
 
-            document.addEventListener('DOMContentLoaded', function() {
-                const inputCabang = document.getElementById('inputCabang');
-                const idCabang = document.getElementById('idCabang');
-                const datalist = document.getElementById('listCabang');
-                const formFilter = document.getElementById('formFilter');
-                const periodeSelect = document.getElementById('periodeSelect');
-                const bulanSelect = document.getElementById('bulanSelect');
-
-                // 1. PAS KETIK / PILIH DARI DATALIST -> ISI HIDDEN
-                inputCabang.addEventListener('input', function() {
-                    let val = this.value;
-                    let options = datalist.querySelectorAll('option');
-                    let found = false;
-
-                    options.forEach(opt => {
-                        if (opt.value === val) {
-                            idCabang.value = opt.getAttribute('data-id'); // bisa "" untuk Semua Cabang
-                            found = true;
-                        }
-                    });
-
-                    if (!found && val !== '') {
-                        idCabang.value = ''; // reset kalau ketik ngaco
-                    }
-                });
-
-                // 2. PAS GANTI PERIODE -> DISABLE BULAN + AUTO SUBMIT
-                periodeSelect.addEventListener('change', function() {
-                    bulanSelect.disabled = this.value === 'tahunan';
-                    formFilter.submit(); // submit setelah bulan di disable
-                });
-
-                // 3. VALIDASI KETIKA KLIK TOMBOL "AMBIL DATA"
-                formFilter.addEventListener('submit', function(e) {
-                    let valCabang = inputCabang.value.trim();
-                    
-                    // Boleh "Semua Cabang" atau kosong
-                    if (valCabang === '' || valCabang === 'Semua Cabang') {
-                        idCabang.value = '';
-                    }
-                    
-                    // Kalau ada tulisan tapi id kosong = ketik manual ga valid
-                    if (valCabang !== '' && valCabang !== 'Semua Cabang' && idCabang.value === '') {
-                        e.preventDefault();
-                        alert('Pilih cabang dari daftar, jangan ketik manual!');
-                        inputCabang.focus();
-                    }
-                });
-            });
-
-            // =========================================================
-            // HITUNG BEBAN OPERASIONAL
-            // =========================================================
-            function hitungBO() {
-                let totalBO = 0;
-
-                document.querySelectorAll('.jumlah').forEach(function(el) {
-                    let no = el.dataset.no;
-                    let harian = parseFloat(document.querySelector('.harian[data-no="' + no + '"]')?.value) || 0;
-                    let bulanan = parseFloat(document.querySelector('.bulanan[data-no="' + no + '"]')?.value) || 0;
-                    let tahunan = parseFloat(document.querySelector('.tahunan[data-no="' + no + '"]')?.value) || 0;
-                    let dibayarkan = parseFloat(document.querySelector('.dibayarkan[data-no="' + no + '"]')?.value) || 0;
-                    let jumlah = harian + bulanan + tahunan - dibayarkan;
-                    el.innerText = formatRupiah(jumlah);
-                    totalBO += jumlah;
-                });
-
-                if (document.getElementById('total_bo')) document.getElementById('total_bo').innerText = formatRupiah(totalBO);
-                if (document.getElementById('bo_akumulasi')) document.getElementById('bo_akumulasi').innerText = formatRupiah(totalBO);
-
-                // Jalankan kalkulasi investor & pengelola
-                hitungInvestor();
-            }
-
-            // =========================================================
-            // UPDATE REKAP AKHIR (MANAGEMENT PUSAT 3% + SERVICE FEE)
-            // =========================================================
-            function updateFinalRekap(serviceFee = 0) {
-                // 1. Ambil Total Net Investor
-                let final_inv = parseFloat(document.getElementById('inv_total')?.innerText.replace(/[^0-9-]/g, '') || 0);
-
-                // 2. Ambil Total Net Pengelola
-                let final_pgl = parseFloat(document.getElementById('pgl_total_profit')?.innerText.replace(/[^0-9-]/g, '') || 0);
-
-                // 3. HITUNG MANAGEMENT PUSAT 3% DARI NET PROFIT (SESUAI TABEL POIN 5)
-                const labaBersih = parseFloat("<?= floatval($laba_bersih_dasar ?? 0) ?>") || 0;
-                const persenAdmin = parseFloat("<?= floatval($persen_admin ?? 3) ?>") || 3;
-                
-                // Komponen 1: Management Pusat 3% dari Net Profit
-                let admin3Persen = (labaBersih * persenAdmin) / 100;
-                
-                // Komponen 2: Service Fee dari Pengelola (dioper dari hitungPengelola)
-                
-                // TOTAL AKHIR ADMIN PUSAT = 3% Net Profit + Service Fee Pengelola
-                let totalAdminGabungan = admin3Persen + serviceFee;
-
-                // Render ke Tampilan
-                if (document.getElementById('final_inv')) {
-                    document.getElementById('final_inv').innerText = formatRupiah(final_inv);
-                }
-                if (document.getElementById('final_pgl')) {
-                    document.getElementById('final_pgl').innerText = formatRupiah(final_pgl);
-                }
-                if (document.getElementById('final_admin')) {
-                    // Gabungan 2 Keuntungan Admin Pusat
-                    document.getElementById('final_admin').innerText = formatRupiah(totalAdminGabungan);
-                }
-            }
-
-            // =========================================================
-            // KOREKSI DIVIDEN - INVESTOR
-            // =========================================================
-            function hitungInvestor() {
-                let profit = parseFloat(document.getElementById('inv_profit')?.value) || 0;
-                let sewa = parseFloat(document.getElementById('inv_sewa')?.value) || 0;
-                let modal = parseFloat(document.getElementById('inv_modal')?.value) || 0;
-                let kasbon = parseFloat(document.getElementById('inv_kasbon')?.value) || 0;
-                let operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
-
-                let total = profit;
-
-                if (operatorSewa === 'plus') {
-                    total += sewa;
-                } else {
-                    total -= sewa;
-                }
-
-                total += modal;
-                total += kasbon;
-                total = Math.max(0, total);
-
-                const invTotal = document.getElementById('inv_total');
-                if (invTotal) {
-                    invTotal.innerText = formatRupiah(total);
-                }
-
-                hitungPengelola();
-            }
-
-            // =========================================================
-            // KOREKSI DIVIDEN - PENGELOLA
-            // =========================================================
-            function hitungPengelola() {
-                let profit = parseFloat(document.getElementById('pgl_profit')?.value) || 0;
-                let adminPersen = parseFloat(document.getElementById('pgl_admin_persen')?.value) || 0;
-                let kasbon = parseFloat(document.getElementById('inv_kasbon')?.value) || 0;
-
-                // Service Fee yang dipotong dari Pengelola (3%, 5%, atau 7.5%)
-                let serviceFee = (profit * adminPersen) / 100;
-
-                // Net Profit Pengelola setelah dipotong Service Fee & Kasbon
-                let profitBersih = profit - serviceFee - kasbon;
-                profitBersih = Math.max(0, profitBersih);
-
-                const totalProfit = document.getElementById('pgl_total_profit');
-                if (totalProfit) {
-                    totalProfit.innerText = formatRupiah(profitBersih);
-                }
-
-                const totalAdmin = document.getElementById('pgl_total_admin');
-                if (totalAdmin) {
-                    totalAdmin.innerText = formatRupiah(serviceFee);
-                }
-
-                // Kirim Service Fee ke Rekap Akhir untuk dijumlahkan dengan Management Pusat 3%
-                updateFinalRekap(serviceFee);
-            }
-
-            // =========================================================
-            // JALANKAN SAAT HALAMAN SELESAI DIMUAT
-            // =========================================================
-            document.addEventListener('DOMContentLoaded', function() {
-                hitungBO();
-            });
-        </script>
-
-        <script>
-            // Export Excel - SESUAI STRUKTUR BARU & PERHITUNGAN PRESISI
-            async function exportExcel() {
-                const wb = XLSX.utils.book_new();
-
-                const periode = `<?= date("F Y", strtotime("$tahun-$bulan-01")) ?>`;
-                const namaCabang = `<?= h($nama_cabang ?? "WBB Cabang") ?>`;
-
-                // Data PHP biar sinkron
-                const omzet_akumulasi = <?= (float)$penjualan ?>;
-                const belanja_akumulasi = <?= (float)$belanja_akumulasi ?>;
-                const bo_akumulasi = <?= (float)$bo_akumulasi ?>;
-                const pengeluaran_akumulasi = <?= (float)$pengeluaran_akumulasi ?>;
-                const modal_awal = <?= (float)$modal_awal ?>;
-                const laba_akumulasi = <?= (float)$laba_akumulasi ?>;
-                const persen_investor = <?= (float)$persen_investor ?>;
-                const persen_pengelola = <?= (float)$persen_pengelola ?>;
-                const persen_admin = <?= (float)$persen_admin ?>;
-                const share_investor = <?= (float)$share_investor ?>;
-                const share_pengelola = <?= (float)$share_pengelola ?>;
-                const share_admin = <?= (float)$share_admin ?>;
-                const share_pengelola_bersih = <?= (float)$share_pengelola_bersih ?>;
-
-                // Fungsi kop surat biar gak nulis ulang
-                function addKop(ws, startRow = 1) {
-                    ws['A' + startRow] = { t: 's', v: 'WARTEG BUMI BAHARI' };
-                    ws['A' + (startRow + 1)] = { t: 's', v: <?= json_encode($alamat_cabang ?? "Kantor Pusat : Kecamatan Pamulang Kota Tangerang Selatan | BANTEN 15417") ?> };
-                    ws['A' + (startRow + 2)] = { t: 's', v: 'Phone : <?= h($no_hp_cabang ?? "+62 858 1111 2222") ?>' };
-                    ws['F' + startRow] = { t: 's', v: 'Cabang' };
-                    ws['G' + startRow] = { t: 's', v: ': ' + namaCabang };
-                    ws['F' + (startRow + 1)] = { t: 's', v: 'Periode' };
-                    ws['G' + (startRow + 1)] = { t: 's', v: ': ' + periode };
-                    ws['F' + (startRow + 2)] = { t: 's', v: 'Pengelola' };
-                    ws['G' + (startRow + 2)] = { t: 's', v: ': <?= h($pengelola['nama_pengelola'] ?? "-") ?>' };
-                    ws['F' + (startRow + 3)] = { t: 's', v: 'Investor' };
-                    ws['G' + (startRow + 3)] = { t: 's', v: ': <?= h($cabang_info['investor'] ?? "-") ?>' };
-                    ws['!cols'] = [{wch: 35},{wch: 18},{wch: 18},{wch: 22},{wch: 15},{wch: 12},{wch: 32}];
-                    return startRow + 5;
-                }
-
-                // SHEET 1 - 7 SAMA SEPERTI KODE KAMU
-                // ... copy semua sheet 1-7 dari kode kamu ...
-                // DEMI RINGKAS SAYA SKIP, TETAP PAKAI PUNYA KAMU
-
-                // EXPORT
-                XLSX.writeFile(wb, `<?= h($nama_file_export) ?>_MultiSheet.xlsx`);
-            }
-
-            async function exportPDF() {
-                const { jsPDF } = window.jspdf;
-                let doc = new jsPDF('landscape', 'mm', 'a4');
-
-                const margin = 14;
-                const baseTableStyles = {
-                    theme: 'grid',
-                    styles: { fontSize: 8, cellPadding: 2 },
-                    headStyles: { fillColor: [52, 58, 64], textColor: 255, halign: 'center' }
-                };
-
-                function parseAngka(val) {
-                    return parseFloat(String(val || 0).replace(/[^0-9,.-]+/g, "").replace(/\./g, "").replace(",", ".")) || 0;
-                }
-
-                function formatRupiahPDF(angka) {
-                    return 'Rp ' + Math.round(angka || 0).toLocaleString('id-ID');
-                }
-
-                const omzet_akumulasi = <?= (float)$penjualan ?>;
-                const belanja_akumulasi = <?= (float)$belanja_akumulasi ?>;
-                const bo_akumulasi = <?= (float)$bo_akumulasi ?>;
-                const pengeluaran_akumulasi = <?= (float)$pengeluaran_akumulasi ?>;
-                const modal_awal = <?= (float)$modal_awal ?>;
-                const laba_akumulasi = <?= (float)$laba_akumulasi ?>;
-
-                const addWatermark = (pdfDoc) => {
-                    let imgLogo = document.getElementById('logoWWB');
-                    if (imgLogo) {
-                        try {
-                            const pageWidth = 297; const pageHeight = 210; const wmSize = 80;
-                            const wmX = (pageWidth - wmSize) / 2; const wmY = (pageHeight - wmSize) / 2;
-                            pdfDoc.saveGraphicsState();
-                            pdfDoc.setGState(new pdfDoc.GState({ opacity: 0.08 }));
-                            pdfDoc.addImage(imgLogo, 'PNG', wmX, wmY, wmSize, wmSize);
-                            pdfDoc.restoreGraphicsState();
-                        } catch (err) { console.warn("Gagal memuat watermark:", err); }
-                    }
-                };
-
-                // HALAMAN 1
-                addWatermark(doc);
-                let startYContent = 12; let textXPosition = margin;
-                let imgLogo = document.getElementById('logoWWB'); let logoHeight = 16; let logoWidth = 16;
-                if (imgLogo) { try { let ratio = (imgLogo.naturalWidth||1)/(imgLogo.naturalHeight||1); logoWidth = logoHeight * ratio; doc.addImage(imgLogo, 'PNG', margin, startYContent, logoWidth, logoHeight); textXPosition = margin + logoWidth + 5; } catch (e) { textXPosition = margin; } }
-                let textYStart = imgLogo ? startYContent + 4.5 : startYContent;
-                doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(40, 40, 40); doc.text('WARTEG BUMI BAHARI', textXPosition, textYStart);
-                doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 100, 100);
-                doc.text(<?= json_encode($alamat_cabang ?? "Kantor Pusat : Kecamatan Pamulang Kota Tangerang Selatan | BANTEN 15417") ?>, textXPosition, textYStart + 5);
-                doc.text('Phone : <?= h($no_hp_cabang ?? "+62 858 1111 2222") ?>', textXPosition, textYStart + 9);
-                let infoData = [
-                    ['Cabang', ': <?= h($nama_cabang ?? "WBB Cabang") ?>'],
-                    ['Periode', ': <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>'],
-                    ['Pengelola', ': <?= h($pengelola['nama_pengelola'] ?? "-") ?>'],
-                    ['Investor', ': <?= h($cabang_info['investor'] ?? "-") ?>']
-                ];
-                doc.autoTable({ body: infoData, startY: imgLogo ? startYContent + 1.5 : startYContent - 3, theme: 'plain', styles: { fontSize: 8.5, cellPadding: 0.3, fontStyle: 'bold', textColor: [40, 40, 40] }, columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 80 } }, margin: { left: 190 } });
-                let yLine = startYContent + 20; doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.4); doc.line(margin, yLine, 283, yLine);
-                let yTabelHarian = yLine + 7; doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
-                doc.text('1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>', margin, yTabelHarian);
-                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 7, cellPadding: 1.2 } });
-
-                // HALAMAN 2
-                doc.addPage(); addWatermark(doc); let y = 15;
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('2. Rincian Beban Operasional', margin, y);
-                let t2 = document.querySelector('.table-clean-input'); let elTabel2 = t2?.tagName === 'TABLE' ? t2 : t2?.querySelector('table');
-                if (elTabel2) { doc.autoTable({ html: elTabel2, startY: y + 5, ...baseTableStyles }); y = doc.lastAutoTable.finalY + 12; } else { y += 15; }
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('3. Matriks Akumulasi', margin, y);
-                let dataMatriks = [
-                    ['Omzet Penjualan', formatRupiahPDF(omzet_akumulasi), 'Pendapatan bruto masuk'],
-                    ['Pengeluaran Belanja', formatRupiahPDF(belanja_akumulasi), 'Total belanja 1 bulan'],
-                    ['Beban Operasional', formatRupiahPDF(bo_akumulasi), 'Total BO 1 bulan'],
-                    ['Total Pengeluaran', formatRupiahPDF(pengeluaran_akumulasi), 'Belanja + BO'],
-                    ['Modal Awal', formatRupiahPDF(modal_awal), 'Penyesuaian kas awal'],
-                    ['Total Laba Bersih', formatRupiahPDF(laba_akumulasi), 'Omzet - Total Pengeluaran'],
-                ];
-                doc.autoTable({ head: [['Komponen Pokok', 'Jumlah', 'Catatan Ringkas']], body: dataMatriks, startY: y + 5, ...baseTableStyles });
-
-                // HALAMAN 3 - FIX
-                doc.addPage(); addWatermark(doc); y = 15;
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('4. Koreksi Dividen: Sisi Investor', margin, y);
-
-                const inv_profit = parseFloat(document.getElementById('inv_profit')?.value || <?= (float)$share_investor ?>);
-                const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($bo_db['sewa'] ?? 0) ?>);
-                const inv_modal = parseFloat(document.getElementById('inv_modal')?.value || 0);
-                const inv_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
-                const inv_admin = parseFloat(document.getElementById('inv_admin')?.value || 0);
-                const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
-
-                let inv_total_val = inv_profit;
-                if (operatorSewa === 'plus') inv_total_val += inv_sewa; else inv_total_val -= inv_sewa;
-                inv_total_val += inv_modal + inv_kasbon - inv_admin;
-                inv_total_val = Math.max(0, inv_total_val);
-
-                let dataInvestor = [
-                    ['Profit Investor (50%)', formatRupiahPDF(inv_profit)],
-                    ['Potongan Sewa Ruko ' + (operatorSewa === 'plus' ? '(+)' : '(-)'), formatRupiahPDF(inv_sewa)],
-                    ['Pengembalian Dana Talangan / Modal', formatRupiahPDF(inv_modal)],
-                    ['Penambahan/Pengembalian Kasbon Pengelola', formatRupiahPDF(inv_kasbon)],
-                    ['Potongan Admin', formatRupiahPDF(inv_admin)],
-                    ['TOTAL BERSIH INVESTOR', formatRupiahPDF(inv_total_val)],
-                ];
-                doc.autoTable({ head: [['Keterangan Komponen', 'Nilai']], body: dataInvestor, startY: y + 5, ...baseTableStyles });
-                y = doc.lastAutoTable.finalY + 12;
-
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('5. Koreksi Dividen: Sisi Pengelola', margin, y);
-
-                const pgl_profit = parseFloat(document.getElementById('pgl_profit')?.value || <?= (float)$share_pengelola ?>);
-                const elSelectFee = document.getElementById('pgl_admin_persen');
-                const pct_admin = parseFloat(elSelectFee?.value || <?= (float)($persen_admin ?? 3) ?>);
-                const pgl_service_fee = (pgl_profit * pct_admin) / 100;
-                const pgl_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
-                const pct_bersih = 50 - pct_admin; // FIX: ini yang tadinya undefined
-                const pgl_total_val = Math.max(0, pgl_profit - pgl_service_fee - pgl_kasbon);
-
-                const str_pct_admin = pct_admin.toString().replace('.', ',');
-                const str_pct_bersih = pct_bersih.toString().replace('.', ',');
-
-                let dataPengelola = [
-                    ['Profit Pengelola (50%)', formatRupiahPDF(pgl_profit)],
-                    [`Service Fee / Admin (${str_pct_admin}%)`, formatRupiahPDF(pgl_service_fee)], // FIX: pgl_service_fee
-                    ['Potongan Kasbon', formatRupiahPDF(pgl_kasbon)],
-                    [`TOTAL BERSIH PENGELOLA (${str_pct_bersih}%)`, formatRupiahPDF(pgl_total_val)]
-                ];  
-                doc.autoTable({ head: [['Keterangan Komponen', 'Nilai']], body: dataPengelola, startY: y + 5, ...baseTableStyles });
-                y = doc.lastAutoTable.finalY + 12;
-
-                // UPDATE FINAL DULU BARU AMBIL TABLE
-                if (document.getElementById('final_inv')) document.getElementById('final_inv').innerText = formatRupiahPDF(inv_total_val);
-                if (document.getElementById('final_pgl')) document.getElementById('final_pgl').innerText = formatRupiahPDF(pgl_total_val);
-                const labaBersih = parseFloat("<?= floatval($laba_bersih_dasar ?? 0) ?>") || 0;
-                const persenAdmin = parseFloat("<?= floatval($persen_admin ?? 3) ?>") || 3;
-                const admin3Persen = (labaBersih * persenAdmin) / 100;
-                const totalAdminGabungan = admin3Persen + pgl_service_fee;
-                if (document.getElementById('final_admin')) document.getElementById('final_admin').innerText = formatRupiahPDF(totalAdminGabungan);
-
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('6. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)', margin, y);
-                let wrapperPayroll = document.querySelector('.card.border-0.mb-5'); 
-                let elTabel6 = wrapperPayroll?.querySelector('table');
-                if (elTabel6) {
-                    doc.autoTable({ html: elTabel6, startY: y + 5, ...baseTableStyles, columnStyles: { 5: { halign: 'right' } } });
-                }
-                doc.save("<?= h($nama_file_export) ?>.pdf");
-            }
-        </script>
+        <?php if (!empty($id_cabang) && ($jumlah_hari_data ?? 0) > 0): ?>
+        <?php include __DIR__ . '/_rekap_script_export.php'; ?>
+        <?php endif; ?>

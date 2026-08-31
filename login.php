@@ -1,38 +1,108 @@
 <?php
 require 'config/koneksi.php';
 
+// Kalau sudah login, jangan tampilkan form lagi.
+if (!empty($_SESSION['user_id'])) {
+    header('Location: ' . role_home($_SESSION['role'] ?? ''));
+    exit;
+}
+
 $error = '';
-if(isset($_POST['login'])){
-    if(!csrf_check($_POST['csrf']?? '')){ 
+
+if (isset($_POST['login'])) {
+
+    if (!csrf_check($_POST['csrf'] ?? '')) {
         $error = "Sesi tidak valid. Silakan refresh halaman.";
     } else {
-        $username = $_POST['username'];
-        $password = $_POST['password'];
-        
-        // 1. PAKAI PREPARED STATEMENT
-        $stmt = $conn->prepare("SELECT * FROM users WHERE username=? LIMIT 1");
+        $username = trim((string) ($_POST['username'] ?? ''));
+        $password = (string) ($_POST['password'] ?? '');
+
+        $LOCK_AFTER   = 5;    // gagal berturut-turut sebelum dikunci
+        $LOCK_MINUTES = 15;   // lama kunci
+
+        $stmt = $conn->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
         $stmt->bind_param("s", $username);
         $stmt->execute();
-        $result = $stmt->get_result();
-        $user = $result->fetch_assoc();
-        
-        if($user && password_verify($password, $user['password'])){
-            // 2. ANTI SESSION FIXATION
-            session_regenerate_id(true);
-            
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['id_cabang'] = $user['id_cabang'];
-            $_SESSION['nama_pengelola'] = $user['nama_pengelola'];
-            
-            if($user['role'] == 'pusat'){
-                header("Location: admin_pusat/index"); // TANPA .PHP
-            } else {
-                header("Location: admin_cabang/input_data"); // TANPA .PHP
+        $user = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        $uid = is_array($user) ? (int) $user['id'] : null;
+
+        // --- 1. Akun sedang terkunci? ---
+        $terkunci = false;
+        if ($user && !empty($user['lock_until'])) {
+            $sisa = strtotime($user['lock_until']) - time();
+            if ($sisa > 0) {
+                $terkunci = true;
+                $error = "Akun terkunci sementara. Coba lagi dalam " . ceil($sisa / 60) . " menit.";
+                audit($conn, 'login_ditolak_terkunci', 'users', $uid, ['username' => $username]);
             }
-            exit;
-        } else {
-            $error = "Username atau password salah!";
+        }
+
+        if (!$terkunci) {
+            $cocok = $user && password_verify($password, $user['password']);
+
+            if ($cocok && strtolower(str_replace('-', '', $user['status'] ?? 'aktif')) !== 'aktif') {
+                $error = "Akun Anda telah dinonaktifkan. Silakan hubungi Administrator!";
+                audit($conn, 'login_ditolak_nonaktif', 'users', $uid, ['username' => $username]);
+
+            } elseif ($cocok) {
+                // ================= LOGIN SUKSES (password) =================
+                if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
+                    $newHash = password_hash($password, PASSWORD_DEFAULT);
+                    $r = $conn->prepare("UPDATE users SET password = ?, password_changed_at = NOW() WHERE id = ?");
+                    $r->bind_param("si", $newHash, $uid);
+                    $r->execute();
+                    $r->close();
+                }
+
+                $ip = client_ip();
+                $r = $conn->prepare("UPDATE users SET login_attempts = 0, lock_until = NULL, last_login_at = NOW(), last_login_ip = ? WHERE id = ?");
+                $r->bind_param("si", $ip, $uid);
+                $r->execute();
+                $r->close();
+
+                // Akun pusat dengan 2FA aktif: password saja belum cukup, minta kode dulu.
+                if ($user['role'] === 'pusat' && !empty($user['totp_enabled'])) {
+                    session_regenerate_id(true);
+                    $_SESSION['pending_2fa_uid']   = $uid;
+                    $_SESSION['pending_2fa_at']    = time();
+                    $_SESSION['pending_2fa_tries'] = 0;
+                    audit($conn, 'login_2fa_menunggu', 'users', $uid, ['username' => $user['username']]);
+                    header('Location: verify_2fa');
+                    exit;
+                }
+
+                // Anti session fixation + tuntaskan sesi.
+                finalize_login($conn, $user);
+
+                header('Location: ' . role_home($user['role']));
+                exit;
+
+            } else {
+                // ================= LOGIN GAGAL =================
+                if ($user) {
+                    $attempts = (int) $user['login_attempts'] + 1;
+                    if ($attempts >= $LOCK_AFTER) {
+                        $lock = date('Y-m-d H:i:s', time() + $LOCK_MINUTES * 60);
+                        $r = $conn->prepare("UPDATE users SET login_attempts = ?, lock_until = ? WHERE id = ?");
+                        $r->bind_param("isi", $attempts, $lock, $uid);
+                        $r->execute();
+                        $r->close();
+                        $error = "Terlalu banyak percobaan gagal. Akun dikunci {$LOCK_MINUTES} menit.";
+                    } else {
+                        $r = $conn->prepare("UPDATE users SET login_attempts = ? WHERE id = ?");
+                        $r->bind_param("ii", $attempts, $uid);
+                        $r->execute();
+                        $r->close();
+                        $error = "Username atau password salah!";
+                    }
+                } else {
+                    $error = "Username atau password salah!";
+                }
+                audit($conn, 'login_gagal', 'users', $uid, ['username' => $username]);
+                usleep(700000); // ~0,7 dtk — perlambat serangan brute force
+            }
         }
     }
 }
@@ -121,7 +191,7 @@ if(isset($_POST['login'])){
 
         .input-group-custom .form-control {
             padding-left: 42px;
-            padding-right: 42px; /* BARU: kasih ruang buat icon mata */
+            padding-right: 42px;
             height: 48px;
             border-radius: 10px;
             border: 1px solid #cbd5e1;
@@ -220,12 +290,12 @@ if(isset($_POST['login'])){
             <?php if($error):?>
                 <div class="alert alert-custom d-flex align-items-center mb-4" role="alert">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <div><?= h($error)?></div> <!-- XSS -->
+                    <div><?= h($error)?></div>
                 </div>
             <?php endif;?>
             
             <form method="POST" autocomplete="off">
-                <input type="hidden" name="csrf" value="<?=csrf_token()?>"> <!-- CSRF -->
+                <input type="hidden" name="csrf" value="<?=csrf_token()?>">
                 <div class="mb-3">
                     <label class="form-label">Username</label>
                     <div class="input-group-custom">

@@ -232,13 +232,13 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
     <div class="sidebar-menu flex-grow-1">
         <nav class="nav flex-column">
             <a class="nav-link-custom <?=($current_page=='input_data')?'active':''?>" href="input_data">
-                <i class="bi bi-clipboard-plus fs-5"></i> 
-                <span>Input Data Harian</span>
+                <i class="bi bi-camera fs-5"></i>
+                <span>Kirim Nota Harian</span>
             </a>
-            
+
             <a class="nav-link-custom <?=($current_page=='riwayat')?'active':''?>" href="riwayat">
-                <i class="bi bi-clock-history fs-5"></i> 
-                <span>Riwayat Data</span>
+                <i class="bi bi-clock-history fs-5"></i>
+                <span>Riwayat Laporan</span>
             </a>
 
             <a class="nav-link-custom nav-link-logout" href="../logout">

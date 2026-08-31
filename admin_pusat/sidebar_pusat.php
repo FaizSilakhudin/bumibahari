@@ -166,6 +166,11 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
             </a>
         </li>
         <li class="nav-item">
+            <a class="nav-link <?=($current_page=='data_user')?'active':''?>" href="data_user"> <!-- 2. TANPA .PHP -->
+                <i class="bi bi-buildings-fill"></i> Data User
+            </a>
+        </li>
+        <li class="nav-item">
             <a class="nav-link <?=($current_page=='data_cabang')?'active':''?>" href="data_cabang"> <!-- 2. TANPA .PHP -->
                 <i class="bi bi-buildings-fill"></i> Data Cabang
             </a>
@@ -182,13 +187,37 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
         </li>
         <div class="nav-section">Laporan</div>
         <li class="nav-item">
-            <a class="nav-link <?=($current_page=='laporan')?'active':''?>" href="laporan"> <!-- 5. TANPA .PHP -->
+            <a class="nav-link <?=($current_page=='laporan')?'active':''?>" href="laporan">
                 <i class="bi bi-file-earmark-text-fill"></i> Laporan Harian
             </a>
         </li>
+
         <li class="nav-item">
-            <a class="nav-link <?=($current_page=='rekapitulasi')?'active':''?>" href="rekapitulasi"> <!-- 6. TANPA .PHP -->
+            <a class="nav-link <?=($current_page=='laporan_mingguan')?'active':''?>" href="laporan_mingguan">
+                <i class="bi bi-calendar-week-fill"></i> Laporan Mingguan
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link <?=($current_page=='rekapitulasi')?'active':''?>" href="rekapitulasi">
                 <i class="bi bi-graph-up-arrow"></i> Rekapitulasi
+            </a>
+        </li>
+
+        <div class="nav-section">Sistem</div>
+        <li class="nav-item">
+            <a class="nav-link <?=($current_page=='audit_log')?'active':''?>" href="audit_log">
+                <i class="bi bi-shield-lock-fill"></i> Log Aktivitas
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?=($current_page=='arsip_laporan')?'active':''?>" href="arsip_laporan">
+                <i class="bi bi-archive-fill"></i> Arsip Laporan Terhapus
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?=($current_page=='keamanan_2fa')?'active':''?>" href="keamanan_2fa">
+                <i class="bi bi-shield-lock-fill"></i> Keamanan (2FA)
             </a>
         </li>
     </ul>

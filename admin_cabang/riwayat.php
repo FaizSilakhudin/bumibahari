@@ -12,7 +12,7 @@ if(!isset($_SESSION['role']) || $_SESSION['role'] != 'cabang'){
 }
 
 $id_cabang = $_SESSION['id_cabang'];
-$nama_pengelola = $_SESSION['nama_pengelola'];
+$nama_pengelola = $_SESSION['nama_pengelola'] ?? '';
 
 // 1. LOGIKA PER BULAN
 $bulan = $_GET['bulan'] ?? date('m');
@@ -31,23 +31,38 @@ $next_bulan = date('m', $next_time);
 $next_tahun = date('Y', $next_time);
 
 // 2. AMBIL DATA LAPORAN 1 BULAN
-$stmt = $conn->prepare("SELECT 
+$stmt = $conn->prepare("SELECT
                         tanggal,
+                        status_laporan,
                         pencairan_qris,
-                        total_pengeluaran,
+
+                        /* TOTAL OMZET */
+                        total_omset,
+
+                        /* TOTAL BELANJA RUTIN */
+                        total_rutin,
+
+                        /* TOTAL OPERASIONAL */
                         total_operasional,
+
+                        /* TOTAL PENGELUARAN */
+                        total_pengeluaran,
+
+                        /* SISA UANG */
                         sisa_tunai,
                         sisa_qris,
-                        -- Hitung ulang Total Omset
-                        ((tunai + qris + grab_food + go_food) - pencairan_qris) AS total_omset,
-                        -- Hitung ulang Net Profit agar selalu sinkron
-                        (sisa_tunai + sisa_qris + go_food + grab_food) AS net_profit,
-                        -- Hitung ulang Margin
-                        IF(((tunai + qris + grab_food + go_food) - pencairan_qris) > 0, 
-                            ((sisa_tunai + sisa_qris + go_food + grab_food) / ((tunai + qris + grab_food + go_food) - pencairan_qris)) * 100, 
-                            0
-                        ) AS persentase,
-                        foto_nota1, foto_nota2, foto_nota3, foto_nota4
+
+                        /* NET PROFIT */
+                        net_profit,
+
+                        /* PERSENTASE */
+                        persentase,
+
+                        foto_nota1,
+                        foto_nota2,
+                        foto_nota3,
+                        foto_nota4
+
                         FROM laporan_cabang
                         WHERE id_cabang=?
                         AND tanggal BETWEEN ? AND ?
@@ -176,7 +191,7 @@ $no = 1;
     <!-- Header Banner -->
     <div class="header-banner d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
-            <h4 class="mb-1 fw-bold"><i class="bi bi-clock-history me-2"></i> Riwayat Input Data</h4>
+            <h4 class="mb-1 fw-bold"><i class="bi bi-clock-history me-2"></i> Riwayat Laporan Harian</h4>
             <p class="mb-0 opacity-90"><i class="bi bi-shop me-1"></i> <strong><?= h($cabang) ?></strong> <span class="d-none d-sm-inline">&nbsp;|&nbsp;</span><br class="d-block d-sm-none"> Pengelola: <?= h($nama_pengelola) ?></p>
         </div>
         <div class="bg-white bg-opacity-20 rounded-pill px-3 py-1 px-sm-4 py-sm-2 text-white border-white border-opacity-25">
@@ -209,11 +224,13 @@ $no = 1;
                     <thead>
                         <tr>
                             <th class="ps-4" style="width: 70px;">No</th>
-                            <th>Tanggal</th>
+                            <th>Tanggal Laporan</th>
+                            <th>Status</th>
                             <th>Omzet</th>
                             <th>Pencairan QRIS</th>
-                            <th>Pengeluaran</th>
+                            <th>Belanja Rutin</th>
                             <th>Operasional</th>
+                            <th>Total Pengeluaran</th>
                             <th>Sisa Tunai</th>
                             <th>Sisa QRIS</th>
                             <th>Net Profit</th>
@@ -224,16 +241,28 @@ $no = 1;
                     <tbody>
                     <?php if($data->num_rows == 0): ?>
                         <tr>
-                            <td colspan="11" class="text-center py-5 text-muted">
+                            <td colspan="13" class="text-center py-5 text-muted">
                                 <i class="bi bi-folder-x fs-1 d-block mb-2 text-success opacity-50"></i>
                                 Belum ada data pada bulan <?= date('F Y', strtotime($tgl_awal)) ?>
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php while($row=$data->fetch_assoc()): ?>
+                        <?php while($row=$data->fetch_assoc()):
+                            $lengkap = ($row['status_laporan'] ?? 'lengkap') === 'lengkap';
+                        ?>
                         <tr>
                             <td class="ps-4 fw-semibold text-muted"><?= $no++ ?></td>
                             <td class="fw-bold text-secondary"><?= date("d M Y", strtotime($row['tanggal'])) ?></td>
+                            <td>
+                                <?php if ($lengkap): ?>
+                                    <span class="badge badge-modern bg-success-subtle text-success border-success-subtle"><i class="bi bi-check-circle-fill me-1"></i>Selesai</span>
+                                <?php else: ?>
+                                    <span class="badge badge-modern bg-warning-subtle text-warning border-warning-subtle"><i class="bi bi-hourglass-split me-1"></i>Menunggu PIC</span>
+                                <?php endif; ?>
+                            </td>
+                            <?php if (!$lengkap): ?>
+                                <td colspan="9" class="text-muted small fst-italic">Laporan keuangan belum diinput PIC</td>
+                            <?php else: ?>
                             <td>
                                 <span class="text-success fw-bold">
                                     Rp <?= number_format($row['total_omset'], 0, ',', '.') ?>
@@ -245,12 +274,19 @@ $no = 1;
                                 Rp <?= number_format($row['pencairan_qris'] ?? 0, 0, ',', '.') ?>
                             </td>
 
-                            <td class="text-muted">
-                                Rp <?= number_format($row['total_pengeluaran'], 0, ',', '.') ?>
+                            <!-- BELANJA RUTIN -->
+                            <td class="fw-semibold text-danger">
+                                Rp <?= number_format($row['total_rutin'] ?? 0, 0, ',', '.') ?>
                             </td>
 
+                            <!-- OPERASIONAL -->
                             <td class="fw-semibold text-primary">
-                                Rp <?= number_format($row['total_operasional'], 0, ',', '.') ?>
+                                Rp <?= number_format($row['total_operasional'] ?? 0, 0, ',', '.') ?>
+                            </td>
+
+                            <!-- TOTAL PENGELUARAN -->
+                            <td class="fw-semibold text-dark">
+                                Rp <?= number_format($row['total_pengeluaran'] ?? 0, 0, ',', '.') ?>
                             </td>
 
                             <!-- SISA TUNAI -->
@@ -273,6 +309,7 @@ $no = 1;
                                     <i class="bi bi-graph-up-arrow me-1"></i> <?= number_format($row['persentase'],2) ?>%
                                 </span>
                             </td>
+                            <?php endif; ?>
                             <td class="text-center pe-4">
                                 <div class="d-flex justify-content-center gap-1">
                                     <?php 
@@ -281,8 +318,11 @@ $no = 1;
                                         if(!empty($row["foto_nota$i"])):
                                             $has_nota = true;
                                     ?>
-                                            <a href="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" target="_blank" class="btn btn-sm btn-outline-success rounded-circle" style="width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center;" title="Nota <?= $i ?>">
+                                            <a href="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" target="_blank" class="btn btn-sm btn-outline-success rounded-circle" style="width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center;" title="Lihat Nota <?= $i ?>">
                                                 <i class="bi bi-file-earmark-image" style="font-size: 0.85rem;"></i>
+                                            </a>
+                                            <a href="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" download class="btn btn-sm btn-outline-secondary rounded-circle" style="width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center;" title="Unduh Nota <?= $i ?>">
+                                                <i class="bi bi-download" style="font-size: 0.85rem;"></i>
                                             </a>
                                     <?php 
                                         endif; 
