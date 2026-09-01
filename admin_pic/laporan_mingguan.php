@@ -80,6 +80,26 @@ if ($id_cabang) {
     $nama_pic = $stmt->get_result()->fetch_assoc()['pic'] ?? null;
     $nama_pic = $nama_pic ?: '-';
     $stmt->close();
+
+    // Belum ada laporan yang difinalisasi periode ini (mis. laporan sedang berjalan) —
+    // fallback ke PIC yang DITUGASKAN (tabel pengelola) supaya kolom ini tidak
+    // kosong percuma padahal cabangnya sudah punya PIC.
+    if ($nama_pic === '-') {
+        $stmt2 = $conn->prepare("
+            SELECT u.username FROM pengelola p
+            JOIN users u ON u.id = p.id_user AND u.role = 'pic'
+            WHERE p.id_cabang = ? AND p.tgl_mulai <= ? AND (p.tgl_selesai IS NULL OR p.tgl_selesai >= ?)
+            ORDER BY p.tgl_mulai DESC LIMIT 1
+        ");
+        $anchor_pic = anchor_periode($tgl_selesai);
+        $stmt2->bind_param('iss', $id_cabang, $anchor_pic, $anchor_pic);
+        $stmt2->execute();
+        $ditugaskan = $stmt2->get_result()->fetch_assoc()['username'] ?? null;
+        $stmt2->close();
+        if ($ditugaskan) {
+            $nama_pic = $ditugaskan . ' (ditugaskan)';
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -330,7 +350,6 @@ function lm_rp($n): string
         </div>
 
         <div class="lm-doc-title">LAPORAN MINGGUAN &mdash; SETOR TUNAI &amp; SEWA TEMPAT</div>
-        <div class="lm-doc-sub">Cabang <?= h($nama_cabang) ?></div>
 
         <div class="lm-meta">
             <div><span class="k">Cabang</span><span class="v">: <?= h($nama_cabang) ?></span></div>

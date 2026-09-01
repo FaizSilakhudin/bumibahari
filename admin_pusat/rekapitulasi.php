@@ -225,6 +225,24 @@ if ($id_cabang != '') {
     $stmt->execute();
     $nama_pic = $stmt->get_result()->fetch_assoc()['pic'] ?? null;
     $nama_pic = $nama_pic ?: '-';
+
+    // Belum ada laporan yang difinalisasi bulan ini — fallback ke PIC yang
+    // DITUGASKAN (tabel pengelola) supaya kolom ini tidak kosong percuma.
+    if ($nama_pic === '-') {
+        $stmt2 = $conn->prepare("
+            SELECT u.username FROM pengelola p
+            JOIN users u ON u.id = p.id_user AND u.role = 'pic'
+            WHERE p.id_cabang = ? AND p.tgl_mulai <= ? AND (p.tgl_selesai IS NULL OR p.tgl_selesai >= ?)
+            ORDER BY p.tgl_mulai DESC LIMIT 1
+        ");
+        $stmt2->bind_param('iss', $id_cabang, $periode_anchor, $periode_anchor);
+        $stmt2->execute();
+        $ditugaskan = $stmt2->get_result()->fetch_assoc()['username'] ?? null;
+        $stmt2->close();
+        if ($ditugaskan) {
+            $nama_pic = $ditugaskan . ' (ditugaskan)';
+        }
+    }
 }
 
 // Format nama file export
@@ -768,8 +786,8 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     <i class="bi bi-pencil-square me-2"></i>Koreksi Dividen: Sisi Investor
                 </span>
             </div>
-            <div class="card-body p-4">
-                <div class="row g-3">
+            <div class="card-body p-4 d-flex flex-column justify-content-between">
+                <div class="row g-3 mb-3">
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Profit Investor</label>
                         <div class="form-control border-2 bg-light d-flex align-items-center" style="border-radius: 8px; height: 38px;">
@@ -790,7 +808,6 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                         </div>
                     </div>
 
-                    <!-- DROPDOWN ASAL DANA TALANGAN -->
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Asal Dana Talangan</label>
                         <select id="inv_sumber_talangan" class="form-select border-2" style="border-radius: 8px;" onchange="hitungCascade()">
@@ -801,17 +818,21 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
 
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Pengembalian Dana Talangan</label>
-                        <input type="number" id="inv_modal" class="form-control border-2 mb-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungCascade()">
-                        <input type="text" id="inv_modal_ket" class="form-control form-control-sm border-2" style="border-radius: 8px;" placeholder="Keterangan dana talangan...">
+                        <input type="number" id="inv_modal" class="form-control border-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungCascade()">
                     </div>
 
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Kasbon Pengelola</label>
                         <input type="number" id="inv_kasbon" class="form-control border-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungCascade()">
                     </div>
+
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small fw-semibold">Keterangan Dana Talangan</label>
+                        <input type="text" id="inv_modal_ket" class="form-control border-2" style="border-radius: 8px;" placeholder="Opsional...">
+                    </div>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 p-3 rounded-3 mt-4 border border-primary border-opacity-10">
+                <div class="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 p-3 rounded-3 mt-auto border border-primary border-opacity-10">
                     <span class="fw-bold text-primary small">TOTAL BERSIH INVESTOR:</span>
                     <h4 class="fw-bold text-primary mb-0" id="inv_total">Rp 0</h4>
                 </div>

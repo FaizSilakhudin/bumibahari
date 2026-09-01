@@ -145,15 +145,47 @@ if (!empty($cabang_ids)) {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <style>
-    :root { --inv-primary: #7e22ce; --inv-primary-2: #a855f7; --inv-glow: rgba(126,34,206,.08); }
+    :root { --inv-primary: #7e22ce; --inv-primary-2: #a855f7; --inv-glow: rgba(126,34,206,.08); --inv-gold: #d4af37; }
     body { background-color: #faf7ff !important; font-family: 'Plus Jakarta Sans', sans-serif !important; color: #1e1b2e; }
+
+    .inv-hero {
+        position: relative; overflow: hidden; border-radius: 24px; padding: 32px 30px;
+        background: linear-gradient(135deg, #4a1d5c 0%, #2e0f3a 100%);
+        box-shadow: 0 20px 40px -12px rgba(74,29,92,.45);
+        color: #fff;
+    }
+    .inv-hero::before {
+        content: ""; position: absolute; top: -60px; right: -60px; width: 260px; height: 260px;
+        border-radius: 50%; background: radial-gradient(circle, rgba(212,175,55,.18) 0%, rgba(212,175,55,0) 70%);
+    }
+    .inv-hero::after {
+        content: ""; position: absolute; bottom: -80px; left: -40px; width: 220px; height: 220px;
+        border-radius: 50%; background: radial-gradient(circle, rgba(168,85,247,.18) 0%, rgba(168,85,247,0) 70%);
+    }
+    .inv-hero-avatar {
+        width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
+        background: linear-gradient(135deg, var(--inv-gold) 0%, #b8860b 100%);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 800; font-size: 22px; color: #2e0f3a;
+        box-shadow: 0 8px 20px rgba(212,175,55,.35);
+    }
+    .inv-hero-badge {
+        display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+        letter-spacing: 1px; text-transform: uppercase; color: #e9d5ff;
+        background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+        padding: 5px 12px; border-radius: 20px;
+    }
+    .inv-hero-since {
+        font-size: 12px; color: rgba(255,255,255,.65); font-weight: 500; margin-top: 6px;
+    }
 
     .saas-card { background: #fff; border: 1px solid #f3e8ff !important; border-radius: 18px !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / .02), 0 10px 15px -3px rgb(0 0 0 / .01) !important; padding: 24px; transition: all .25s ease; }
     .saas-card:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / .05) !important; }
 
     .kpi-premium-card { background: #fff; border: 1px solid #f3e8ff; border-radius: 18px; padding: 22px; position: relative; overflow: hidden; min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 6px -1px rgb(0 0 0 / .02); transition: all .25s ease; }
-    .kpi-premium-card:hover { transform: translateY(-2px); box-shadow: 0 12px 20px -8px rgba(126,34,206,.1); }
-    .kpi-badge-icon { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 19px; background: var(--badge-bg); color: var(--badge-color); }
+    .kpi-premium-card:hover { transform: translateY(-4px); box-shadow: 0 16px 28px -10px rgba(126,34,206,.15); }
+    .kpi-badge-icon { width: 46px; height: 46px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; background: var(--badge-bg); color: #fff; box-shadow: 0 6px 14px var(--badge-shadow, rgba(0,0,0,.12)); }
+    .rank-avatar { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--inv-primary) 0%, var(--inv-primary-2) 100%); flex-shrink: 0; }
     .kpi-meta { font-size: 11px; font-weight: 700; color: #8b7aa0; text-transform: uppercase; letter-spacing: 1px; }
     .kpi-value { font-size: 22px; font-weight: 800; color: #1e1b2e; letter-spacing: -.5px; margin-top: 4px; }
     .kpi-subvalue { font-size: 12px; font-weight: 500; color: #8b7aa0; margin-top: 4px; }
@@ -187,25 +219,31 @@ if (!empty($cabang_ids)) {
 </style>
 
 <div class="container-fluid py-4 px-3 px-md-4">
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
-        <div>
-            <span class="text-muted small fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 1px; color: #a78bc4 !important;">PORTAL INVESTOR &bull; <?= strtoupper($nama_periode) ?></span>
-            <h3 class="fw-extrabold mb-0 mt-1" style="color: #1e1b2e; font-size: 24px; letter-spacing: -.5px;">
-                Selamat datang, <span style="color: var(--inv-primary);"><?= h($nama_investor) ?></span>
-            </h3>
+    <div class="inv-hero mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3" style="position: relative; z-index: 1;">
+            <div class="d-flex align-items-center gap-3">
+                <div class="inv-hero-avatar"><?= h(mb_strtoupper(mb_substr($nama_investor, 0, 1))) ?></div>
+                <div>
+                    <span class="inv-hero-badge"><i class="bi bi-gem"></i> Portal Investor</span>
+                    <h3 class="fw-extrabold mb-0 mt-2 text-white" style="font-size: 24px; letter-spacing: -.5px;">
+                        Selamat datang, <?= h($nama_investor) ?>
+                    </h3>
+                    <div class="inv-hero-since"><i class="bi bi-calendar-week me-1"></i> Periode <?= h($nama_periode) ?></div>
+                </div>
+            </div>
+            <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
+                <select name="bulan" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
+                    <?php for ($m = 1; $m <= 12; $m++): ?>
+                        <option value="<?= $m ?>" <?= $sel_bulan == $m ? 'selected' : '' ?>><?= date('F', mktime(0, 0, 0, $m, 1)) ?></option>
+                    <?php endfor; ?>
+                </select>
+                <select name="tahun" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
+                    <?php for ($y = (int) date('Y') + 1; $y >= tahun_data_paling_lama($conn); $y--): ?>
+                        <option value="<?= $y ?>" <?= $sel_tahun == $y ? 'selected' : '' ?>><?= $y ?></option>
+                    <?php endfor; ?>
+                </select>
+            </form>
         </div>
-        <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
-            <select name="bulan" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
-                <?php for ($m = 1; $m <= 12; $m++): ?>
-                    <option value="<?= $m ?>" <?= $sel_bulan == $m ? 'selected' : '' ?>><?= date('F', mktime(0, 0, 0, $m, 1)) ?></option>
-                <?php endfor; ?>
-            </select>
-            <select name="tahun" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
-                <?php for ($y = (int) date('Y') + 1; $y >= tahun_data_paling_lama($conn); $y--): ?>
-                    <option value="<?= $y ?>" <?= $sel_tahun == $y ? 'selected' : '' ?>><?= $y ?></option>
-                <?php endfor; ?>
-            </select>
-        </form>
     </div>
 
     <?php if (empty($cabang_ids)): ?>
@@ -221,10 +259,10 @@ if (!empty($cabang_ids)) {
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="d-flex flex-column">
                         <span class="kpi-meta">Total Omzet</span>
-                        <h4 class="kpi-value">Rp <?= number_format($kpi['omzet'] ?? 0, 0, ',', '.') ?></h4>
+                        <h4 class="kpi-value kpi-countup" data-value="<?= (float) ($kpi['omzet'] ?? 0) ?>">Rp 0</h4>
                         <span class="kpi-subvalue">Kemarin: <span class="fw-semibold text-dark">Rp <?= number_format($kpi_hari_ini['omzet'] ?? 0, 0, ',', '.') ?></span></span>
                     </div>
-                    <div class="kpi-badge-icon" style="--badge-bg: var(--inv-glow); --badge-color: var(--inv-primary);"><i class="bi bi-graph-up-arrow"></i></div>
+                    <div class="kpi-badge-icon" style="--badge-bg: linear-gradient(135deg, var(--inv-primary) 0%, var(--inv-primary-2) 100%); --badge-shadow: rgba(126,34,206,.35);"><i class="bi bi-graph-up-arrow"></i></div>
                 </div>
                 <div class="pt-3 mt-2 border-top d-flex align-items-center justify-content-between" style="border-color: #f5f0fb !important;">
                     <span class="<?= $naik_turun >= 0 ? 'badge-modern-success' : 'badge-modern-danger' ?>">
@@ -240,10 +278,10 @@ if (!empty($cabang_ids)) {
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="d-flex flex-column">
                         <span class="kpi-meta">Net Profit</span>
-                        <h4 class="kpi-value">Rp <?= number_format($kpi['laba'] ?? 0, 0, ',', '.') ?></h4>
+                        <h4 class="kpi-value kpi-countup" data-value="<?= (float) ($kpi['laba'] ?? 0) ?>">Rp 0</h4>
                         <span class="kpi-subvalue">Kemarin: <span class="fw-semibold text-dark">Rp <?= number_format($kpi_hari_ini['laba'] ?? 0, 0, ',', '.') ?></span></span>
                     </div>
-                    <div class="kpi-badge-icon" style="--badge-bg: rgba(168,85,247,.08); --badge-color: #a855f7;"><i class="bi bi-wallet2"></i></div>
+                    <div class="kpi-badge-icon" style="--badge-bg: linear-gradient(135deg, #a855f7 0%, #d946ef 100%); --badge-shadow: rgba(168,85,247,.35);"><i class="bi bi-wallet2"></i></div>
                 </div>
                 <div class="pt-3 mt-2 border-top" style="border-color: #f5f0fb !important;">
                     <span class="badge-modern-success" style="background:#faf5ff;color:#a855f7;border-color:#f3e8ff;"><i class="bi bi-pie-chart-fill me-1"></i> Margin <?= number_format($kpi['margin'] ?? 0, 2) ?>%</span>
@@ -258,7 +296,7 @@ if (!empty($cabang_ids)) {
                         <span class="kpi-meta">Cabang Sudah Lapor</span>
                         <h4 class="kpi-value"><?= $cabang_aktif ?> <span style="font-size: 14px; color:#a78bc4; font-weight: 500;">/ <?= count($cabang_ids) ?> Unit</span></h4>
                     </div>
-                    <div class="kpi-badge-icon" style="--badge-bg: rgba(217,119,6,.08); --badge-color: #d97706;"><i class="bi bi-building-check"></i></div>
+                    <div class="kpi-badge-icon" style="--badge-bg: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); --badge-shadow: rgba(217,119,6,.35);"><i class="bi bi-building-check"></i></div>
                 </div>
                 <div class="pt-3 mt-2">
                     <div class="progress" style="height: 6px; border-radius: 10px; background: #f5f0fb;">
@@ -275,7 +313,7 @@ if (!empty($cabang_ids)) {
                         <span class="kpi-meta">Laporan Final Periode Ini</span>
                         <h4 class="kpi-value"><?= $total_laporan ?> <span style="font-size: 14px; color:#a78bc4; font-weight: 500;">laporan</span></h4>
                     </div>
-                    <div class="kpi-badge-icon" style="--badge-bg: rgba(22,163,74,.08); --badge-color: #16a34a;"><i class="bi bi-file-earmark-check"></i></div>
+                    <div class="kpi-badge-icon" style="--badge-bg: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); --badge-shadow: rgba(22,163,74,.35);"><i class="bi bi-file-earmark-check"></i></div>
                 </div>
                 <div class="pt-3 mt-2 border-top" style="border-color: #f5f0fb !important; font-size: 12px; color: #8b7aa0; font-weight: 500;">
                     <i class="bi bi-info-circle me-1 text-success"></i> Sudah diinput &amp; diverifikasi PIC
@@ -331,8 +369,13 @@ if (!empty($cabang_ids)) {
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <div style="font-weight: 700; color: #1e1b2e;"><?= h($rank['nama_cabang']) ?></div>
-                                    <div style="font-size: 11px; color: #8b7aa0;"><?= h($rank['nama_pengelola'] ?? '-') ?></div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="rank-avatar"><?= h(mb_strtoupper(mb_substr($rank['nama_cabang'], 0, 2))) ?></div>
+                                        <div>
+                                            <div style="font-weight: 700; color: #1e1b2e;"><?= h($rank['nama_cabang']) ?></div>
+                                            <div style="font-size: 11px; color: #8b7aa0;"><?= h($rank['nama_pengelola'] ?? '-') ?></div>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="text-end" style="font-weight: 700; color: var(--inv-primary);">Rp <?= number_format($rank['total_omset'], 0, ',', '.') ?></td>
                                 <td class="text-end" style="font-weight: 700; color: <?= $rank['total_net_profit'] >= 0 ? '#16a34a' : '#dc2626' ?>;">Rp <?= number_format($rank['total_net_profit'], 0, ',', '.') ?></td>
@@ -389,6 +432,22 @@ if (!empty($cabang_ids)) {
     </div>
     <?php endif; ?>
 </div>
+
+<script>
+// Animasi hitung naik untuk angka KPI utama — murni kosmetik.
+document.querySelectorAll('.kpi-countup').forEach(function (el) {
+    const target = parseFloat(el.dataset.value) || 0;
+    const durasi = 900;
+    const mulai = performance.now();
+    function frame(now) {
+        const progres = Math.min(1, (now - mulai) / durasi);
+        const halus = 1 - Math.pow(1 - progres, 3);
+        el.textContent = 'Rp ' + Math.round(target * halus).toLocaleString('id-ID');
+        if (progres < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+});
+</script>
 
 <?php if (!empty($label_grafik)): ?>
 <script>
