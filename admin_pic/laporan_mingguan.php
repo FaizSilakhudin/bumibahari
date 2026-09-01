@@ -1,15 +1,10 @@
 <?php
 require '../config/koneksi.php';
+require_role('pic');
+include 'sidebar.php';
 
-// -----------------------------------------------------------------------------
-// PROTEKSI ROLE PUSAT
-// -----------------------------------------------------------------------------
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'pusat') {
-    header('Location: ../login');
-    exit;
-}
-
-include 'sidebar_pusat.php';
+$id_user = current_user_id();
+$cabang_ids_pic = pic_cabang_ids($conn, $id_user);
 
 // -----------------------------------------------------------------------------
 // FILTER & PARAMETER
@@ -23,15 +18,20 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $tgl_selesai)) { $tgl_selesai = date('Y
 if ($tgl_selesai < $tgl_mulai) { [$tgl_mulai, $tgl_selesai] = [$tgl_selesai, $tgl_mulai]; }
 
 // -----------------------------------------------------------------------------
-// DAFTAR CABANG (dropdown)
+// DAFTAR CABANG (dropdown) — HANYA cabang yang dipegang PIC ini.
 // -----------------------------------------------------------------------------
 $list_cabang = [];
-$res_cabang  = $conn->query("SELECT id_cabang, nama_cabang FROM cabang ORDER BY nama_cabang ASC");
-while ($c = $res_cabang->fetch_assoc()) {
-    $list_cabang[] = $c;
+if (!empty($cabang_ids_pic)) {
+    $ph = implode(',', array_fill(0, count($cabang_ids_pic), '?'));
+    $stmt = $conn->prepare("SELECT id_cabang, nama_cabang FROM cabang WHERE id_cabang IN ($ph) ORDER BY nama_cabang ASC");
+    $stmt->bind_param(str_repeat('i', count($cabang_ids_pic)), ...$cabang_ids_pic);
+    $stmt->execute();
+    $list_cabang = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 }
-if (!$id_cabang && $list_cabang) {
-    $id_cabang = (int) $list_cabang[0]['id_cabang'];
+
+// Wajib: cabang yang diminta harus salah satu yang dipegang PIC ini.
+if (!$id_cabang || !in_array($id_cabang, $cabang_ids_pic, true)) {
+    $id_cabang = $list_cabang ? (int) $list_cabang[0]['id_cabang'] : 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -269,9 +269,13 @@ function lm_rp($n): string
     <div class="lm-page-head d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
             <h4 class="mb-1">Laporan Mingguan</h4>
-            <p class="mb-0">Rekapitulasi setor tunai &amp; sewa tempat per cabang</p>
+            <p class="mb-0">Rekapitulasi setor tunai &amp; sewa tempat &mdash; cabang yang Anda pegang</p>
         </div>
     </div>
+
+    <?php if (empty($cabang_ids_pic)): ?>
+        <div class="alert alert-warning rounded-4"><i class="bi bi-exclamation-triangle-fill me-2"></i> Anda belum ditugaskan ke cabang manapun. Hubungi Admin Pusat.</div>
+    <?php else: ?>
 
     <!-- Filter -->
     <form method="GET" action="" class="lm-filter mb-4">
@@ -384,6 +388,7 @@ function lm_rp($n): string
         <div class="lm-foot-note">Dicetak pada <?= date('d/m/Y H:i') ?> WIB</div>
     </div>
 
+    <?php endif; ?>
   </div>
 </div>
 

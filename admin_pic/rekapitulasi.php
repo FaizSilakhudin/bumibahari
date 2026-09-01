@@ -1,12 +1,10 @@
 <?php
 require '../config/koneksi.php';
-include 'sidebar_pusat.php';
+require_role('pic');
+include 'sidebar.php';
 
-// 1. PROTEKSI ROLE PUSAT
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'pusat') {
-    header("Location:../login");
-    exit;
-}
+$id_user = current_user_id();
+$cabang_ids_pic = pic_cabang_ids($conn, $id_user);
 
 $periode = $_GET['periode'] ?? 'bulanan';
 $tahun = (int) ($_GET['tahun'] ?? date('Y'));
@@ -21,6 +19,11 @@ $id_cabang = $_GET['id_cabang'] ?? '';
 // ada rotasi pengelola/investor sesudahnya.
 $periode_anchor = anchor_periode(date('Y-m-t', strtotime("$tahun-$bulan-01")));
 
+// Wajib: cabang yang diminta harus salah satu yang dipegang PIC ini.
+if ($id_cabang !== '' && !in_array((int) $id_cabang, $cabang_ids_pic, true)) {
+    $id_cabang = '';
+}
+
 // Ambil nama cabang yang kepilih biar input keisi
 $nama_cabang_terpilih = '';
 if ($id_cabang != '') {
@@ -30,7 +33,15 @@ if ($id_cabang != '') {
     $nama_cabang_terpilih = $stmt->get_result()->fetch_assoc()['nama_cabang'] ?? '';
 }
 
-$list_cabang = $conn->query("SELECT id_cabang, nama_cabang FROM cabang ORDER BY nama_cabang");
+// Daftar cabang untuk dropdown — HANYA cabang yang dipegang PIC ini.
+$list_cabang = null;
+if (!empty($cabang_ids_pic)) {
+    $ph = implode(',', array_fill(0, count($cabang_ids_pic), '?'));
+    $stmt_lc = $conn->prepare("SELECT id_cabang, nama_cabang FROM cabang WHERE id_cabang IN ($ph) ORDER BY nama_cabang");
+    $stmt_lc->bind_param(str_repeat('i', count($cabang_ids_pic)), ...$cabang_ids_pic);
+    $stmt_lc->execute();
+    $list_cabang = $stmt_lc->get_result();
+}
 
 // 2. BUAT WHERE PAKAI PREPARED
 $where_sql = "";
@@ -190,8 +201,7 @@ $pengelola = [
 ];
 
 if ($id_cabang != '') {
-    // Pengelola PADA PERIODE yang dipilih — bukan yang aktif sekarang, supaya
-    // rekap bulan lama tetap benar walau pengelola sudah berganti sesudahnya.
+    // Pengelola PADA PERIODE yang dipilih — bukan yang aktif sekarang.
     $stmt = $conn->prepare("
         SELECT
             nama_pengelola,
@@ -325,8 +335,12 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
     <!-- Header Page -->
     <div class="mb-4">
         <h3 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;"><?= h($judul) ?></h3>
-        <p class="text-secondary small mb-0">Halaman rekapitulasi performa finansial, rasio bagi hasil, serta perhitungan biaya operasional.</p>
+        <p class="text-secondary small mb-0">Halaman rekapitulasi performa finansial, rasio bagi hasil, serta perhitungan biaya operasional &mdash; cabang yang Anda pegang.</p>
     </div>
+
+    <?php if (empty($cabang_ids_pic)): ?>
+        <div class="alert alert-warning rounded-4"><i class="bi bi-exclamation-triangle-fill me-2"></i> Anda belum ditugaskan ke cabang manapun. Hubungi Admin Pusat.</div>
+    <?php endif; ?>
 
     <!-- Filter Section -->
     <div class="card border-0 mb-4">
@@ -342,10 +356,10 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
 
                 <datalist id="listCabang">
                     <option value="Semua Cabang" data-id=""></option>
-                    <?php $list_cabang->data_seek(0);
+                    <?php if ($list_cabang): $list_cabang->data_seek(0);
                     while ($c = $list_cabang->fetch_assoc()): ?>
                         <option value="<?= h($c['nama_cabang']) ?>" data-id="<?= $c['id_cabang'] ?>"></option>
-                    <?php endwhile; ?>
+                    <?php endwhile; endif; ?>
                 </datalist>
             </div>
             <div class="col-xl-2 col-md-6">

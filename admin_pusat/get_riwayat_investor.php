@@ -27,26 +27,20 @@ if ($id_investor <= 0) {
     exit;
 }
 
-// 3. QUERY: daftar cabang yang diinvestasikan investor
-//    beserta periode investasi + nama pengelola aktif tiap cabang
+// 3. QUERY: daftar cabang yang diinvestasikan investor beserta periode investasi.
 // 1 baris per cabang (gabung bila ada beberapa periode investasi di cabang yang sama).
+// Nama pengelola DIHITUNG PER BARIS di bawah (bukan di SQL) — memakai
+// pengelola_pada_tanggal() supaya pas dengan pengelola yang menjabat SAAT
+// periode investasi itu berlangsung, bukan pengelola yang aktif sekarang.
 $sql = "SELECT
             c.id_cabang,
             c.nama_cabang,
-            COALESCE(
-                (SELECT p.nama_pengelola
-                   FROM pengelola p
-                  WHERE p.id_cabang = c.id_cabang AND p.status = 'aktif'
-                  ORDER BY p.tgl_mulai DESC
-                  LIMIT 1),
-                c.nama_pengelola
-            ) AS nama_pengelola,
             MIN(ci.tgl_mulai) AS tgl_mulai,
             CASE WHEN SUM(ci.tgl_selesai IS NULL) > 0 THEN NULL ELSE MAX(ci.tgl_selesai) END AS tgl_selesai
         FROM cabang_investor ci
         JOIN cabang c ON ci.id_cabang = c.id_cabang
         WHERE ci.id_investor = ?
-        GROUP BY c.id_cabang, c.nama_cabang, c.nama_pengelola
+        GROUP BY c.id_cabang, c.nama_cabang
         ORDER BY (MAX(CASE WHEN ci.tgl_selesai IS NULL THEN 1 ELSE 0 END)) DESC, tgl_mulai DESC";
 
 $stmt = $conn->prepare($sql);
@@ -76,10 +70,12 @@ while ($row = $result->fetch_assoc()) {
     $tgl_mulai_fmt   = $tgl_mulai ? date('d-m-Y', strtotime($tgl_mulai)) : '-';
     $tgl_selesai_fmt = $tgl_selesai ? date('d-m-Y', strtotime($tgl_selesai)) : '-';
 
+    $nama_pengelola = $tgl_mulai ? pengelola_pada_tanggal($conn, (int) $row['id_cabang'], $tgl_mulai) : '-';
+
     $cabang_list[] = [
         'id_cabang'       => $row['id_cabang'] ?? null,
         'nama_cabang'     => $row['nama_cabang'] ?? ('Cabang #' . ($row['id_cabang'] ?? '-')),
-        'nama_pengelola'  => !empty($row['nama_pengelola']) ? $row['nama_pengelola'] : '-',
+        'nama_pengelola'  => $nama_pengelola,
         'tgl_mulai'       => $tgl_mulai,
         'tgl_selesai'     => $tgl_selesai,
         'tgl_mulai_fmt'   => $tgl_mulai_fmt,

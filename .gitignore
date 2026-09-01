@@ -7,7 +7,28 @@
 # Konfigurasi lokal / rahasia
 /config/env.php
 /config/db_credentials.php
+.env
+.env.*
 
 # Cadangan database & artefak sementara
 /database/backups/
 /database/_dumperr.txt
+
+# Log
+*.log
+error_log
+php_errors.log
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Berkas OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Pengaturan lokal Claude Code (khusus mesin ini, jangan ikut di-commit)
+.claude/settings.local.json

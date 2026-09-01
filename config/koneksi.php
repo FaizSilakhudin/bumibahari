@@ -211,6 +211,55 @@ if (!function_exists('require_role')) {
     }
 }
 
+if (!function_exists('kompres_gambar_upload')) {
+    // Kecilkan foto (resize + re-encode JPEG) SETELAH diupload, di tempat (in-place).
+    // Hanya untuk upload BARU — tidak pernah dipanggil untuk foto lama yang sudah
+    // tersimpan, supaya riwayat foto lama tidak pernah tersentuh/hilang kualitasnya.
+    // Aman dipanggil walau GD tidak aktif: kalau gagal di titik manapun, file asli
+    // dibiarkan apa adanya (tidak pernah menghapus/merusak upload yang sudah masuk).
+    function kompres_gambar_upload(string $path, int $sisi_maks = 1600, int $kualitas = 78): void
+    {
+        if (!extension_loaded('gd') || !is_file($path)) {
+            return;
+        }
+        $info = @getimagesize($path);
+        if (!$info) {
+            return;
+        }
+        [$lebar, $tinggi] = $info;
+        if ($lebar <= 0 || $tinggi <= 0) {
+            return;
+        }
+
+        $src = null;
+        switch ($info['mime'] ?? '') {
+            case 'image/jpeg': $src = @imagecreatefromjpeg($path); break;
+            case 'image/png':  $src = @imagecreatefrompng($path); break;
+        }
+        if (!$src) {
+            return;
+        }
+
+        $skala = min(1, $sisi_maks / max($lebar, $tinggi));
+        $lebar_baru = max(1, (int) round($lebar * $skala));
+        $tinggi_baru = max(1, (int) round($tinggi * $skala));
+
+        $dst = imagecreatetruecolor($lebar_baru, $tinggi_baru);
+        $putih = imagecolorallocate($dst, 255, 255, 255);
+        imagefill($dst, 0, 0, $putih);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $lebar_baru, $tinggi_baru, $lebar, $tinggi);
+        imagedestroy($src);
+
+        $tmp = $path . '.tmp';
+        if (imagejpeg($dst, $tmp, $kualitas) && filesize($tmp) > 0 && filesize($tmp) < filesize($path)) {
+            @rename($tmp, $path);
+        } else {
+            @unlink($tmp);
+        }
+        imagedestroy($dst);
+    }
+}
+
 if (!function_exists('tahun_data_paling_lama')) {
     // Tahun paling awal yang punya data laporan — dipakai sebagai batas bawah
     // dropdown filter tahun, supaya data lama (mis. 2025 dst) tidak pernah
@@ -224,6 +273,76 @@ if (!function_exists('tahun_data_paling_lama')) {
             $tahun = $th ? (int) $th : ((int) date('Y') - 3);
         }
         return $tahun;
+    }
+}
+
+if (!function_exists('anchor_periode')) {
+    // Titik tanggal untuk pengelola_pada_tanggal()/investor_pada_tanggal() saat
+    // menampilkan RINGKASAN satu periode (minggu/bulan) — SELALU akhir periode
+    // (dibatasi maksimal hari ini), BUKAN awal periode.
+    //
+    // Kenapa akhir, bukan awal: relasi pengelola/investor kadang baru mulai
+    // tercatat di TENGAH periode (mis. investor baru terdaftar tanggal 28,
+    // padahal laporan bulan itu baru ada dari tanggal 30) — kalau dites di
+    // AWAL periode, hasilnya "-" (dianggap belum tersambung) walau sebenarnya
+    // sudah tersambung sejak pertengahan periode itu. Anchor di akhir periode
+    // menangkap kondisi "siapa yang menjabat paling akhir dalam periode ini",
+    // sekaligus tetap tidak bisa "melihat masa depan" karena dibatasi hari ini.
+    function anchor_periode(string $tgl_akhir_periode): string
+    {
+        $hari_ini = date('Y-m-d');
+        return $tgl_akhir_periode < $hari_ini ? $tgl_akhir_periode : $hari_ini;
+    }
+}
+
+if (!function_exists('pengelola_pada_tanggal')) {
+    // Nama pengelola yang MENJABAT pada tanggal tertentu — bukan pengelola
+    // yang aktif SEKARANG. Wajib dipakai tiap kali menampilkan/menyimpan data
+    // untuk tanggal/periode historis, supaya rotasi pengelola tidak menimpa
+    // atribusi laporan lama. ("Pengelola aktif sekarang" tetap benar dipakai
+    // di konteks identitas sesi login / form input hari ini.) Untuk RINGKASAN
+    // periode (minggu/bulan), pakai anchor_periode() supaya anchornya akhir
+    // periode, bukan awal periode — lihat komentar anchor_periode().
+    function pengelola_pada_tanggal(mysqli $conn, int $id_cabang, string $tanggal): string
+    {
+        $stmt = $conn->prepare("
+            SELECT nama_pengelola FROM pengelola
+            WHERE id_cabang = ? AND tgl_mulai <= ? AND (tgl_selesai IS NULL OR tgl_selesai >= ?)
+            ORDER BY tgl_mulai DESC LIMIT 1
+        ");
+        $stmt->bind_param('iss', $id_cabang, $tanggal, $tanggal);
+        $stmt->execute();
+        $nama = $stmt->get_result()->fetch_assoc()['nama_pengelola'] ?? null;
+        $stmt->close();
+        if ($nama) {
+            return $nama;
+        }
+
+        $stmt = $conn->prepare('SELECT nama_pengelola FROM cabang WHERE id_cabang = ?');
+        $stmt->bind_param('i', $id_cabang);
+        $stmt->execute();
+        $fallback = $stmt->get_result()->fetch_assoc()['nama_pengelola'] ?? null;
+        $stmt->close();
+        return $fallback ?: '-';
+    }
+}
+
+if (!function_exists('investor_pada_tanggal')) {
+    // Nama investor yang berinvestasi PADA tanggal tertentu — bukan investor
+    // aktif sekarang. Sama alasannya dengan pengelola_pada_tanggal().
+    function investor_pada_tanggal(mysqli $conn, int $id_cabang, string $tanggal): string
+    {
+        $stmt = $conn->prepare("
+            SELECT i.nama_investor FROM cabang_investor ci
+            JOIN investor i ON i.id_investor = ci.id_investor
+            WHERE ci.id_cabang = ? AND ci.tgl_mulai <= ? AND (ci.tgl_selesai IS NULL OR ci.tgl_selesai >= ?)
+            ORDER BY ci.tgl_mulai DESC LIMIT 1
+        ");
+        $stmt->bind_param('iss', $id_cabang, $tanggal, $tanggal);
+        $stmt->execute();
+        $nama = $stmt->get_result()->fetch_assoc()['nama_investor'] ?? null;
+        $stmt->close();
+        return $nama ?: '-';
     }
 }
 

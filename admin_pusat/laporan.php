@@ -395,6 +395,10 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
             <h3 class="fw-bold mb-1 text-dark">Laporan Semua Cabang</h3>
             <p class="text-muted small mb-0">Pantau perkembangan omzet, pengeluaran, dan net profit secara berkala.</p>
         </div>
+        <a href="export_laporan.php?<?= http_build_query(['tgl_awal' => $tgl_awal, 'tgl_akhir' => $tgl_akhir, 'id_cabang' => $id_cabang]) ?>"
+           class="btn btn-outline-success fw-semibold" style="border-radius: 10px;">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export CSV
+        </a>
     </div>
 
     <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">

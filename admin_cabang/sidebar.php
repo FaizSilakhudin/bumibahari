@@ -241,6 +241,11 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
                 <span>Riwayat Laporan</span>
             </a>
 
+            <a class="nav-link-custom <?=($current_page=='riwayat_nota')?'active':''?>" href="riwayat_nota">
+                <i class="bi bi-images fs-5"></i>
+                <span>Riwayat Nota</span>
+            </a>
+
             <a class="nav-link-custom nav-link-logout" href="../logout">
                 <i class="bi bi-box-arrow-right fs-5"></i> 
                 <span>Keluar Aplikasi</span>

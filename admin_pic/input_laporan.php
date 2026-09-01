@@ -17,23 +17,16 @@ if (!in_array($id_cabang, $cabang_ids, true)) {
     exit;
 }
 
-// Identitas cabang + pengelola aktif.
-$stmt = $conn->prepare("
-    SELECT c.nama_cabang,
-        COALESCE(
-            (SELECT p.nama_pengelola FROM pengelola p
-               WHERE p.id_cabang = c.id_cabang AND p.status = 'aktif'
-               ORDER BY p.tgl_mulai DESC LIMIT 1),
-            c.nama_pengelola
-        ) AS nama_pengelola
-    FROM cabang c WHERE c.id_cabang = ?
-");
+// Identitas cabang + pengelola PADA TANGGAL laporan ini (bukan yang aktif
+// sekarang) — supaya kalau ada rotasi pengelola, laporan lama tetap
+// tercatat atas nama pengelola yang menjabat waktu itu.
+$stmt = $conn->prepare("SELECT nama_cabang FROM cabang WHERE id_cabang = ?");
 $stmt->bind_param("i", $id_cabang);
 $stmt->execute();
 $data_cabang = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 $nama_cabang = $data_cabang['nama_cabang'] ?? '-';
-$nama_pengelola = $data_cabang['nama_pengelola'] ?: '-';
+$nama_pengelola = pengelola_pada_tanggal($conn, $id_cabang, $tanggal);
 
 // =====================================================
 // PROSES SIMPAN

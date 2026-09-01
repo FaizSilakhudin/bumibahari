@@ -1,0 +1,48 @@
+name: Tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+          MYSQL_DATABASE: db_bumi_bahari
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli, zip
+          coverage: none
+
+      - name: Load database schema
+        run: mysql -h 127.0.0.1 -u root db_bumi_bahari < database/db_bumi_bahari.sql
+
+      - name: Point app at the CI database (TCP, not local socket)
+        run: |
+          cat > config/db_credentials.php <<'EOF'
+          <?php
+          return ['host' => '127.0.0.1', 'user' => 'root', 'pass' => '', 'name' => 'db_bumi_bahari'];
+          EOF
+
+      - name: Run test suite
+        run: php tests/run.php

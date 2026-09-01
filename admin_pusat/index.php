@@ -34,12 +34,16 @@ $where_filter_cabang = "";   // untuk query yang pakai cabang c
 $params = [];
 $types  = "";
 
-// Sub-query: id_cabang yang investor AKTIF-nya = ? (tahan terhadap baris relasi lama/basi).
+// Sub-query: id_cabang yang investor-nya = ? PADA PERIODE TERPILIH (bukan investor
+// aktif hari ini) — supaya filter investor tetap benar untuk bulan-bulan lama
+// walau sudah ada rotasi investor sesudahnya. $periode_ini sudah divalidasi
+// int di atas, aman diinterpolasi langsung sebagai tanggal literal.
+$periode_anchor_sql = $conn->real_escape_string(anchor_periode(date('Y-m-t', strtotime("$periode_ini-01"))));
 $cabang_of_investor = "SELECT c2.id_cabang FROM cabang c2 WHERE (
         SELECT ci.id_investor FROM cabang_investor ci
         WHERE ci.id_cabang = c2.id_cabang
-          AND ci.tgl_mulai <= CURDATE()
-          AND (ci.tgl_selesai IS NULL OR ci.tgl_selesai >= CURDATE())
+          AND ci.tgl_mulai <= '$periode_anchor_sql'
+          AND (ci.tgl_selesai IS NULL OR ci.tgl_selesai >= '$periode_anchor_sql')
         ORDER BY ci.tgl_mulai DESC, ci.id DESC LIMIT 1
     ) = ?";
 
@@ -186,6 +190,9 @@ $res_rank = $st->get_result();
 $no = 1;
 while ($row = $res_rank->fetch_assoc()) {
     $row['no'] = $no++;
+    // Pengelola PADA PERIODE terpilih, bukan kolom statis cabang.nama_pengelola
+    // (yang tidak pernah ikut ter-update walau ada rotasi pengelola).
+    $row['nama_pengelola'] = pengelola_pada_tanggal($conn, (int) $row['id_cabang'], $periode_anchor_sql);
     $ranking_cabang[] = $row;
 }
 ?>
@@ -642,7 +649,10 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                                 </div>
                             </td>
                         </tr>
-                        <?php else: while($p=$peringatan->fetch_assoc()): 
+                        <?php else: while($p=$peringatan->fetch_assoc()):
+                            // Pengelola yang MENJABAT SEKARANG (bukan kolom statis cabang.nama_pengelola
+                            // yang tidak pernah ikut ter-update) — ini widget kontak operasional hari ini.
+                            $p['nama_pengelola'] = pengelola_pada_tanggal($conn, (int) $p['id_cabang'], date('Y-m-d'));
                             $hari_telat = $p['selisih_hari']?? 0;
                             
                             if ($hari_telat == 0 || $p['input_terakhir'] == NULL) {

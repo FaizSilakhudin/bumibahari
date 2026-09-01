@@ -120,6 +120,11 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
 
     <div class="sidebar-menu flex-grow-1">
         <nav class="nav flex-column">
+            <a class="nav-link-custom <?=($current_page=='dashboard')?'active':''?>" href="dashboard">
+                <i class="bi bi-speedometer2 fs-5"></i>
+                <span>Dashboard</span>
+            </a>
+
             <a class="nav-link-custom <?=($current_page=='index')?'active':''?>" href="index">
                 <i class="bi bi-clipboard-check fs-5"></i>
                 <span>Antrian Laporan</span>
@@ -128,6 +133,21 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
             <a class="nav-link-custom <?=($current_page=='riwayat')?'active':''?>" href="riwayat">
                 <i class="bi bi-clock-history fs-5"></i>
                 <span>Riwayat Laporan</span>
+            </a>
+
+            <a class="nav-link-custom <?=($current_page=='laporan')?'active':''?>" href="laporan">
+                <i class="bi bi-file-earmark-bar-graph fs-5"></i>
+                <span>Laporan Harian</span>
+            </a>
+
+            <a class="nav-link-custom <?=($current_page=='laporan_mingguan')?'active':''?>" href="laporan_mingguan">
+                <i class="bi bi-calendar-week fs-5"></i>
+                <span>Laporan Mingguan</span>
+            </a>
+
+            <a class="nav-link-custom <?=($current_page=='rekapitulasi')?'active':''?>" href="rekapitulasi">
+                <i class="bi bi-bar-chart-line-fill fs-5"></i>
+                <span>Rekapitulasi</span>
             </a>
 
             <a class="nav-link-custom nav-link-logout" href="../logout">

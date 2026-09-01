@@ -65,7 +65,15 @@ C:\xampp\php\php.exe C:\xampp\htdocs\warteg-bumi-bahari\database\backup.php
 
 **Sudah terjadwal** lewat Windows Task Scheduler — task **`SIMC-WBB Backup Harian`**, jalan setiap hari jam **02:00** (memanggil `backup.bat`, log ke `database/backups/_backup.log`). Task ini terdaftar untuk user Windows yang aktif saat ini (`Run only when user is logged on`) — kalau PC ini akan sering ditinggal logout/restart tanpa auto-login, ubah task itu di Task Scheduler GUI ke *Run whether user is logged on or not* (klik kanan task → Properties → General; akan diminta password Windows sekali).
 
-Simpan sebagian berkas cadangan (SQL + zip uploads) di lokasi terpisah (drive lain / cloud) secara berkala — backup lokal saja tidak melindungi dari kerusakan disk/PC.
+Simpan sebagian berkas cadangan (SQL + zip uploads) di lokasi terpisah (drive lain / cloud) secara berkala — backup lokal saja tidak melindungi dari kerusakan disk/PC. **Status saat ini: backup HANYA lokal** (folder `database/backups/` di server ini) — sinkronisasi ke cloud (OneDrive/Google Drive) belum diaktifkan karena OneDrive di komputer ini belum login/jalan saat pengecekan terakhir (2026-09-01). Kalau mau diaktifkan: login OneDrive (atau pasang Google Drive Desktop), lalu arahkan tujuan backup di `database/backup.php` ke folder sync itu.
+
+## CI — test otomatis di GitHub Actions
+
+`.github/workflows/tests.yml` menjalankan `tests/run.php` otomatis di setiap push/PR (branch apa saja) — servis MySQL sementara di-provision oleh GitHub Actions, skema dimuat dari `database/db_bumi_bahari.sql`. Kalau lupa jalankan test manual sebelum push, CI akan menangkapnya.
+
+## Export CSV/Excel
+
+`admin_pusat/laporan.php` dan `admin_pic/laporan.php` (khusus cabang yang dipegang) punya tombol **Export CSV** yang mengambil data sesuai filter tanggal/cabang yang sedang aktif di halaman, dibuka langsung oleh Excel. `rekapitulasi.php` sengaja tidak ditambah CSV karena sudah ada Export PDF (format matrix per-cabang lebih cocok dicetak/dibagikan daripada tabel datar CSV).
 
 ## Migrasi
 
@@ -97,3 +105,22 @@ Rumus keuangan sekarang HANYA ada di satu tempat (`config/keuangan.php`, fungsi 
 - **Arsip sebelum hapus** — laporan yang dihapus di `admin_pusat/laporan.php` otomatis disnapshot ke `laporan_cabang_arsip` dulu; kalau snapshot gagal dibuat, penghapusan **dibatalkan** (tidak pernah hapus tanpa cadangan). Pulihkan kapan saja lewat `admin_pusat/arsip_laporan.php`.
 - **Riwayat koreksi lengkap** — tiap kali pusat mengoreksi laporan lewat modal "Koreksi Laporan Harian", nilai lama (seluruh kolom, bukan cuma ringkasan) disimpan ke `audit_log` sebelum ditimpa.
 - Dropdown filter tahun (dashboard pusat & investor) otomatis menyesuaikan ke tahun data paling lama di `laporan_cabang` (`tahun_data_paling_lama()` di `config/koneksi.php`) — data lama tidak pernah "hilang" dari pilihan filter walau bertahun-tahun kemudian.
+
+## Atribusi historis (rolling pengelola & investor)
+
+Cabang bisa ganti pengelola atau investor kapan saja (tabel `pengelola` dan `cabang_investor` sudah punya `tgl_mulai`/`tgl_selesai` per periode). Supaya laporan/rekap tahun-tahun lalu tetap menampilkan pengelola/investor yang **benar-benar menjabat saat itu** — bukan siapa yang aktif sekarang — semua tampilan histori (laporan harian, laporan mingguan, rekapitulasi, riwayat investasi) WAJIB memanggil:
+
+- `pengelola_pada_tanggal($conn, $id_cabang, $tanggal)`
+- `investor_pada_tanggal($conn, $id_cabang, $tanggal)`
+
+(keduanya di `config/koneksi.php`) dengan `$tanggal` = tanggal/periode laporan yang sedang ditampilkan — **bukan** `date('Y-m-d')`. Pengecualian yang SENGAJA tetap memakai "sekarang": identitas sesi login, form input hari berjalan, dan widget "Peringatan Dini" (itu memang menampilkan kontak pengelola SAAT INI untuk ditelepon/dihubungi, bukan riwayat).
+
+**Untuk RINGKASAN satu periode (laporan mingguan, rekapitulasi bulanan, dashboard)** — bukan satu tanggal tunggal — WAJIB pakai `anchor_periode($tgl_akhir_periode)` (juga di `config/koneksi.php`) sebagai `$tanggal`, **bukan** tanggal awal periode. Alasan (bug nyata yang pernah terjadi, diperbaiki 2026-09-01): relasi pengelola/investor baru sering baru tercatat di TENGAH periode (mis. investor terdaftar tanggal 28, padahal laporan bulan itu baru ada dari tanggal 30) — kalau anchornya AWAL periode, hasilnya salah tampil "-" (dianggap tidak tersambung) walau sebenarnya sudah tersambung sejak pertengahan periode itu. `anchor_periode()` memakai akhir periode (dibatasi maksimal hari ini, supaya tidak "melihat masa depan" untuk periode yang masih berjalan).
+
+Diuji otomatis di `tests/periode_test.php` (skenario rotasi pengelola & investor + `anchor_periode()`, isolasi lewat transaksi + rollback — tidak pernah menyentuh data live).
+
+## Kompresi foto nota baru
+
+Sejak 2026-09-01, foto nota yang **baru** diupload (`admin_cabang/input_data.php`) otomatis diperkecil (resize maksimal 1600px sisi terpanjang + re-encode JPEG kualitas 78) lewat `kompres_gambar_upload()` di `config/koneksi.php` — butuh ekstensi PHP **GD** (sudah diaktifkan di `php.ini`). Ini utamanya menghemat pertumbuhan ukuran folder `uploads/` untuk pemakaian jangka panjang (backup zip juga jadi lebih cepat & kecil).
+
+**Foto lama TIDAK PERNAH disentuh** — fungsi ini hanya jalan sekali, tepat setelah file baru selesai diupload. Kalau GD ternyata mati atau proses kompresi gagal di titik manapun, file asli hasil upload dibiarkan apa adanya (tidak pernah dihapus atau dirusak).

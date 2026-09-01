@@ -4,32 +4,23 @@ include 'sidebar.php';
 
 $id_cabang = (int) $_SESSION['id_cabang'];
 
+// Tanggal laporan = 1 hari sebelum hari input (cabang tidak bisa memilih tanggal).
+$tgl = date('Y-m-d', strtotime('-1 day'));
+
 // =====================================================
-// IDENTITAS CABANG + PENGELOLA AKTIF
+// IDENTITAS CABANG + PENGELOLA PADA TANGGAL LAPORAN
+// (bukan pengelola aktif sekarang — supaya rotasi pengelola tidak menimpa
+//  atribusi laporan; lihat config/koneksi.php: pengelola_pada_tanggal()).
 // =====================================================
-$stmt = $conn->prepare("
-    SELECT
-        c.nama_cabang,
-        COALESCE(
-            (SELECT p.nama_pengelola FROM pengelola p
-               WHERE p.id_cabang = c.id_cabang AND p.status = 'aktif'
-               ORDER BY p.tgl_mulai DESC LIMIT 1),
-            c.nama_pengelola
-        ) AS nama_pengelola
-    FROM cabang c
-    WHERE c.id_cabang = ?
-");
+$stmt = $conn->prepare("SELECT nama_cabang FROM cabang WHERE id_cabang = ?");
 $stmt->bind_param("i", $id_cabang);
 $stmt->execute();
 $data_cabang = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 $cabang = $data_cabang['nama_cabang'] ?? '-';
-$nama_pengelola = $data_cabang['nama_pengelola'] ?: '-';
+$nama_pengelola = pengelola_pada_tanggal($conn, $id_cabang, $tgl);
 $_SESSION['nama_pengelola'] = $nama_pengelola;
-
-// Tanggal laporan = 1 hari sebelum hari input (cabang tidak bisa memilih tanggal).
-$tgl = date('Y-m-d', strtotime('-1 day'));
 
 // Status nota untuk tanggal ini (kalau sudah pernah kirim / sudah diproses PIC).
 $stmt = $conn->prepare("SELECT foto_nota1, foto_nota2, foto_nota3, foto_nota4, status_laporan, keterangan_nota
@@ -93,6 +84,7 @@ if (isset($_POST['simpan'])) {
                     $nama_file = date('Ymd') . "_" . $id_cabang . "_" . uniqid() . "_" . $i . "." . $ext;
 
                     if (move_uploaded_file($tmp_name, $upload_dir . $nama_file)) {
+                        kompres_gambar_upload($upload_dir . $nama_file);
                         $foto[$i - 1] = $nama_file;
                     } else {
                         $ada_error_upload = true;
@@ -250,9 +242,6 @@ body { background-color: #f6f8fa; }
                                     <?php if ($sudah_ada): ?><i class="bi bi-check-circle-fill text-success ms-1" title="Sudah terkirim"></i><?php endif; ?>
                                 </label>
                                 <input type="file" name="foto_nota<?= $i ?>" class="form-control form-control-sm" accept="image/jpeg,image/png">
-                                <?php if ($sudah_ada): ?>
-                                    <a href="../uploads/nota/<?= h($laporan_hari_ini["foto_nota$i"]) ?>" target="_blank" class="d-block small mt-2 text-success">Lihat yang sudah terkirim</a>
-                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endfor; ?>
@@ -260,6 +249,7 @@ body { background-color: #f6f8fa; }
                 <div class="mt-3 text-muted" style="font-size: 0.8rem;">
                     <i class="bi bi-info-circle me-1"></i>
                     Format JPG/PNG, maksimal 2MB per berkas. Gambar di atas 2MB akan dikompres otomatis. Kosongkan kolom yang tidak ingin diganti.
+                    Nota yang sudah pernah terkirim bisa dilihat di menu <a href="riwayat_nota" class="fw-semibold">Riwayat Nota</a>.
                 </div>
 
                 <div class="mt-3">

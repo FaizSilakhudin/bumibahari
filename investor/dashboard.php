@@ -106,6 +106,8 @@ if (!empty($cabang_ids)) {
     $no = 1;
     while ($row = $res_rank->fetch_assoc()) {
         $row['no'] = $no++;
+        // Pengelola PADA PERIODE terpilih, bukan kolom statis cabang.nama_pengelola.
+        $row['nama_pengelola'] = pengelola_pada_tanggal($conn, (int) $row['id_cabang'], anchor_periode($tgl_akhir));
         $ranking_cabang[] = $row;
     }
 
