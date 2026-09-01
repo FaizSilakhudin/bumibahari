@@ -32,6 +32,13 @@ $label_grafik = $data_omzet = $data_laba = [];
 $ranking_cabang = [];
 $peringatan = [];
 
+// Paginasi peringatan dini — 10 per halaman, sama persis dengan admin_pusat.
+$limit_peringatan  = 10;
+$page_peringatan   = max(1, (int) ($_GET['page_peringatan'] ?? 1));
+$offset_peringatan = ($page_peringatan - 1) * $limit_peringatan;
+$total_peringatan  = 0;
+$total_pages_peringatan = 1;
+
 if (!empty($cabang_ids)) {
     $ph = implode(',', array_fill(0, count($cabang_ids), '?'));
     $types_ids = str_repeat('i', count($cabang_ids));
@@ -111,12 +118,22 @@ if (!empty($cabang_ids)) {
     }
 
     // 6. Peringatan dini — cabang Anda yang belum lapor lengkap untuk KEMARIN
+    // Paginasi — 10 per halaman, sama persis dengan render_pagination() yang dipakai admin_pusat.
+    $st = $conn->prepare("SELECT COUNT(*) total FROM cabang c
+                           WHERE c.id_cabang IN ($ph)
+                             AND c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ? AND status_laporan = 'lengkap')");
+    $st->bind_param($types_ids . 's', ...array_merge($cabang_ids, [$kemarin]));
+    $st->execute();
+    $total_peringatan = (int) $st->get_result()->fetch_assoc()['total'];
+    $total_pages_peringatan = max(1, (int) ceil($total_peringatan / $limit_peringatan));
+
     $st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang, MAX(l.tanggal) input_terakhir, DATEDIFF(?, MAX(l.tanggal)) selisih_hari
                            FROM cabang c LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang
                            WHERE c.id_cabang IN ($ph)
                              AND c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ? AND status_laporan = 'lengkap')
-                           GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC");
-    $st->bind_param('s' . $types_ids . 's', $kemarin, ...array_merge($cabang_ids, [$kemarin]));
+                           GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC
+                           LIMIT ? OFFSET ?");
+    $st->bind_param('s' . $types_ids . 's' . 'ii', $kemarin, ...array_merge($cabang_ids, [$kemarin, $limit_peringatan, $offset_peringatan]));
     $st->execute();
     $res_p = $st->get_result();
     while ($row = $res_p->fetch_assoc()) {
@@ -371,6 +388,11 @@ if (!empty($cabang_ids)) {
                 </tbody>
             </table>
         </div>
+        <?php if (!empty($peringatan)): ?>
+        <div class="px-4">
+            <?php render_pagination($page_peringatan, $total_pages_peringatan, ['from' => $offset_peringatan + 1, 'to' => min($offset_peringatan + $limit_peringatan, $total_peringatan), 'total' => $total_peringatan, 'label' => 'cabang'], 'page_peringatan'); ?>
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

@@ -16,17 +16,47 @@ $next_tgl = date('Y-m-d', strtotime($tanggal . ' +1 day'));
 $antrian = [];
 $ringkasan = ['total' => 0, 'lengkap' => 0, 'menunggu' => 0, 'belum_nota' => 0];
 
+// Paginasi — 10 per halaman, sama persis dengan render_pagination() yang dipakai admin_pusat.
+$limit  = 10;
+$page   = max(1, (int) ($_GET['page'] ?? 1));
+$offset = ($page - 1) * $limit;
+$total_pages = 1;
+
 if (!empty($cabang_ids)) {
     $placeholders = implode(',', array_fill(0, count($cabang_ids), '?'));
+
+    // Ringkasan status dihitung dari SEMUA cabang (bukan cuma halaman ini).
+    $sql_all = "SELECT lc.status_laporan, lc.foto_nota1, lc.foto_nota2, lc.foto_nota3
+                FROM cabang c
+                LEFT JOIN laporan_cabang lc ON lc.id_cabang = c.id_cabang AND lc.tanggal = ?
+                WHERE c.id_cabang IN ($placeholders)";
+    $stmt_all = $conn->prepare($sql_all);
+    $types = 's' . str_repeat('i', count($cabang_ids));
+    $stmt_all->bind_param($types, $tanggal, ...$cabang_ids);
+    $stmt_all->execute();
+    $res_all = $stmt_all->get_result();
+    while ($row = $res_all->fetch_assoc()) {
+        $punya_nota = !empty($row['foto_nota1']) || !empty($row['foto_nota2']) || !empty($row['foto_nota3']);
+        $status = $row['status_laporan'] ?? ($punya_nota ? 'menunggu' : null);
+        $ringkasan['total']++;
+        if ($status === 'lengkap') $ringkasan['lengkap']++;
+        elseif ($status === 'menunggu') $ringkasan['menunggu']++;
+        else $ringkasan['belum_nota']++;
+    }
+    $stmt_all->close();
+
+    $total_pages = max(1, (int) ceil($ringkasan['total'] / $limit));
+
     $sql = "SELECT c.id_cabang, c.nama_cabang,
                    lc.status_laporan, lc.foto_nota1, lc.foto_nota2, lc.foto_nota3, lc.keterangan_nota
             FROM cabang c
             LEFT JOIN laporan_cabang lc ON lc.id_cabang = c.id_cabang AND lc.tanggal = ?
             WHERE c.id_cabang IN ($placeholders)
-            ORDER BY c.nama_cabang ASC";
+            ORDER BY c.nama_cabang ASC
+            LIMIT ? OFFSET ?";
     $stmt = $conn->prepare($sql);
-    $types = 's' . str_repeat('i', count($cabang_ids));
-    $stmt->bind_param($types, $tanggal, ...$cabang_ids);
+    $types_limit = 's' . str_repeat('i', count($cabang_ids)) . 'ii';
+    $stmt->bind_param($types_limit, $tanggal, ...array_merge($cabang_ids, [$limit, $offset]));
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
@@ -35,11 +65,6 @@ if (!empty($cabang_ids)) {
         $row['punya_nota'] = $punya_nota;
         $row['status_efektif'] = $status;
         $antrian[] = $row;
-
-        $ringkasan['total']++;
-        if ($status === 'lengkap') $ringkasan['lengkap']++;
-        elseif ($status === 'menunggu') $ringkasan['menunggu']++;
-        else $ringkasan['belum_nota']++;
     }
     $stmt->close();
 }
@@ -158,5 +183,10 @@ if (!empty($cabang_ids)) {
                 </tbody>
             </table>
         </div>
+        <?php if (!empty($cabang_ids)): ?>
+        <div class="px-4">
+            <?php render_pagination($page, $total_pages, ['from' => $offset + 1, 'to' => min($offset + $limit, $ringkasan['total']), 'total' => $ringkasan['total'], 'label' => 'cabang']); ?>
+        </div>
+        <?php endif; ?>
     </div>
 </div>

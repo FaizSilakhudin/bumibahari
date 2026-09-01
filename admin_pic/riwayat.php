@@ -20,6 +20,13 @@ $next_bulan = date('m', $next_time); $next_tahun = date('Y', $next_time);
 $cabang_list = [];
 $rows = [];
 
+// Paginasi — 10 per halaman, sama persis dengan render_pagination() yang dipakai admin_pusat.
+$limit  = 10;
+$page   = max(1, (int) ($_GET['page'] ?? 1));
+$offset = ($page - 1) * $limit;
+$total_data  = 0;
+$total_pages = 1;
+
 if (!empty($cabang_ids)) {
     $placeholders = implode(',', array_fill(0, count($cabang_ids), '?'));
     $stmt = $conn->prepare("SELECT id_cabang, nama_cabang FROM cabang WHERE id_cabang IN ($placeholders) ORDER BY nama_cabang ASC");
@@ -30,14 +37,25 @@ if (!empty($cabang_ids)) {
 
     $scope_ids = ($id_cabang_filter && in_array($id_cabang_filter, $cabang_ids, true)) ? [$id_cabang_filter] : $cabang_ids;
     $ph2 = implode(',', array_fill(0, count($scope_ids), '?'));
+
+    $sql_count = "SELECT COUNT(*) total FROM laporan_cabang lc WHERE lc.id_cabang IN ($ph2) AND lc.tanggal BETWEEN ? AND ?";
+    $stmt = $conn->prepare($sql_count);
+    $types_count = str_repeat('i', count($scope_ids)) . 'ss';
+    $stmt->bind_param($types_count, ...array_merge($scope_ids, [$tgl_awal, $tgl_akhir]));
+    $stmt->execute();
+    $total_data = (int) $stmt->get_result()->fetch_assoc()['total'];
+    $stmt->close();
+    $total_pages = max(1, (int) ceil($total_data / $limit));
+
     $sql = "SELECT lc.*, c.nama_cabang
             FROM laporan_cabang lc
             JOIN cabang c ON c.id_cabang = lc.id_cabang
             WHERE lc.id_cabang IN ($ph2) AND lc.tanggal BETWEEN ? AND ?
-            ORDER BY lc.tanggal DESC, c.nama_cabang ASC";
+            ORDER BY lc.tanggal DESC, c.nama_cabang ASC
+            LIMIT ? OFFSET ?";
     $stmt = $conn->prepare($sql);
-    $types = str_repeat('i', count($scope_ids)) . 'ss';
-    $stmt->bind_param($types, ...array_merge($scope_ids, [$tgl_awal, $tgl_akhir]));
+    $types = str_repeat('i', count($scope_ids)) . 'ssii';
+    $stmt->bind_param($types, ...array_merge($scope_ids, [$tgl_awal, $tgl_akhir, $limit, $offset]));
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -166,6 +184,11 @@ if (!empty($cabang_ids)) {
                     </tbody>
                 </table>
             </div>
+            <?php if (!empty($rows)): ?>
+            <div class="px-4 pb-2">
+                <?php render_pagination($page, $total_pages, ['from' => $offset + 1, 'to' => min($offset + $limit, $total_data), 'total' => $total_data, 'label' => 'laporan']); ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
