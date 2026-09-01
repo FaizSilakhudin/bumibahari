@@ -120,6 +120,49 @@ if (isset($_POST['edit'])) {
     $atas_nama_rekening = trim($_POST['atas_nama_pengelola'] ?? '');
     $status             = $_POST['status'] ?? 'aktif';
 
+    // Cek dulu: apakah ini benar-benar PERGANTIAN ORANG (id_user/nama beda dari
+    // yang tersimpan), bukan cuma koreksi data (typo rekening, dll)? Kalau ganti
+    // orang, JANGAN timpa baris lama — itu akan merusak riwayat (laporan lama jadi
+    // salah atribusi ke orang baru). Sebagai gantinya: tutup baris lama (kasih
+    // tgl_selesai), lalu buat baris BARU untuk orang baru mulai dari tgl_mulai
+    // yang diisi di form. Baris lama & riwayatnya tidak pernah disentuh.
+    $lama = $conn->prepare("SELECT id_user, nama_pengelola FROM pengelola WHERE id = ?");
+    $lama->bind_param("i", $id);
+    $lama->execute();
+    $data_lama = $lama->get_result()->fetch_assoc();
+    $lama->close();
+
+    $ganti_orang = $data_lama && (
+        ($data_lama['id_user'] ?? null) != $id_user
+        || (empty($data_lama['id_user']) && empty($id_user) && $data_lama['nama_pengelola'] !== $nama_pengelola)
+    );
+
+    if ($ganti_orang) {
+        $tgl_mulai_baru = $tgl_mulai ?: date('Y-m-d');
+        $tgl_selesai_lama = date('Y-m-d', strtotime($tgl_mulai_baru . ' -1 day'));
+
+        $tutup = $conn->prepare("UPDATE pengelola SET tgl_selesai = ?, status = 'nonaktif' WHERE id = ? AND (tgl_selesai IS NULL OR tgl_selesai > ?)");
+        $tutup->bind_param("sis", $tgl_selesai_lama, $id, $tgl_selesai_lama);
+        $tutup->execute();
+        $tutup->close();
+
+        $baru = $conn->prepare("INSERT INTO pengelola (id_user, id_cabang, nama_pengelola, tgl_mulai, tgl_selesai, no_rekening_pengelola, nama_bank_pengelola, atas_nama_pengelola, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $baru->bind_param("iisssssss", $id_user, $id_cabang, $nama_pengelola, $tgl_mulai_baru, $tgl_selesai, $no_rekening, $nama_bank, $atas_nama_rekening, $status);
+
+        if ($baru->execute()) {
+            $new_id = $conn->insert_id;
+            $baru->close();
+            audit($conn, 'pengelola_ganti', 'pengelola', $new_id, ['nama_baru' => $nama_pengelola, 'id_cabang' => $id_cabang, 'menutup_id_lama' => $id, 'mulai' => $tgl_mulai_baru]);
+            $_SESSION['success'] = 'Pengelola diganti — riwayat periode sebelumnya tetap tersimpan.';
+        } else {
+            $error_msg = $baru->error;
+            $baru->close();
+            $_SESSION['error'] = 'Gagal mengganti pengelola: ' . $error_msg;
+        }
+        header("Location: data_pengelola");
+        exit;
+    }
+
     $stmt = $conn->prepare("UPDATE pengelola SET id_user=?, id_cabang=?, nama_pengelola=?, tgl_mulai=?, tgl_selesai=?, no_rekening_pengelola=?, nama_bank_pengelola=?, atas_nama_pengelola=?, status=? WHERE id=?");
     $stmt->bind_param("iisssssssi", $id_user, $id_cabang, $nama_pengelola, $tgl_mulai, $tgl_selesai, $no_rekening, $nama_bank, $atas_nama_rekening, $status, $id);
 

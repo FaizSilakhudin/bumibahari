@@ -217,7 +217,9 @@ if (!function_exists('kompres_gambar_upload')) {
     // tersimpan, supaya riwayat foto lama tidak pernah tersentuh/hilang kualitasnya.
     // Aman dipanggil walau GD tidak aktif: kalau gagal di titik manapun, file asli
     // dibiarkan apa adanya (tidak pernah menghapus/merusak upload yang sudah masuk).
-    function kompres_gambar_upload(string $path, int $sisi_maks = 1600, int $kualitas = 78): void
+    // Ukuran & kualitas SENGAJA dijaga cukup tinggi (2000px/88%) — ini foto nota/struk
+    // yang teksnya (nominal rupiah) harus tetap terbaca jelas oleh PIC, bukan foto biasa.
+    function kompres_gambar_upload(string $path, int $sisi_maks = 2000, int $kualitas = 88): void
     {
         if (!extension_loaded('gd') || !is_file($path)) {
             return;
