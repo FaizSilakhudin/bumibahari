@@ -1,14 +1,15 @@
+ssh access :
+ssh root@103.67.244.132
+
 root@wartegbumibahari:/www/wwwroot/wartegbumibahari.co.id# git log
-commit 6007d7de68a6848c51962bf0bb3394cf734a57b3 (HEAD -> main, origin/main)
-Author: Faiz Silakhudin <faiz87601@gmail.com>
-Date:   Sun Aug 16 21:45:19 2026 +0700
+commit a6af6726672fc5c335b077456d7b88d70c7338cc (HEAD -> main, origin/main)
+Author: FaizSilakhudin <faiz87601@gmail.com>
+Date:   Tue Sep 1 13:25:30 2026 +0700
 
-    final
+    Fix missing newline at end of deploy.txt
 
-commit d92d2689826b3e472f2b9d5b1523da0d0f61068f
-Author: Faiz Silakhudin <faiz87601@gmail.com>
-Date:   Sat Aug 15 17:40:24 2026 +0700
-
-    update1
+(deploy terakhir: 2026-09-01, lihat database/README.md untuk daftar migration
+yang sudah dijalankan di production — termasuk 2026_09_01_000003_bridge_production_legacy.sql
+yang khusus menjembatani schema lama production ke schema saat ini)
 
 root@wartegbumibahari:/www/wwwroot/wartegbumibahari.co.id# 
