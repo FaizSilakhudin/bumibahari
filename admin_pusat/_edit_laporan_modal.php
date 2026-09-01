@@ -24,7 +24,9 @@ for ($n = 1; $n <= 4; $n++) {
     }
 }
 
-// Render satu field angka (Rp)
+// Render satu field angka (Rp) — teks dengan mask ribuan (1.000.000), bukan angka polos.
+// Backend (bersihkan_angka_koreksi) sudah lama siap menerima titik ribuan, jadi ini murni
+// penyesuaian tampilan; nilai yang dikirim tetap sama persis.
 $ed_field = static function (string $label, string $name) use ($row) {
     $val = (int) ($row[$name] ?? 0);
     ?>
@@ -32,9 +34,10 @@ $ed_field = static function (string $label, string $name) use ($row) {
         <label class="ed-lbl"><?= h($label) ?></label>
         <div class="input-group input-group-sm ed-ig">
             <span class="input-group-text">Rp</span>
-            <input type="number" inputmode="numeric" step="1"
-                   name="<?= $name ?>" value="<?= $val ?>"
-                   class="form-control ed-num" data-field="<?= $name ?>">
+            <input type="text" inputmode="decimal"
+                   name="<?= $name ?>" value="<?= number_format($val, 0, ',', '.') ?>"
+                   class="form-control ed-num" data-field="<?= $name ?>"
+                   oninput="maskRupiahEd(this)">
         </div>
     </div>
     <?php
@@ -65,7 +68,7 @@ $ed_rp = static fn ($v) => 'Rp ' . number_format((float) ($v ?? 0), 0, ',', '.')
         <div class="row g-3">
 
           <!-- ============ KIRI: FORM INPUT ============ -->
-          <div class="col-xl-7">
+          <div class="col-xl-5">
             <div class="d-flex flex-column gap-3">
 
               <section class="ed-sec">
@@ -114,10 +117,9 @@ $ed_rp = static fn ($v) => 'Rp ' . number_format((float) ($v ?? 0), 0, ',', '.')
             </div>
           </div>
 
-          <!-- ============ KANAN: RINGKASAN + NOTA ============ -->
-          <div class="col-xl-5">
+          <!-- ============ TENGAH: RINGKASAN ============ -->
+          <div class="col-xl-3">
             <div class="ed-side">
-
               <section class="ed-sec ed-sum">
                 <div class="ed-sec-h"><i class="bi bi-calculator"></i> Ringkasan <span class="ed-auto">otomatis</span></div>
                 <div class="ed-sum-list">
@@ -131,14 +133,19 @@ $ed_rp = static fn ($v) => 'Rp ' . number_format((float) ($v ?? 0), 0, ',', '.')
                   <div class="ed-sum-hi"><span>Margin</span><b id="summaryMargin<?= $ed_id ?>"><?= number_format((float) ($row['persentase'] ?? 0), 2) ?>%</b></div>
                 </div>
               </section>
+            </div>
+          </div>
 
+          <!-- ============ KANAN: NOTA (bisa di-scroll) ============ -->
+          <div class="col-xl-4">
+            <div class="ed-side">
               <section class="ed-sec">
                 <div class="ed-sec-h">
                   <i class="bi bi-images"></i> Foto Nota
                   <span class="ed-auto"><?= count($ed_notas) ?> file</span>
                 </div>
                 <?php if ($ed_notas): ?>
-                  <div class="ed-notas">
+                  <div class="ed-notas ed-notas-scroll">
                     <?php foreach ($ed_notas as $n => $file): ?>
                       <figure class="ed-nota">
                         <img src="../uploads/nota/<?= h($file) ?>" alt="Nota <?= $n ?>" loading="lazy"
@@ -154,7 +161,6 @@ $ed_rp = static fn ($v) => 'Rp ' . number_format((float) ($v ?? 0), 0, ',', '.')
                   </div>
                 <?php endif; ?>
               </section>
-
             </div>
           </div>
 

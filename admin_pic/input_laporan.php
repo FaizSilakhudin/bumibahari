@@ -133,8 +133,9 @@ input.form-control-custom { text-align: right; }
 .bg-header-info { background: #EBF8FF; color: #2B6CB0; }
 .bg-header-secondary { background: #F7FAFC; color: #4A5568; }
 .badge-info-cabang { background: linear-gradient(135deg, #1e3a5f 0%, #12233a 100%); border-radius: 12px; padding: 16px 20px; color: #ffffff; box-shadow: 0 4px 15px rgba(18, 35, 58, 0.1); }
+.nota-scroll-area { max-height: calc(100vh - 220px); min-height: 300px; overflow-y: auto; padding-right: 4px; }
 .nota-thumb-wrap { position: relative; }
-.nota-thumb { width: 100%; height: auto; max-height: 75vh; object-fit: contain; background: #f1f5f9; border-radius: 10px; border: 1px solid #E2E8F0; cursor: zoom-in; transition: box-shadow .15s ease; display: block; }
+.nota-thumb { width: 100%; height: auto; max-height: 65vh; object-fit: contain; background: #f1f5f9; border-radius: 10px; border: 1px solid #E2E8F0; cursor: zoom-in; transition: box-shadow .15s ease; display: block; }
 .nota-thumb:hover { box-shadow: 0 6px 18px rgba(15,23,42,.12); }
 .nota-dl-btn { position: absolute; bottom: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; background: rgba(15,23,42,.65); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .9rem; text-decoration: none; backdrop-filter: blur(2px); transition: background .15s ease, transform .15s ease; }
 .nota-dl-btn:hover { background: #1e3a5f; color: #fff; transform: scale(1.08); }
@@ -174,22 +175,24 @@ input.form-control-custom { text-align: right; }
                     <div class="card card-custom mb-4">
                         <div class="card-custom-header bg-header-secondary"><i class="bi bi-camera fs-5"></i> Foto Nota dari Cabang <span class="ms-2 small fw-normal text-muted">ketuk untuk perbesar penuh layar</span></div>
                         <div class="card-body p-4 p-mobile-custom">
-                            <div class="row g-3">
-                                <?php for ($i = 1; $i <= 4; $i++): if (!empty($row["foto_nota$i"])): ?>
-                                    <div class="col-12">
-                                        <div class="nota-thumb-wrap">
-                                            <img src="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" class="nota-thumb" alt="Nota <?= $i ?>"
-                                                 onclick="picZoom('../uploads/nota/<?= h(rawurlencode($row["foto_nota$i"])) ?>')">
-                                            <a href="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" download class="nota-dl-btn" title="Unduh Nota <?= $i ?>" onclick="event.stopPropagation()">
-                                                <i class="bi bi-download"></i>
-                                            </a>
+                            <div class="nota-scroll-area">
+                                <div class="row g-3">
+                                    <?php for ($i = 1; $i <= 4; $i++): if (!empty($row["foto_nota$i"])): ?>
+                                        <div class="col-12">
+                                            <div class="nota-thumb-wrap">
+                                                <img src="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" class="nota-thumb" alt="Nota <?= $i ?>"
+                                                     onclick="picZoom('../uploads/nota/<?= h(rawurlencode($row["foto_nota$i"])) ?>')">
+                                                <a href="../uploads/nota/<?= h($row["foto_nota$i"]) ?>" download class="nota-dl-btn" title="Unduh Nota <?= $i ?>" onclick="event.stopPropagation()">
+                                                    <i class="bi bi-download"></i>
+                                                </a>
+                                            </div>
                                         </div>
-                                    </div>
-                                <?php endif; endfor; ?>
+                                    <?php endif; endfor; ?>
+                                </div>
+                                <?php if (!empty($row['keterangan_nota'])): ?>
+                                    <div class="mt-3 small text-muted"><i class="bi bi-chat-left-text me-1"></i> Catatan cabang: <?= h($row['keterangan_nota']) ?></div>
+                                <?php endif; ?>
                             </div>
-                            <?php if (!empty($row['keterangan_nota'])): ?>
-                                <div class="mt-3 small text-muted"><i class="bi bi-chat-left-text me-1"></i> Catatan cabang: <?= h($row['keterangan_nota']) ?></div>
-                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endif; ?>

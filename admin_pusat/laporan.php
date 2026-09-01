@@ -680,8 +680,9 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
 .ed-sum-hi{background:#f0fdf4!important}
 .ed-sum-hi b{color:#047857!important;font-size:.95rem}
 .ed-notas{display:flex;flex-direction:column;gap:14px}
+.ed-notas-scroll{max-height:calc(100vh - 260px);min-height:260px;overflow-y:auto;padding-right:4px}
 .ed-nota{margin:0}
-.ed-nota-img{width:100%;height:auto;max-height:72vh;object-fit:contain;background:#0f172a;border-radius:10px;border:1px solid #e2e8f0;cursor:zoom-in;display:block}
+.ed-nota-img{width:100%;height:auto;max-height:60vh;object-fit:contain;background:#0f172a;border-radius:10px;border:1px solid #e2e8f0;cursor:zoom-in;display:block}
 .ed-nota figcaption{text-align:center;font-size:.72rem;color:#94a3b8;margin-top:5px;font-weight:600}
 .ed-nota-empty{text-align:center;color:#94a3b8;padding:26px 0}
 .ed-nota-empty i{font-size:2rem;display:block;margin-bottom:6px}
@@ -762,7 +763,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function angka(input) {
-        return parseFloat(input?.value || 0) || 0;
+        if (!input) return 0;
+        return parseFloat(String(input.value || '0').replace(/\./g, '')) || 0;
+    }
+
+    // Mask ribuan sambil mengetik (mis. "1.000.000"), boleh diawali minus untuk koreksi manual.
+    function maskRupiahEd(el) {
+        const neg = el.value.trim().charAt(0) === '-';
+        let digits = el.value.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
+        const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        el.value = (neg && digits !== '' ? '-' : '') + formatted;
     }
 
     document.querySelectorAll('[id^="detailModal"]').forEach(function(modal) {
@@ -898,7 +908,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
         // Jalankan setiap input berubah
-        modal.querySelectorAll('input[type="number"]').forEach(function(input) {
+        modal.querySelectorAll('input.ed-num').forEach(function(input) {
 
             input.addEventListener('input', function() {
                 hitungLaporan();
