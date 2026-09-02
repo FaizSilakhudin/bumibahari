@@ -204,6 +204,12 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
             </a>
         </li>
 
+        <li class="nav-item">
+            <a class="nav-link <?=($current_page=='backup_laporan')?'active':''?>" href="backup_laporan">
+                <i class="bi bi-life-preserver"></i> Backup Laporan
+            </a>
+        </li>
+
         <div class="nav-section">Sistem</div>
         <li class="nav-item">
             <a class="nav-link <?=($current_page=='simulasi')?'active':''?>" href="simulasi">
