@@ -192,17 +192,21 @@ if (!empty($cabang_ids_pic)) {
                         <tr><td colspan="12" class="text-center py-5 text-muted">Belum ada data laporan pada periode ini</td></tr>
                     <?php else: $no = $offset + 1; while ($row = $data->fetch_assoc()):
                         $lengkap = ($row['status_laporan'] ?? 'lengkap') === 'lengkap';
+                        $libur   = ($row['status_laporan'] ?? '') === 'libur';
                         $margin = $row['persentase'] ?? 0;
                     ?>
                         <tr>
                             <td class="text-center px-4 text-muted fw-bold"><?= $no++ ?></td>
                             <td>
                                 <span class="badge bg-light text-dark border p-2 d-block mb-1"><i class="bi bi-calendar3 me-1 text-muted"></i><?= date('d/m/Y', strtotime($row['tanggal'])) ?></span>
-                                <?php if ($lengkap): ?><span class="badge bg-success-subtle text-success">Selesai</span>
+                                <?php if ($libur): ?><span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-moon-stars-fill me-1"></i>Libur/Tutup</span>
+                                <?php elseif ($lengkap): ?><span class="badge bg-success-subtle text-success">Selesai</span>
                                 <?php else: ?><span class="badge bg-warning-subtle text-warning">Menunggu Input</span><?php endif; ?>
                             </td>
                             <td class="fw-semibold text-dark"><?= h($row['nama_cabang']) ?></td>
-                            <?php if (!$lengkap): ?>
+                            <?php if ($libur): ?>
+                                <td colspan="8" class="text-center text-muted fst-italic"><i class="bi bi-moon-stars-fill me-1"></i> Warung Libur / Tutup — tidak ada laporan keuangan</td>
+                            <?php elseif (!$lengkap): ?>
                                 <td colspan="8" class="text-muted small fst-italic">Laporan keuangan belum diinput</td>
                             <?php else: ?>
                             <td><span class="text-dark fw-bold">Rp <?= number_format($row['total_omset'] ?? 0, 0, ',', '.') ?></span></td>
@@ -215,9 +219,13 @@ if (!empty($cabang_ids_pic)) {
                             <td><span class="badge <?= $margin >= 20 ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' ?> px-2 py-1 rounded"><?= number_format($margin, 2) ?>%</span></td>
                             <?php endif; ?>
                             <td class="text-center px-4">
+                                <?php if ($libur): ?>
+                                    <span class="text-muted small fst-italic">Tidak ada laporan</span>
+                                <?php else: ?>
                                 <a href="input_laporan.php?id_cabang=<?= (int) $row['id_cabang'] ?>&tanggal=<?= h($row['tanggal']) ?>" class="btn btn-sm btn-outline-primary px-3 rounded-pill fw-medium">
                                     <i class="bi bi-pencil-square me-1"></i> <?= $lengkap ? 'Lihat/Edit' : 'Isi' ?>
                                 </a>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endwhile; endif; ?>

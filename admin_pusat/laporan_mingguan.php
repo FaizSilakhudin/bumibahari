@@ -113,22 +113,26 @@ $total_sisa_tunai = 0;
 
 if ($id_cabang) {
     $stmt = $conn->prepare("
-        SELECT tanggal, sewa, sisa_tunai
+        SELECT tanggal, sewa, sisa_tunai, status_laporan
         FROM laporan_cabang
-        WHERE id_cabang = ? AND tanggal BETWEEN ? AND ? AND status_laporan = 'lengkap'
+        WHERE id_cabang = ? AND tanggal BETWEEN ? AND ? AND status_laporan IN ('lengkap','libur')
         ORDER BY tanggal ASC
     ");
     $stmt->bind_param('iss', $id_cabang, $tgl_mulai, $tgl_selesai);
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
+        $is_libur = $row['status_laporan'] === 'libur';
         $sisa = abs((int) $row['sisa_tunai']);
-        $total_sewa       += (int) $row['sewa'];
-        $total_sisa_tunai += $sisa;
+        if (!$is_libur) {
+            $total_sewa       += (int) $row['sewa'];
+            $total_sisa_tunai += $sisa;
+        }
         $data_laporan[] = [
             'tanggal'    => $row['tanggal'],
             'sewa'       => (int) $row['sewa'],
             'sisa_tunai' => $sisa,
+            'libur'      => $is_libur,
         ];
     }
     $stmt->close();
@@ -369,12 +373,20 @@ function lm_rp($n): string
             <tbody>
                 <?php if ($total_baris > 0): ?>
                     <?php $no = 1; foreach ($data_laporan as $row): ?>
+                        <?php if ($row['libur']): ?>
+                        <tr>
+                            <td class="c"><?= $no++ ?></td>
+                            <td class="c"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
+                            <td class="c" colspan="2" style="font-style:italic; color:#666;">LIBUR / TUTUP</td>
+                        </tr>
+                        <?php else: ?>
                         <tr>
                             <td class="c"><?= $no++ ?></td>
                             <td class="c"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
                             <td class="num"><?= lm_rp($row['sewa']) ?></td>
                             <td class="num lm-neg"><?= $row['sisa_tunai'] > 0 ? '(' . lm_rp($row['sisa_tunai']) . ')' : '0' ?></td>
                         </tr>
+                        <?php endif; ?>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr class="lm-empty"><td colspan="4">Tidak ada data laporan pada periode ini.</td></tr>

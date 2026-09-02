@@ -249,6 +249,7 @@ $no = 1;
                     <?php else: ?>
                         <?php while($row=$data->fetch_assoc()):
                             $lengkap = ($row['status_laporan'] ?? 'lengkap') === 'lengkap';
+                            $libur   = ($row['status_laporan'] ?? '') === 'libur';
                         ?>
                         <tr>
                             <td class="ps-4 fw-semibold text-muted"><?= $no++ ?></td>
@@ -256,11 +257,15 @@ $no = 1;
                             <td>
                                 <?php if ($lengkap): ?>
                                     <span class="badge badge-modern bg-success-subtle text-success border-success-subtle"><i class="bi bi-check-circle-fill me-1"></i>Selesai</span>
+                                <?php elseif ($libur): ?>
+                                    <span class="badge badge-modern bg-secondary-subtle text-secondary border-secondary-subtle"><i class="bi bi-moon-stars-fill me-1"></i>Libur / Tutup</span>
                                 <?php else: ?>
                                     <span class="badge badge-modern bg-warning-subtle text-warning border-warning-subtle"><i class="bi bi-hourglass-split me-1"></i>Menunggu PIC</span>
                                 <?php endif; ?>
                             </td>
-                            <?php if (!$lengkap): ?>
+                            <?php if ($libur): ?>
+                                <td colspan="9" class="text-muted small fst-italic">Warung libur / tutup pada tanggal ini</td>
+                            <?php elseif (!$lengkap): ?>
                                 <td colspan="9" class="text-muted small fst-italic">Laporan keuangan belum diinput PIC</td>
                             <?php else: ?>
                             <td>

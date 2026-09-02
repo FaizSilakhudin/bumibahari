@@ -14,7 +14,7 @@ $prev_tgl = date('Y-m-d', strtotime($tanggal . ' -1 day'));
 $next_tgl = date('Y-m-d', strtotime($tanggal . ' +1 day'));
 
 $antrian = [];
-$ringkasan = ['total' => 0, 'lengkap' => 0, 'menunggu' => 0, 'belum_nota' => 0];
+$ringkasan = ['total' => 0, 'lengkap' => 0, 'menunggu' => 0, 'belum_nota' => 0, 'libur' => 0];
 
 // Paginasi — 10 per halaman, sama persis dengan render_pagination() yang dipakai admin_pusat.
 $limit  = 10;
@@ -41,6 +41,7 @@ if (!empty($cabang_ids)) {
         $ringkasan['total']++;
         if ($status === 'lengkap') $ringkasan['lengkap']++;
         elseif ($status === 'menunggu') $ringkasan['menunggu']++;
+        elseif ($status === 'libur') $ringkasan['libur']++;
         else $ringkasan['belum_nota']++;
     }
     $stmt_all->close();
@@ -103,26 +104,32 @@ if (!empty($cabang_ids)) {
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
+    <div class="row g-3 mb-4 row-cols-2 row-cols-md-5">
+        <div class="col">
             <div class="stat-card d-flex align-items-center gap-3" style="--sc-accent:#2563eb;">
                 <div class="icon" style="background:#eef2ff;color:#2563eb;"><i class="bi bi-shop"></i></div>
                 <div><div class="text-muted small fw-semibold">Cabang Dipegang</div><div class="fw-bold fs-4 text-dark"><?= $ringkasan['total'] ?></div></div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col">
             <div class="stat-card d-flex align-items-center gap-3" style="--sc-accent:#15803d;">
                 <div class="icon" style="background:#dcfce7;color:#15803d;"><i class="bi bi-check-circle"></i></div>
                 <div><div class="text-muted small fw-semibold">Laporan Selesai</div><div class="fw-bold fs-4 text-dark"><?= $ringkasan['lengkap'] ?></div></div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col">
             <div class="stat-card d-flex align-items-center gap-3" style="--sc-accent:#b45309;">
                 <div class="icon" style="background:#fef3c7;color:#b45309;"><i class="bi bi-hourglass-split"></i></div>
                 <div><div class="text-muted small fw-semibold">Menunggu Diinput</div><div class="fw-bold fs-4 text-dark"><?= $ringkasan['menunggu'] ?></div></div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col">
+            <div class="stat-card d-flex align-items-center gap-3" style="--sc-accent:#64748b;">
+                <div class="icon" style="background:#f1f5f9;color:#64748b;"><i class="bi bi-moon-stars-fill"></i></div>
+                <div><div class="text-muted small fw-semibold">Libur / Tutup</div><div class="fw-bold fs-4 text-dark"><?= $ringkasan['libur'] ?></div></div>
+            </div>
+        </div>
+        <div class="col">
             <div class="stat-card d-flex align-items-center gap-3" style="--sc-accent:#b91c1c;">
                 <div class="icon" style="background:#fee2e2;color:#b91c1c;"><i class="bi bi-camera"></i></div>
                 <div><div class="text-muted small fw-semibold">Nota Belum Masuk</div><div class="fw-bold fs-4 text-dark"><?= $ringkasan['belum_nota'] ?></div></div>
@@ -167,16 +174,22 @@ if (!empty($cabang_ids)) {
                                 <span class="badge bg-success-subtle text-success px-3 py-2 rounded-pill"><i class="bi bi-check-circle-fill me-1"></i>Selesai</span>
                             <?php elseif ($row['status_efektif'] === 'menunggu'): ?>
                                 <span class="badge bg-warning-subtle text-warning px-3 py-2 rounded-pill"><i class="bi bi-hourglass-split me-1"></i>Menunggu Input</span>
+                            <?php elseif ($row['status_efektif'] === 'libur'): ?>
+                                <span class="badge bg-secondary-subtle text-secondary px-3 py-2 rounded-pill"><i class="bi bi-moon-stars-fill me-1"></i>Libur / Tutup</span>
                             <?php else: ?>
                                 <span class="badge bg-danger-subtle text-danger px-3 py-2 rounded-pill"><i class="bi bi-camera me-1"></i>Nota Belum Ada</span>
                             <?php endif; ?>
                         </td>
                         <td class="text-center">
+                            <?php if ($row['status_efektif'] === 'libur'): ?>
+                                <span class="text-muted small fst-italic">Tidak ada laporan</span>
+                            <?php else: ?>
                             <a href="input_laporan.php?id_cabang=<?= (int)$row['id_cabang'] ?>&tanggal=<?= h($tanggal) ?>"
                                class="btn btn-sm <?= $row['status_efektif'] === 'lengkap' ? 'btn-outline-secondary' : 'btn-primary' ?>">
                                 <i class="bi bi-<?= $row['status_efektif'] === 'lengkap' ? 'eye' : 'pencil-square' ?> me-1"></i>
                                 <?= $row['status_efektif'] === 'lengkap' ? 'Lihat / Edit' : 'Isi Laporan' ?>
                             </a>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; endif; ?>

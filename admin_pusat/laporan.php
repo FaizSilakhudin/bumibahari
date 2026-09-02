@@ -516,6 +516,7 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                         while($row = $data->fetch_assoc()):
                             $margin = $row['persentase'] ?? 0; // AMBIL DARI KOLOM DB
                             $id = $row['id'];
+                            $is_libur = ($row['status_laporan'] ?? '') === 'libur';
                         ?>
                         <tr>
                             <tr>
@@ -528,7 +529,9 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                     <i class="bi bi-calendar3 me-1 text-muted"></i>
                                     <?= date('d/m/Y', strtotime($row['tanggal'])) ?>
                                 </span>
-                                <?php if (($row['status_laporan'] ?? 'lengkap') === 'lengkap'): ?>
+                                <?php if ($is_libur): ?>
+                                    <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-moon-stars-fill me-1"></i>Libur/Tutup</span>
+                                <?php elseif (($row['status_laporan'] ?? 'lengkap') === 'lengkap'): ?>
                                     <span class="badge bg-success-subtle text-success">Selesai</span>
                                 <?php else: ?>
                                     <span class="badge bg-warning-subtle text-warning">Menunggu PIC</span>
@@ -543,6 +546,11 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                 <?= h($row['nama_pengelola']) ?>
                             </td>
 
+                            <?php if ($is_libur): ?>
+                            <td colspan="8" class="text-center text-muted fst-italic">
+                                <i class="bi bi-moon-stars-fill me-1"></i> Warung Libur / Tutup — tidak ada laporan keuangan
+                            </td>
+                            <?php else: ?>
                             <!-- OMZET BERSIH -->
                             <td>
                                 <span class="text-dark fw-bold">
@@ -598,6 +606,7 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
                                     <?= number_format($margin, 2) ?>%
                                 </span>
                             </td>
+                            <?php endif; ?>
 
                             <!-- AKSI -->
                             <td class="text-center px-4">

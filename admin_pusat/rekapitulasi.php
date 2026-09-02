@@ -488,7 +488,11 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                     include '_rekap_tabel_harian.php';
 
                     // Angka yang dipakai bagian lain (Matrik Akumulasi, tombol export, dll.)
-                    $jumlah_hari_data = $rk_num_rows;
+                    // $jumlah_hari_data = total baris (termasuk libur), untuk "ada data / tombol export".
+                    // $jumlah_hari_kerja = jumlah hari 'lengkap' saja, untuk pembagi rata-rata harian
+                    // (hari libur tidak boleh mengencerkan rata-rata beban operasional harian).
+                    $jumlah_hari_data  = $rk_num_rows;
+                    $jumlah_hari_kerja = $rk_num_lengkap;
                     $total_pasar   = $rk_t_pasar;
                     $total_beras   = $rk_t_beras;
                     $total_sembako = $rk_t_sembako;
@@ -538,8 +542,8 @@ $nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_"
                 </thead>
                 <tbody>
                     <?php
-                    // Hitung jumlah hari ada data untuk dapat rata2 harian
-                    $jumlah_hari = (($jumlah_hari_data ?? 0) > 0) ? $jumlah_hari_data : 1;
+                    // Hitung jumlah hari ada data untuk dapat rata2 harian (hari libur tidak dihitung)
+                    $jumlah_hari = (($jumlah_hari_kerja ?? 0) > 0) ? $jumlah_hari_kerja : 1;
 
                     $uraian_bo = [
                         1 => ['nama' => 'Sewa Ruko', 'field' => 'sewa', 'harian' => true, 'tahunan' => true],

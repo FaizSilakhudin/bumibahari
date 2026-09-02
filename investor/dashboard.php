@@ -118,7 +118,7 @@ if (!empty($cabang_ids)) {
     $offset_laporan = ($page_laporan - 1) * $limit_laporan;
 
     $st = $conn->prepare("SELECT COUNT(*) total FROM laporan_cabang l
-                           WHERE l.status_laporan = 'lengkap' AND l.tanggal BETWEEN ? AND ? AND l.id_cabang IN ($ph)");
+                           WHERE l.status_laporan IN ('lengkap','libur') AND l.tanggal BETWEEN ? AND ? AND l.id_cabang IN ($ph)");
     $st->bind_param('ss' . str_repeat('i', count($cabang_ids)), $tgl_awal, $tgl_akhir, ...$cabang_ids);
     $st->execute();
     $total_laporan = (int) $st->get_result()->fetch_assoc()['total'];
@@ -128,7 +128,7 @@ if (!empty($cabang_ids)) {
                            FROM laporan_cabang l
                            JOIN cabang c ON c.id_cabang = l.id_cabang
                            LEFT JOIN users u ON u.id = l.id_user_laporan
-                           WHERE l.status_laporan = 'lengkap' AND l.tanggal BETWEEN ? AND ? AND l.id_cabang IN ($ph)
+                           WHERE l.status_laporan IN ('lengkap','libur') AND l.tanggal BETWEEN ? AND ? AND l.id_cabang IN ($ph)
                            ORDER BY l.tanggal DESC, c.nama_cabang ASC
                            LIMIT ? OFFSET ?");
     $st->bind_param('ss' . str_repeat('i', count($cabang_ids)) . 'ii', $tgl_awal, $tgl_akhir, ...array_merge($cabang_ids, [$limit_laporan, $offset_laporan]));
@@ -418,15 +418,21 @@ if (!empty($cabang_ids)) {
                 <tbody>
                 <?php if (empty($laporan_list)): ?>
                     <tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>Belum ada laporan final pada periode ini.</td></tr>
-                <?php else: foreach ($laporan_list as $r): ?>
+                <?php else: foreach ($laporan_list as $r): $r_libur = ($r['status_laporan'] ?? '') === 'libur'; ?>
                     <tr>
                         <td data-label="Tanggal" class="fw-semibold"><?= date('d M Y', strtotime($r['tanggal'])) ?></td>
                         <td data-label="Cabang" class="fw-bold" style="color:#1e1b2e;"><?= h($r['nama_cabang']) ?></td>
+                        <?php if ($r_libur): ?>
+                        <td colspan="5" class="text-center text-muted fst-italic">
+                            <i class="bi bi-moon-stars-fill me-1"></i> Warung Libur / Tutup — tidak ada laporan keuangan
+                        </td>
+                        <?php else: ?>
                         <td data-label="Omzet" class="fw-semibold" style="color: var(--inv-primary);">Rp <?= number_format($r['total_omset'], 0, ',', '.') ?></td>
                         <td data-label="Total Pengeluaran">Rp <?= number_format($r['total_pengeluaran'], 0, ',', '.') ?></td>
                         <td data-label="Net Profit" class="fw-bold" style="color:#16a34a;">Rp <?= number_format($r['net_profit'], 0, ',', '.') ?></td>
                         <td data-label="Margin"><span class="badge badge-modern-success"><?= number_format($r['persentase'], 2) ?>%</span></td>
                         <td data-label="Diinput Oleh"><i class="bi bi-person-badge me-1 text-muted"></i><?= h($r['nama_pic'] ?? 'Pusat') ?></td>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; endif; ?>
                 </tbody>

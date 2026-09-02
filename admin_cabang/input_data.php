@@ -33,9 +33,77 @@ $stmt->close();
 $status_saat_ini = $laporan_hari_ini['status_laporan'] ?? null;
 
 // =====================================================
+// PROSES TANDAI LIBUR / TUTUP
+// =====================================================
+if (isset($_POST['tandai_libur'])) {
+
+    if (!csrf_check($_POST['csrf'] ?? '')) {
+        die("<script>alert('Token tidak valid!'); history.back();</script>");
+    }
+
+    if ($status_saat_ini === 'lengkap') {
+        echo "<script>alert('Laporan tanggal ini sudah diproses PIC, tidak bisa ditandai libur.'); history.back();</script>";
+        exit;
+    }
+
+    $id_user_nota = current_user_id();
+    $stmt = $conn->prepare("
+        INSERT INTO laporan_cabang (id_cabang, nama_pengelola, tanggal, id_user_nota, status_laporan)
+        VALUES (?, ?, ?, ?, 'libur')
+        ON DUPLICATE KEY UPDATE
+            nama_pengelola = VALUES(nama_pengelola),
+            id_user_nota   = VALUES(id_user_nota),
+            status_laporan = 'libur'
+    ");
+    $stmt->bind_param("issi", $id_cabang, $nama_pengelola, $tgl, $id_user_nota);
+
+    if ($stmt->execute()) {
+        audit($conn, 'tandai_libur', 'laporan_cabang', $id_cabang . '@' . $tgl, [
+            'id_cabang' => $id_cabang, 'tanggal' => $tgl,
+        ]);
+        echo "<script>
+                alert('Tanggal " . $tgl . " ditandai Libur/Tutup.');
+                window.location.replace('input_data.php');
+              </script>";
+        exit;
+    } else {
+        echo "<script>alert('Gagal simpan: " . addslashes($stmt->error) . "'); history.back();</script>";
+        exit;
+    }
+}
+
+// =====================================================
+// PROSES BATALKAN TANDA LIBUR (kembali ke alur kirim nota biasa)
+// =====================================================
+if (isset($_POST['batalkan_libur'])) {
+
+    if (!csrf_check($_POST['csrf'] ?? '')) {
+        die("<script>alert('Token tidak valid!'); history.back();</script>");
+    }
+
+    if ($status_saat_ini === 'libur') {
+        $stmt = $conn->prepare("DELETE FROM laporan_cabang WHERE id_cabang = ? AND tanggal = ? AND status_laporan = 'libur'");
+        $stmt->bind_param("is", $id_cabang, $tgl);
+        $stmt->execute();
+        audit($conn, 'batalkan_libur', 'laporan_cabang', $id_cabang . '@' . $tgl, [
+            'id_cabang' => $id_cabang, 'tanggal' => $tgl,
+        ]);
+    }
+
+    echo "<script>window.location.replace('input_data.php');</script>";
+    exit;
+}
+
+// =====================================================
 // PROSES SIMPAN (UPLOAD NOTA)
 // =====================================================
 if (isset($_POST['simpan'])) {
+
+    if ($status_saat_ini === 'libur') {
+        echo "<script>alert('Tanggal ini sudah ditandai Libur/Tutup. Batalkan tanda libur dulu untuk mengirim nota.'); history.back();</script>";
+        exit;
+    }
+
 
     if (!csrf_check($_POST['csrf'] ?? '')) {
         die("<script>alert('Token tidak valid!'); history.back();</script>");
@@ -202,8 +270,33 @@ body { background-color: #f6f8fa; }
             <i class="bi bi-hourglass-split fs-4 me-3"></i>
             <div>Nota tanggal <?= date('d M Y', strtotime($tgl)) ?> sudah terkirim, menunggu diproses PIC.</div>
         </div>
+    <?php elseif ($status_saat_ini === 'libur'): ?>
+        <div class="alert alert-secondary d-flex align-items-center justify-content-between flex-wrap gap-2 rounded-4 mb-4">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-moon-stars-fill fs-4 me-3"></i>
+                <div>Tanggal <?= date('d M Y', strtotime($tgl)) ?> ditandai <strong>Libur / Tutup</strong>. Tidak perlu kirim nota.</div>
+            </div>
+            <form method="POST" onsubmit="return confirm('Batalkan tanda libur dan kembali ke pengiriman nota biasa?')">
+                <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                <button type="submit" name="batalkan_libur" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Batalkan, Kirim Nota
+                </button>
+            </form>
+        </div>
     <?php endif; ?>
 
+    <?php if ($status_saat_ini !== 'libur' && $status_saat_ini !== 'lengkap'): ?>
+        <div class="d-flex justify-content-end mb-4">
+            <form method="POST" onsubmit="return confirm('Tandai warung LIBUR/TUTUP untuk tanggal <?= date('d M Y', strtotime($tgl)) ?>? Anda tidak perlu kirim nota untuk hari ini.')">
+                <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                <button type="submit" name="tandai_libur" class="btn btn-outline-dark btn-sm rounded-pill px-3">
+                    <i class="bi bi-moon-stars-fill me-1"></i> Warung Libur / Tutup
+                </button>
+            </form>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($status_saat_ini !== 'libur'): ?>
     <form method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
 
@@ -265,6 +358,7 @@ body { background-color: #f6f8fa; }
             </button>
         </div>
     </form>
+    <?php endif; ?>
 </div>
 
 <script>

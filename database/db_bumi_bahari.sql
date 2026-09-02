@@ -188,7 +188,7 @@ CREATE TABLE `laporan_cabang` (
   `foto_nota2` varchar(255) DEFAULT NULL,
   `foto_nota3` varchar(255) DEFAULT NULL,
   `foto_nota4` varchar(255) DEFAULT NULL,
-  `status_laporan` enum('menunggu','lengkap') NOT NULL DEFAULT 'lengkap',
+  `status_laporan` enum('menunggu','lengkap','libur') NOT NULL DEFAULT 'lengkap',
   `id_user_nota` int(11) DEFAULT NULL,
   `id_user_laporan` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),

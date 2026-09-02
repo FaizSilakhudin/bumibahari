@@ -11,7 +11,8 @@
  *   $rk_tabel_id    string  id untuk atribut <table>
  *
  * OUTPUT (di-set untuk pemanggil):
- *   $rk_num_rows    int
+ *   $rk_num_rows     int  total baris (termasuk hari libur)
+ *   $rk_num_lengkap  int  jumlah hari status 'lengkap' saja (dipakai untuk rata-rata harian)
  *   $rk_t_pasar, $rk_t_beras, $rk_t_sembako, $rk_t_toko  float
  */
 
@@ -26,15 +27,16 @@ $rk_stmt = $conn->prepare("
            l.belanja_pasar, l.belanja_beras, l.belanja_sembako, l.belanja_toko,
            l.sewa, l.gaji, l.listrik, l.air, l.sampah, l.keamanan, l.internet,
            l.gas, l.mingguan_karyawan, l.es_batu, l.bensin, l.lain_lain,
-           l.net_profit, l.persentase
+           l.net_profit, l.persentase, l.status_laporan
     FROM laporan_cabang l
-    WHERE YEAR(l.tanggal) = ? AND MONTH(l.tanggal) = ? AND l.id_cabang = ? AND l.status_laporan = 'lengkap'
+    WHERE YEAR(l.tanggal) = ? AND MONTH(l.tanggal) = ? AND l.id_cabang = ? AND l.status_laporan IN ('lengkap','libur')
     ORDER BY l.tanggal ASC
 ");
 $rk_stmt->bind_param('iii', $rk_th, $rk_bl, $rk_id_cabang);
 $rk_stmt->execute();
-$rk_res      = $rk_stmt->get_result();
-$rk_num_rows = $rk_res->num_rows;
+$rk_res        = $rk_stmt->get_result();
+$rk_num_rows   = $rk_res->num_rows;
+$rk_num_lengkap = 0;
 
 $rk_t_tunai = $rk_t_qris = $rk_t_gofood = $rk_t_grab = 0;
 $rk_t_omzet = $rk_t_pasar = $rk_t_beras = $rk_t_sembako = $rk_t_toko = 0;
@@ -81,6 +83,17 @@ $rk_no = 1;
     <tbody>
         <?php if ($rk_num_rows > 0): ?>
             <?php while ($rk_h = $rk_res->fetch_assoc()):
+                if (($rk_h['status_laporan'] ?? '') === 'libur'): ?>
+                <tr class="table-secondary">
+                    <td class="text-center text-muted"><?= $rk_no++ ?></td>
+                    <td class="fw-medium"><?= date('d/m/Y', strtotime($rk_h['tanggal'])) ?></td>
+                    <td colspan="16" class="text-center text-muted fst-italic">
+                        <i class="bi bi-moon-stars-fill me-1"></i> LIBUR / TUTUP
+                    </td>
+                </tr>
+                <?php continue; endif;
+
+                $rk_num_lengkap++;
                 $rk_tunai     = (float) ($rk_h['tunai'] ?? 0);
                 $rk_qris      = (float) ($rk_h['qris'] ?? 0);
                 $rk_gofood    = (float) ($rk_h['go_food'] ?? 0);

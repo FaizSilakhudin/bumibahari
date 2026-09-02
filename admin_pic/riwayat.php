@@ -133,19 +133,26 @@ if (!empty($cabang_ids)) {
                                 Belum ada data pada <?= date('F Y', strtotime($tgl_awal)) ?>
                             </td>
                         </tr>
-                    <?php else: $no = 1; foreach ($rows as $row): $lengkap = ($row['status_laporan'] ?? 'lengkap') === 'lengkap'; ?>
+                    <?php else: $no = 1; foreach ($rows as $row):
+                        $lengkap = ($row['status_laporan'] ?? 'lengkap') === 'lengkap';
+                        $libur   = ($row['status_laporan'] ?? '') === 'libur';
+                    ?>
                         <tr>
                             <td class="ps-4 fw-semibold text-muted"><?= $no++ ?></td>
                             <td class="fw-bold text-secondary"><?= date("d M Y", strtotime($row['tanggal'])) ?></td>
                             <td class="fw-semibold text-dark"><?= h($row['nama_cabang']) ?></td>
                             <td>
-                                <?php if ($lengkap): ?>
+                                <?php if ($libur): ?>
+                                    <span class="badge badge-modern bg-secondary-subtle text-secondary border-secondary-subtle"><i class="bi bi-moon-stars-fill me-1"></i>Libur/Tutup</span>
+                                <?php elseif ($lengkap): ?>
                                     <span class="badge badge-modern bg-success-subtle text-success border-success-subtle"><i class="bi bi-check-circle-fill me-1"></i>Selesai</span>
                                 <?php else: ?>
                                     <span class="badge badge-modern bg-warning-subtle text-warning border-warning-subtle"><i class="bi bi-hourglass-split me-1"></i>Menunggu Input</span>
                                 <?php endif; ?>
                             </td>
-                            <?php if (!$lengkap): ?>
+                            <?php if ($libur): ?>
+                                <td colspan="9" class="text-center text-muted fst-italic"><i class="bi bi-moon-stars-fill me-1"></i> Warung Libur / Tutup — tidak ada laporan keuangan</td>
+                            <?php elseif (!$lengkap): ?>
                                 <td colspan="9" class="text-muted small fst-italic">Laporan keuangan belum diinput</td>
                             <?php else: ?>
                             <td><span class="text-success fw-bold">Rp <?= number_format($row['total_omset'], 0, ',', '.') ?></span></td>

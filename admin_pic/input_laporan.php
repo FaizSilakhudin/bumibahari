@@ -28,10 +28,24 @@ $stmt->close();
 $nama_cabang = $data_cabang['nama_cabang'] ?? '-';
 $nama_pengelola = pengelola_pada_tanggal($conn, $id_cabang, $tanggal);
 
+// Cabang ini sudah ditandai libur/tutup untuk tanggal ini? Tidak ada laporan
+// keuangan yang perlu (atau boleh) diinput.
+$stmt = $conn->prepare("SELECT status_laporan FROM laporan_cabang WHERE id_cabang = ? AND tanggal = ?");
+$stmt->bind_param("is", $id_cabang, $tanggal);
+$stmt->execute();
+$status_existing = $stmt->get_result()->fetch_assoc()['status_laporan'] ?? null;
+$stmt->close();
+$is_libur = ($status_existing === 'libur');
+
 // =====================================================
 // PROSES SIMPAN
 // =====================================================
 if (isset($_POST['simpan'])) {
+
+    if ($is_libur) {
+        echo "<script>alert('Cabang ini ditandai Libur/Tutup pada tanggal ini. Tidak bisa input laporan keuangan.'); window.location='index?tanggal=" . $tanggal . "';</script>";
+        exit;
+    }
 
     if (!csrf_check($_POST['csrf'] ?? '')) {
         die("<script>alert('Token tidak valid!'); history.back();</script>");
@@ -166,6 +180,15 @@ input.form-control-custom { text-align: right; }
         </div>
     </div>
 
+    <?php if ($is_libur): ?>
+    <div class="alert alert-secondary d-flex align-items-center rounded-4 py-4">
+        <i class="bi bi-moon-stars-fill fs-2 me-3"></i>
+        <div>
+            <strong>Cabang ini ditandai Libur / Tutup pada tanggal <?= date('d M Y', strtotime($tanggal)) ?>.</strong><br>
+            Tidak ada laporan keuangan yang perlu diinput untuk hari ini.
+        </div>
+    </div>
+    <?php else: ?>
     <div class="row g-4">
         <div class="col-lg-6">
             <div class="pic-nota-sticky">
@@ -344,6 +367,7 @@ input.form-control-custom { text-align: right; }
     </form>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <script>
