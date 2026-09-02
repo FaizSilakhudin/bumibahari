@@ -112,25 +112,24 @@ if ($filter_investor) {
 }
 
 // =====================================================================
-// 5. Grafik tren 6 bulan — berakhir di periode terpilih
+// 5. Grafik tren — granularitas bisa dipilih (harian/mingguan/bulanan/tahunan),
+//    berakhir di periode terpilih.
 // =====================================================================
-$g_start = date('Y-m-01', strtotime("$periode_ini-01 -5 month"));
-$g_end   = date('Y-m-t', strtotime("$periode_ini-01"));
-$st = $conn->prepare("SELECT DATE_FORMAT(l.tanggal,'%b %Y') bulan,
-                             COALESCE(SUM(l.total_omset),0) omzet,
-                             COALESCE(SUM(l.net_profit),0) laba
-                      FROM laporan_cabang l
-                      WHERE l.tanggal BETWEEN ? AND ? $where_filter
-                      GROUP BY DATE_FORMAT(l.tanggal,'%Y-%m') ORDER BY l.tanggal ASC");
-$st->bind_param("ss" . $types, ...array_merge([$g_start, $g_end], $params));
-$st->execute();
-$grafik = $st->get_result();
-$label_grafik = $data_omzet = $data_laba = [];
-while ($g = $grafik->fetch_assoc()) {
-    $label_grafik[] = $g['bulan'];
-    $data_omzet[]   = $g['omzet'];
-    $data_laba[]    = $g['laba'];
+$granularitas_tren = $_GET['tren'] ?? 'bulanan';
+if (!in_array($granularitas_tren, ['harian', 'mingguan', 'bulanan', 'tahunan'], true)) {
+    $granularitas_tren = 'bulanan';
 }
+$g_end = anchor_periode(date('Y-m-t', strtotime("$periode_ini-01")));
+$tren  = ambil_tren_performa($conn, $granularitas_tren, $g_end, $where_filter, $params, $types);
+$label_grafik = $tren['label'];
+$data_omzet   = $tren['omzet'];
+$data_laba    = $tren['laba'];
+$label_periode_tren = [
+    'harian'   => '30 Hari Terakhir',
+    'mingguan' => '12 Minggu Terakhir',
+    'bulanan'  => '6 Bulan Terakhir',
+    'tahunan'  => '5 Tahun Terakhir',
+][$granularitas_tren];
 
 // =====================================================================
 // 6. Peringatan dini — cabang yang SAMA SEKALI belum kirim laporan/nota untuk
@@ -549,11 +548,17 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
         <!-- GRAFIK -->
         <div class="col-lg-8 col-12">
             <div class="saas-card h-100">
-                <div class="d-flex align-items-center justify-content-between mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
                     <div>
-                        <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">Trend Performa 6 Bulan Terakhir</h6>
+                        <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">Trend Performa <?= h($label_periode_tren) ?></h6>
                         <span class="text-muted small">Perbandingan Grafik Omzet vs Laba</span>
                     </div>
+                    <select class="form-select form-select-sm" style="width:auto;" onchange="gantiTren(this.value)">
+                        <option value="harian" <?= $granularitas_tren === 'harian' ? 'selected' : '' ?>>Harian</option>
+                        <option value="mingguan" <?= $granularitas_tren === 'mingguan' ? 'selected' : '' ?>>Mingguan</option>
+                        <option value="bulanan" <?= $granularitas_tren === 'bulanan' ? 'selected' : '' ?>>Bulanan</option>
+                        <option value="tahunan" <?= $granularitas_tren === 'tahunan' ? 'selected' : '' ?>>Tahunan</option>
+                    </select>
                 </div>
                 <div style="position: relative; height: 300px; width: 100%;">
                     <canvas id="grafikTrend"></canvas>
@@ -692,6 +697,12 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+function gantiTren(val) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tren', val);
+    window.location.href = url.toString();
+}
+
 const ctx = document.getElementById('grafikTrend').getContext('2d');
 
 const gradOmzet = ctx.createLinearGradient(0, 0, 0, 280);

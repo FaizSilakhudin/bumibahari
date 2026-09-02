@@ -349,6 +349,70 @@ if (!function_exists('investor_pada_tanggal')) {
 }
 
 // ---------------------------------------------------------------------------
+// 5a-2. Grafik "Trend Performa" — satu logika dipakai bareng oleh admin_pusat
+//       dan investor supaya jendela waktu & pelabelan tiap granularitas SAMA
+//       PERSIS di kedua tempat, tidak ada yang beda sendiri.
+// ---------------------------------------------------------------------------
+if (!function_exists('ambil_tren_performa')) {
+    /**
+     * @param string $granularitas  'harian' | 'mingguan' | 'bulanan' | 'tahunan'
+     * @param string $anchor_tanggal  Tanggal akhir jendela (biasanya akhir periode yang lagi dipilih, dibatasi hari ini).
+     * @param string $where_filter  Filter TAMBAHAN yang sudah diawali "AND ..." (mis. scoping cabang/investor pemanggil).
+     * @param array  $params  Nilai untuk placeholder di $where_filter (belum termasuk tanggal jendela).
+     * @param string $types   Tipe bind_param untuk $params (belum termasuk 2 tanggal jendela).
+     */
+    function ambil_tren_performa(mysqli $conn, string $granularitas, string $anchor_tanggal, string $where_filter, array $params, string $types): array
+    {
+        switch ($granularitas) {
+            case 'harian':
+                $mulai    = date('Y-m-d', strtotime("$anchor_tanggal -29 days")); // 30 hari terakhir
+                $group    = 'l.tanggal';
+                $label_sql = "DATE_FORMAT(MIN(l.tanggal), '%d %b')";
+                break;
+            case 'mingguan':
+                $mulai    = date('Y-m-d', strtotime("$anchor_tanggal -83 days")); // ~12 minggu terakhir
+                $group    = 'YEARWEEK(l.tanggal, 1)';
+                $label_sql = "DATE_FORMAT(MIN(l.tanggal), '%d %b')"; // awal minggu
+                break;
+            case 'tahunan':
+                $mulai    = date('Y-01-01', strtotime("$anchor_tanggal -4 years")); // 5 tahun terakhir
+                $group    = 'YEAR(l.tanggal)';
+                $label_sql = 'YEAR(l.tanggal)';
+                break;
+            case 'bulanan':
+            default:
+                $granularitas = 'bulanan';
+                $mulai    = date('Y-m-01', strtotime("$anchor_tanggal -5 months")); // 6 bulan terakhir
+                $group    = "DATE_FORMAT(l.tanggal, '%Y-%m')";
+                $label_sql = "DATE_FORMAT(MIN(l.tanggal), '%b %Y')";
+                break;
+        }
+
+        $sql = "SELECT $label_sql AS label,
+                       COALESCE(SUM(l.total_omset), 0) omzet,
+                       COALESCE(SUM(l.net_profit), 0) laba
+                FROM laporan_cabang l
+                WHERE l.tanggal BETWEEN ? AND ? $where_filter
+                GROUP BY $group
+                ORDER BY MIN(l.tanggal) ASC";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('ss' . $types, ...array_merge([$mulai, $anchor_tanggal], $params));
+        $stmt->execute();
+        $res = $stmt->get_result();
+
+        $label = $omzet = $laba = [];
+        while ($row = $res->fetch_assoc()) {
+            $label[] = (string) $row['label'];
+            $omzet[] = (float) $row['omzet'];
+            $laba[]  = (float) $row['laba'];
+        }
+        $stmt->close();
+
+        return ['granularitas' => $granularitas, 'label' => $label, 'omzet' => $omzet, 'laba' => $laba];
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 5b. Scoping akses PIC & Investor — dipakai admin_pic/ dan investor/
 //     supaya query cabang selalu difilter, tidak pernah mengandalkan input user.
 // ---------------------------------------------------------------------------
