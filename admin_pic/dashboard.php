@@ -117,11 +117,13 @@ if (!empty($cabang_ids)) {
         $ranking_cabang[] = $row;
     }
 
-    // 6. Peringatan dini — cabang Anda yang belum lapor lengkap untuk KEMARIN
+    // 6. Peringatan dini — cabang Anda yang SAMA SEKALI belum kirim laporan/nota untuk
+    // KEMARIN (bukan yang nota-nya sudah masuk tapi belum diisi PIC — itu urusan
+    // "Antrian Laporan", bukan peringatan ke pusat).
     // Paginasi — 10 per halaman, sama persis dengan render_pagination() yang dipakai admin_pusat.
     $st = $conn->prepare("SELECT COUNT(*) total FROM cabang c
                            WHERE c.id_cabang IN ($ph)
-                             AND c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ? AND status_laporan = 'lengkap')");
+                             AND c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ?)");
     $st->bind_param($types_ids . 's', ...array_merge($cabang_ids, [$kemarin]));
     $st->execute();
     $total_peringatan = (int) $st->get_result()->fetch_assoc()['total'];
@@ -130,7 +132,7 @@ if (!empty($cabang_ids)) {
     $st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang, MAX(l.tanggal) input_terakhir, DATEDIFF(?, MAX(l.tanggal)) selisih_hari
                            FROM cabang c LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang
                            WHERE c.id_cabang IN ($ph)
-                             AND c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ? AND status_laporan = 'lengkap')
+                             AND c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ?)
                            GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC
                            LIMIT ? OFFSET ?");
     $st->bind_param('s' . $types_ids . 's' . 'ii', $kemarin, ...array_merge($cabang_ids, [$kemarin, $limit_peringatan, $offset_peringatan]));
@@ -358,7 +360,7 @@ if (!empty($cabang_ids)) {
     <div class="saas-card p-0 overflow-hidden mb-4">
         <div class="px-4 pt-4 pb-3 border-bottom" style="border-color: #f6f8ff !important;">
             <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">🚨 Peringatan Dini</h6>
-            <p class="text-muted small mb-0 mt-1">Cabang Anda yang belum mengirim laporan lengkap untuk tanggal <?= date('d M Y', strtotime($kemarin)) ?>.</p>
+            <p class="text-muted small mb-0 mt-1">Cabang Anda yang belum mengirim laporan untuk tanggal <?= date('d M Y', strtotime($kemarin)) ?>.</p>
         </div>
         <div class="table-responsive">
             <table class="table table-modern align-middle mb-0">

@@ -133,14 +133,16 @@ while ($g = $grafik->fetch_assoc()) {
 }
 
 // =====================================================================
-// 6. Peringatan dini — cabang yang belum lapor untuk tanggal KEMARIN
+// 6. Peringatan dini — cabang yang SAMA SEKALI belum kirim laporan/nota untuk
+// KEMARIN (bukan yang notanya sudah masuk tapi belum diisi PIC — itu bukan
+// "belum mengirim", jadi tidak masuk peringatan ini).
 // =====================================================================
 $limit_peringatan  = 10;
 $page_peringatan   = max(1, (int) ($_GET['page_peringatan'] ?? 1));
 $offset_peringatan = ($page_peringatan - 1) * $limit_peringatan;
 
 $st = $conn->prepare("SELECT COUNT(*) total FROM cabang c
-    WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ? AND status_laporan = 'lengkap') $where_filter_cabang");
+    WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ?) $where_filter_cabang");
 $st->bind_param("s" . $types, ...array_merge([$kemarin], $params));
 $st->execute();
 $total_peringatan = (int) $st->get_result()->fetch_assoc()['total'];
@@ -149,7 +151,7 @@ $total_pages_peringatan = (int) ceil($total_peringatan / $limit_peringatan);
 $st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola,
         MAX(l.tanggal) input_terakhir, DATEDIFF(?, MAX(l.tanggal)) selisih_hari
     FROM cabang c LEFT JOIN laporan_cabang l ON c.id_cabang = l.id_cabang
-    WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ? AND status_laporan = 'lengkap') $where_filter_cabang
+    WHERE c.id_cabang NOT IN (SELECT id_cabang FROM laporan_cabang WHERE tanggal = ?) $where_filter_cabang
     GROUP BY c.id_cabang ORDER BY selisih_hari DESC, c.nama_cabang ASC
     LIMIT ? OFFSET ?");
 $st->bind_param("ss" . $types . "ii", ...array_merge([$kemarin, $kemarin], $params, [$limit_peringatan, $offset_peringatan]));
