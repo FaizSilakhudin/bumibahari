@@ -144,6 +144,7 @@ if (!empty($cabang_ids)) {
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <style>
     :root { --inv-primary: #7e22ce; --inv-primary-2: #a855f7; --inv-glow: rgba(126,34,206,.08); --inv-gold: #d4af37; }
@@ -217,6 +218,24 @@ if (!empty($cabang_ids)) {
         .table-modern tbody td, .table-saas tbody td { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 !important; border-bottom: 1px dashed #f3e8ff !important; text-align: right; white-space: normal; }
         .table-modern tbody td::before, .table-saas tbody td::before { content: attr(data-label); font-weight: 700; color: #a78bc4; font-size: 11px; text-transform: uppercase; text-align: left; }
     }
+
+    /* Modal Detail Laporan (read-only) */
+    .inv-detail-content { border: 0; border-radius: 14px; overflow: hidden; }
+    .inv-detail-head { background: linear-gradient(135deg, #4a1d5c 0%, #2e0f3a 100%); color: #fff; padding: 14px 18px; align-items: flex-start; }
+    .inv-detail-head .modal-title { color: #fff; }
+    .inv-detail-head-sub { display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: .78rem; color: #e9d5ff; }
+    .inv-detail-body { background: #faf7ff; padding: 16px; }
+    .inv-detail-sec { background: #fff; border: 1px solid #f3e8ff; border-radius: 12px; padding: 14px; }
+    .inv-detail-sec-h { font-weight: 700; font-size: .78rem; letter-spacing: .02em; text-transform: uppercase; color: #4c1d95; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .inv-detail-badge { margin-left: auto; font-weight: 600; font-size: .68rem; background: #f3e8ff; color: #6b21a8; padding: 2px 8px; border-radius: 999px; text-transform: none; letter-spacing: 0; }
+    .inv-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 2px; border-bottom: 1px dashed #f3e8ff; font-size: .85rem; }
+    .inv-detail-row:last-child { border-bottom: none; }
+    .inv-detail-row span { color: #64748b; } .inv-detail-row b { color: #1e1b2e; font-weight: 700; }
+    .inv-detail-hi { background: #faf5ff; margin: 0 -14px; padding: 8px 14px; }
+    .inv-detail-hi b { color: #7e22ce; }
+    .inv-detail-notas { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 2px; }
+    .inv-detail-nota-img { width: 100%; height: auto; max-height: 260px; object-fit: contain; background: #0f172a; border-radius: 10px; border: 1px solid #e2e8f0; cursor: zoom-in; display: block; }
+    .inv-detail-foot { background: #fff; border-top: 1px solid #f3e8ff; padding: 12px 16px; }
 </style>
 
 <div class="container-fluid py-4 px-3 px-md-4">
@@ -413,11 +432,12 @@ if (!empty($cabang_ids)) {
                         <th>Net Profit</th>
                         <th>Margin</th>
                         <th>Diinput Oleh (PIC)</th>
+                        <th class="text-center">Detail</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($laporan_list)): ?>
-                    <tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>Belum ada laporan final pada periode ini.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>Belum ada laporan final pada periode ini.</td></tr>
                 <?php else: foreach ($laporan_list as $r): ?>
                     <tr>
                         <td data-label="Tanggal" class="fw-semibold"><?= date('d M Y', strtotime($r['tanggal'])) ?></td>
@@ -427,6 +447,11 @@ if (!empty($cabang_ids)) {
                         <td data-label="Net Profit" class="fw-bold" style="color:#16a34a;">Rp <?= number_format($r['net_profit'], 0, ',', '.') ?></td>
                         <td data-label="Margin"><span class="badge badge-modern-success"><?= number_format($r['persentase'], 2) ?>%</span></td>
                         <td data-label="Diinput Oleh"><i class="bi bi-person-badge me-1 text-muted"></i><?= h($r['nama_pic'] ?? 'Pusat') ?></td>
+                        <td data-label="Detail" class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#invDetail<?= (int) $r['id'] ?>">
+                                <i class="bi bi-eye me-1"></i> Detail
+                            </button>
+                        </td>
                     </tr>
                 <?php endforeach; endif; ?>
                 </tbody>
@@ -437,8 +462,116 @@ if (!empty($cabang_ids)) {
             <?php render_pagination($page_laporan, $total_pages_laporan, ['from' => $offset_laporan + 1, 'to' => min($offset_laporan + $limit_laporan, $total_laporan), 'total' => $total_laporan, 'label' => 'laporan'], 'page_laporan'); ?>
         </div>
     </div>
+
+    <!-- ============ MODAL DETAIL LAPORAN (READ-ONLY, milik PIC/pusat) ============ -->
+    <?php foreach ($laporan_list as $r):
+        $inv_id = (int) $r['id'];
+        $inv_notas = [];
+        for ($n = 1; $n <= 4; $n++) {
+            if (!empty($r["foto_nota{$n}"])) $inv_notas[$n] = $r["foto_nota{$n}"];
+        }
+        $inv_rp = static fn ($v) => 'Rp ' . number_format((float) ($v ?? 0), 0, ',', '.');
+        $inv_row = static function (string $label, $val) use ($inv_rp) {
+            echo '<div class="inv-detail-row"><span>' . h($label) . '</span><b>' . $inv_rp($val) . '</b></div>';
+        };
+    ?>
+    <div class="modal fade" id="invDetail<?= $inv_id ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content inv-detail-content">
+                <div class="modal-header inv-detail-head">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-1">Detail Laporan Harian</h5>
+                        <div class="inv-detail-head-sub">
+                            <span><i class="bi bi-shop me-1"></i><?= h($r['nama_cabang']) ?></span>
+                            <span><i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($r['tanggal'])) ?></span>
+                            <span><i class="bi bi-person-badge me-1"></i><?= h($r['nama_pic'] ?? 'Pusat') ?></span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body inv-detail-body">
+                    <div class="alert alert-secondary small rounded-3 mb-3"><i class="bi bi-eye-fill me-1"></i> Tampilan lihat-saja &mdash; laporan ini milik cabang/PIC, investor tidak dapat mengubahnya.</div>
+
+                    <div class="row g-3">
+                        <div class="col-lg-7">
+                            <div class="d-flex flex-column gap-3">
+                                <section class="inv-detail-sec">
+                                    <div class="inv-detail-sec-h" style="color:#059669;"><i class="bi bi-cash-coin"></i> Pendapatan</div>
+                                    <?php $inv_row('Tunai', $r['tunai']); $inv_row('QRIS', $r['qris']); $inv_row('Grab Food', $r['grab_food']); $inv_row('Go Food', $r['go_food']); $inv_row('Pencairan QRIS', $r['pencairan_qris']); ?>
+                                </section>
+                                <section class="inv-detail-sec">
+                                    <div class="inv-detail-sec-h" style="color:#dc2626;"><i class="bi bi-basket"></i> Belanja Rutin</div>
+                                    <?php $inv_row('Pasar', $r['belanja_pasar']); $inv_row('Sembako', $r['belanja_sembako']); $inv_row('Beras', $r['belanja_beras']); $inv_row('Toko', $r['belanja_toko']); ?>
+                                </section>
+                                <section class="inv-detail-sec">
+                                    <div class="inv-detail-sec-h" style="color:#d97706;"><i class="bi bi-receipt"></i> Beban Operasional</div>
+                                    <?php foreach ([
+                                        'sewa' => 'Sewa', 'gaji' => 'Gaji', 'listrik' => 'Listrik', 'air' => 'Air',
+                                        'sampah' => 'Sampah', 'keamanan' => 'Keamanan', 'internet' => 'Internet', 'gas' => 'Gas',
+                                        'mingguan_karyawan' => 'Mingguan Karyawan', 'es_batu' => 'Es Batu',
+                                        'bensin' => 'Bensin', 'lain_lain' => 'Lain-lain',
+                                    ] as $fn => $fl) $inv_row($fl, $r[$fn]); ?>
+                                </section>
+                                <?php if (!empty($r['keterangan'])): ?>
+                                <section class="inv-detail-sec">
+                                    <div class="inv-detail-sec-h"><i class="bi bi-chat-left-text"></i> Catatan</div>
+                                    <div class="small text-muted"><?= nl2br(h($r['keterangan'])) ?></div>
+                                </section>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-5">
+                            <div class="d-flex flex-column gap-3">
+                                <section class="inv-detail-sec inv-detail-sum">
+                                    <div class="inv-detail-sec-h"><i class="bi bi-calculator"></i> Ringkasan</div>
+                                    <?php $inv_row('Total Omzet', $r['total_omset']); $inv_row('Belanja Rutin', $r['total_rutin']); $inv_row('Operasional', $r['total_operasional']); $inv_row('Total Pengeluaran', $r['total_pengeluaran']); $inv_row('Sisa Tunai', $r['sisa_tunai']); $inv_row('Sisa QRIS', $r['sisa_qris']); ?>
+                                    <div class="inv-detail-row inv-detail-hi"><span>Net Profit</span><b><?= $inv_rp($r['net_profit']) ?></b></div>
+                                    <div class="inv-detail-row inv-detail-hi"><span>Margin</span><b><?= number_format((float) $r['persentase'], 2) ?>%</b></div>
+                                </section>
+
+                                <section class="inv-detail-sec">
+                                    <div class="inv-detail-sec-h"><i class="bi bi-images"></i> Foto Nota <span class="inv-detail-badge"><?= count($inv_notas) ?> file</span></div>
+                                    <?php if ($inv_notas): ?>
+                                        <div class="inv-detail-notas">
+                                            <?php foreach ($inv_notas as $n => $file): ?>
+                                                <img src="../uploads/nota/<?= h($file) ?>" alt="Nota <?= $n ?>" loading="lazy" class="inv-detail-nota-img" onclick="invZoom(this.src)">
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="text-center text-muted small py-3"><i class="bi bi-image d-block fs-4 mb-1 opacity-50"></i>Tidak ada foto nota</div>
+                                    <?php endif; ?>
+                                </section>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer inv-detail-foot">
+                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+
     <?php endif; ?>
 </div>
+
+<div id="invZoomOverlay" onclick="invZoomClose()" style="position:fixed;inset:0;z-index:3000;background:rgba(2,6,23,.93);display:none;align-items:center;justify-content:center;padding:16px;cursor:zoom-out;">
+    <button type="button" onclick="invZoomClose()" style="position:absolute;top:12px;right:18px;color:#fff;font-size:2.2rem;line-height:1;background:none;border:0;cursor:pointer;">&times;</button>
+    <img id="invZoomImg" src="" alt="Nota" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;">
+</div>
+
+<script>
+function invZoom(src) {
+    document.getElementById('invZoomImg').src = src;
+    document.getElementById('invZoomOverlay').style.display = 'flex';
+}
+function invZoomClose() {
+    document.getElementById('invZoomOverlay').style.display = 'none';
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') invZoomClose(); });
+</script>
 
 <script>
 // Animasi hitung naik untuk angka KPI utama — murni kosmetik.

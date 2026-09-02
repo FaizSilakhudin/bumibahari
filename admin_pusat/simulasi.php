@@ -97,7 +97,7 @@ body { background-color: #f6f8ff !important; font-family: 'Plus Jakarta Sans', s
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <div>
             <h3 class="fw-bold mb-0" style="color:#0f172a;"><i class="bi bi-calculator-fill text-primary me-2"></i>Simulasi Pendapatan</h3>
-            <span class="text-muted small">Gambaran omzet &amp; pembagian hasil untuk cabang baru / calon investor — angka di bawah ini murni simulasi, tidak pernah disimpan ke database.</span>
+            <span class="text-muted small">Gambaran omzet &amp; pembagian hasil untuk cabang baru / calon investor — angka di bawah ini murni simulasi.</span>
         </div>
     </div>
 
@@ -232,7 +232,7 @@ body { background-color: #f6f8ff !important; font-family: 'Plus Jakarta Sans', s
         </div>
 
         <div class="alert alert-warning rounded-4 mt-4 small mb-0">
-            <i class="bi bi-info-circle-fill me-1"></i> Ini hanya simulasi berdasarkan angka perkiraan yang Anda masukkan — bukan data laporan sungguhan, dan tidak tersimpan di sistem.
+            <i class="bi bi-info-circle-fill me-1"></i> Ini hanya simulasi berdasarkan angka perkiraan yang di masukkan — bukan data laporan sungguhan.
         </div>
     </div>
     <?php endif; ?>
