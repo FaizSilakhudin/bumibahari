@@ -19,7 +19,7 @@ $nama_simulasi = trim($_GET['nama_simulasi'] ?? '');
 $jumlah_hari = (int) ($_GET['jumlah_hari'] ?? 30);
 if ($jumlah_hari < 1 || $jumlah_hari > 31) $jumlah_hari = 30;
 $persen_admin = (float) ($_GET['persen_admin'] ?? 3);
-if (!in_array($persen_admin, [3.0, 5.0, 7.5], true)) $persen_admin = 3.0;
+if ($persen_admin < 0 || $persen_admin > 100) $persen_admin = 3.0;
 
 $hasil = null;
 $bulanan = null;
@@ -115,12 +115,12 @@ body { background-color: #f6f8ff !important; font-family: 'Plus Jakarta Sans', s
                     <input type="number" name="jumlah_hari" value="<?= $jumlah_hari ?>" min="1" max="31" class="form-control form-control-sm">
                 </div>
                 <div class="col-6 col-md-3">
-                    <label class="sim-lbl">Admin Fee</label>
-                    <select name="persen_admin" class="form-select form-select-sm">
-                        <option value="3" <?= $persen_admin == 3 ? 'selected' : '' ?>>3%</option>
-                        <option value="5" <?= $persen_admin == 5 ? 'selected' : '' ?>>5%</option>
-                        <option value="7.5" <?= $persen_admin == 7.5 ? 'selected' : '' ?>>7,5%</option>
-                    </select>
+                    <label class="sim-lbl">Admin Fee (%)</label>
+                    <div class="input-group input-group-sm">
+                        <input type="number" name="persen_admin" value="<?= h(rtrim(rtrim(number_format($persen_admin, 2, '.', ''), '0'), '.')) ?>"
+                               step="0.01" min="0" max="100" class="form-control" placeholder="mis. 3">
+                        <span class="input-group-text">%</span>
+                    </div>
                 </div>
             </div>
 
