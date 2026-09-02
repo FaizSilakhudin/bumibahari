@@ -43,7 +43,7 @@ if (!$id_cabang || !in_array($id_cabang, $cabang_ids_pic, true)) {
 $info = null;
 if ($id_cabang) {
     $stmt = $conn->prepare("
-        SELECT c.nama_cabang, c.no_rekening_cabang, c.nama_bank_cabang, c.atas_nama_cabang
+        SELECT c.nama_cabang, c.no_rekening_cabang, c.nama_bank_cabang, c.atas_nama_cabang, c.alamat, c.no_telp
         FROM cabang c WHERE c.id_cabang = ? LIMIT 1
     ");
     $stmt->bind_param('i', $id_cabang);
@@ -64,6 +64,8 @@ $investor      = !empty($info['nama_investor'])     ? $info['nama_investor']    
 $no_rekening   = !empty($info['no_rekening_cabang']) ? $info['no_rekening_cabang'] : '-';
 $nama_bank     = !empty($info['nama_bank_cabang'])   ? $info['nama_bank_cabang']   : '-';
 $atas_nama_rek = !empty($info['atas_nama_cabang'])   ? $info['atas_nama_cabang']   : '-';
+$alamat_cabang = !empty($info['alamat'])   ? $info['alamat']   : 'Kantor Pusat : Jl. Pamulang Permai Raya, Pamulang Bar., Kec. Pamulang, Kota Tangerang Selatan, Banten 15417';
+$no_hp_cabang  = !empty($info['no_telp'])  ? $info['no_telp']  : '087784838769';
 
 // PIC yang menginput/memfinalisasi laporan pada periode ini (bisa lebih dari satu).
 $nama_pic = '-';
@@ -343,8 +345,8 @@ function lm_rp($n): string
             <div>
                 <p class="lm-kop-name">WARTEG BUMI BAHARI</p>
                 <p class="lm-kop-addr">
-                    Kantor Pusat : Jl. Pamulang Permai Raya, Pamulang Bar., Kec. Pamulang, Kota Tangerang Selatan, Banten 15417<br>
-                    Telp. 087784838769
+                    <?= h($alamat_cabang) ?><br>
+                    Telp. <?= h($no_hp_cabang) ?>
                 </p>
             </div>
         </div>

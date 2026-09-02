@@ -59,6 +59,10 @@ if ($periode == 'mingguan') {
 // Filter cabang
 $cabang_info = ['investor' => '-', 'no_rekening' => '-', 'nama_bank' => '-', "atas_nama_rekening" => "-"];
 $nama_cabang = "Semua Cabang";
+// Alamat/telp kop surat PDF — default kantor pusat, ditimpa alamat cabang aslinya
+// kalau lagi lihat 1 cabang spesifik (bukan "Semua Cabang").
+$alamat_cabang = "Kantor Pusat : Jl. Pamulang Permai Raya, Pamulang Bar., Kec. Pamulang, Kota Tangerang Selatan, Banten 15417";
+$no_hp_cabang = "087784838769";
 if ($id_cabang != '') {
     $where_sql .= " AND l.id_cabang = ?";
     $params[] = (int)$id_cabang;
@@ -69,7 +73,9 @@ if ($id_cabang != '') {
         c.nama_cabang,
         IFNULL(c.atas_nama_cabang, '-') AS atas_nama_rekening,
         IFNULL(c.no_rekening_cabang, '-') AS no_rekening,
-        IFNULL(c.nama_bank_cabang, '-') AS nama_bank
+        IFNULL(c.nama_bank_cabang, '-') AS nama_bank,
+        c.alamat,
+        c.no_telp
     FROM cabang c
     WHERE c.id_cabang = ?
     LIMIT 1
@@ -81,6 +87,8 @@ if ($id_cabang != '') {
     $cabang_info['investor'] = investor_pada_tanggal($conn, (int) $id_cabang, $periode_anchor);
     $nama_cabang = $cabang_info['nama_cabang'] ?? "Semua Cabang";
     $judul .= " - " . $nama_cabang;
+    if (!empty($cabang_info['alamat'])) $alamat_cabang = $cabang_info['alamat'];
+    if (!empty($cabang_info['no_telp'])) $no_hp_cabang = $cabang_info['no_telp'];
 }
 
 // 3. QUERY DATA UTAMA PAKAI PREPARED
