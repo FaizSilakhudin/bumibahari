@@ -212,6 +212,13 @@ if (isset($_POST['simpan'], $_POST['id_cabang'], $_POST['tanggal'])) {
         audit($conn, 'nota_kirim_oleh_pusat', 'laporan_cabang', $p_id_cabang . '@' . $p_tanggal, [
             'id_cabang' => $p_id_cabang, 'tanggal' => $p_tanggal,
         ]);
+
+        kirim_notifikasi($conn, pic_untuk_cabang($conn, $p_id_cabang), 'nota_masuk',
+            'Nota Baru (dari Pusat): ' . $cabang_valid['nama_cabang'],
+            'Admin Pusat mengirim nota atas nama cabang ' . $cabang_valid['nama_cabang'] . ' untuk tanggal ' . date('d M Y', strtotime($p_tanggal)) . '.',
+            'input_laporan.php?id_cabang=' . $p_id_cabang . '&tanggal=' . $p_tanggal
+        );
+
         echo "<script>
                 alert('Nota berhasil disimpan atas nama cabang " . addslashes($cabang_valid['nama_cabang']) . ". Terima kasih, PIC akan segera memproses laporan.');
                 window.location.replace('backup_laporan.php?tanggal=$p_tanggal&id_cabang=$p_id_cabang');

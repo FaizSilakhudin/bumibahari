@@ -214,6 +214,12 @@ if (isset($_POST['simpan'])) {
             'id_cabang' => $id_cabang, 'tanggal' => $tgl,
         ]);
 
+        kirim_notifikasi($conn, pic_untuk_cabang($conn, $id_cabang), 'nota_masuk',
+            'Nota Baru: ' . $cabang,
+            'Cabang ' . $cabang . ' mengirim nota untuk tanggal ' . date('d M Y', strtotime($tgl)) . '.',
+            'input_laporan.php?id_cabang=' . $id_cabang . '&tanggal=' . $tgl
+        );
+
         echo "<script>
                 alert('Nota berhasil dikirim. Terima kasih, PIC akan segera memproses laporan.');
                 window.location.replace('input_data.php');

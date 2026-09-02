@@ -463,6 +463,59 @@ if (!function_exists('investor_cabang_ids')) {
 }
 
 // ---------------------------------------------------------------------------
+// 5c. Notifikasi in-app — bel notifikasi sederhana untuk PIC & pusat.
+// ---------------------------------------------------------------------------
+if (!function_exists('pic_untuk_cabang')) {
+    function pic_untuk_cabang(mysqli $conn, int $id_cabang): array
+    {
+        $ids = [];
+        $st = $conn->prepare("
+            SELECT DISTINCT p.id_user
+            FROM pengelola p
+            JOIN users u ON u.id = p.id_user AND u.role = 'pic' AND u.status = 'aktif'
+            WHERE p.id_cabang = ? AND p.status = 'aktif'
+        ");
+        $st->bind_param('i', $id_cabang);
+        $st->execute();
+        $res = $st->get_result();
+        while ($row = $res->fetch_assoc()) {
+            $ids[] = (int) $row['id_user'];
+        }
+        $st->close();
+        return $ids;
+    }
+}
+
+if (!function_exists('semua_user_pusat')) {
+    function semua_user_pusat(mysqli $conn): array
+    {
+        $ids = [];
+        $res = $conn->query("SELECT id FROM users WHERE role = 'pusat' AND status = 'aktif'");
+        while ($row = $res->fetch_assoc()) {
+            $ids[] = (int) $row['id'];
+        }
+        return $ids;
+    }
+}
+
+if (!function_exists('kirim_notifikasi')) {
+    function kirim_notifikasi(mysqli $conn, array $id_user_list, string $jenis, string $judul, string $pesan, string $link): void
+    {
+        $id_user_list = array_unique(array_filter($id_user_list));
+        if (empty($id_user_list)) {
+            return;
+        }
+        $stmt = $conn->prepare("INSERT INTO notifikasi (id_user, jenis, judul, pesan, link) VALUES (?, ?, ?, ?, ?)");
+        foreach ($id_user_list as $id_user) {
+            $id_user = (int) $id_user;
+            $stmt->bind_param("issss", $id_user, $jenis, $judul, $pesan, $link);
+            $stmt->execute();
+        }
+        $stmt->close();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 6. Audit trail — catat aksi penting. Tidak pernah menggagalkan operasi asli.
 // ---------------------------------------------------------------------------
 if (!function_exists('audit')) {

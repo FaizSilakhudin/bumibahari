@@ -110,6 +110,13 @@ if (isset($_POST['simpan'])) {
         audit($conn, 'laporan_pic_simpan', 'laporan_cabang', $id_cabang . '@' . $tanggal, [
             'id_cabang' => $id_cabang, 'tanggal' => $tanggal, 'total_omset' => $total_omset, 'net_profit' => $net,
         ]);
+
+        kirim_notifikasi($conn, semua_user_pusat($conn), 'laporan_diinput',
+            'Laporan Diinput: ' . $nama_cabang,
+            'PIC ' . current_username() . ' menginput laporan cabang ' . $nama_cabang . ' tanggal ' . date('d M Y', strtotime($tanggal)) . '.',
+            'laporan.php?id_cabang=' . $id_cabang . '&tgl_awal=' . $tanggal . '&tgl_akhir=' . $tanggal
+        );
+
         echo "<script>
                 alert('Laporan berhasil disimpan.');
                 window.location.replace('index?tanggal=" . $tanggal . "');

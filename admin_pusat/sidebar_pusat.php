@@ -240,4 +240,6 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
     </div>
 </div>
 
+<?php include '../config/notifikasi_bell.php'; ?>
+
 <div class="content">
