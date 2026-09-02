@@ -98,7 +98,11 @@
                     doc.autoTable({ html: el2, startY: ty, ...baseStyles, styles: { fontSize: 8, cellPadding: 1.5 } });
                 }
 
-                const filenameHarian = <?= json_encode('Rekap_Harian_' . preg_replace('/[^A-Za-z0-9_-]/', '_', (string) $nama_cabang) . '_' . $tahun . $bulan . '.pdf') ?>;
+                // Nama file pakai tanggal SAAT DICETAK/DIKIRIM (bukan periode laporannya) —
+                // sesuai permintaan: "UPDATE LAPORAN PEMBUKUAN HARIAN 1 SEPTEMBER 2026".
+                const filenameHarian = <?= json_encode(
+                    'UPDATE LAPORAN PEMBUKUAN HARIAN ' . date('j') . ' ' . strtoupper(nama_bulan_id((int) date('n'))) . ' ' . date('Y') . '.pdf'
+                ) ?>;
                 if (mode === 'share') {
                     await sharePdfToWA(doc, filenameHarian, 'Rekap Harian - ' + namaCabang + ' - ' + blnIni);
                 } else {

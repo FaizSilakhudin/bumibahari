@@ -146,6 +146,20 @@ if (!function_exists('h')) {
     }
 }
 
+if (!function_exists('nama_bulan_id')) {
+    // Nama bulan Indonesia — TIDAK pakai setlocale() (tidak portable, tergantung
+    // locale terpasang di server). $bulan = 1-12.
+    function nama_bulan_id(int $bulan): string
+    {
+        $nama = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        ];
+        return $nama[$bulan] ?? '-';
+    }
+}
+
 if (!function_exists('csrf_token')) {
     function csrf_token(): string
     {
