@@ -98,13 +98,13 @@
                     doc.autoTable({ html: el2, startY: ty, ...baseStyles, styles: { fontSize: 8, cellPadding: 1.5 } });
                 }
 
-                // Nama file pakai tanggal SAAT DICETAK/DIKIRIM (bukan periode laporannya) —
-                // sesuai permintaan: "UPDATE LAPORAN PEMBUKUAN HARIAN 1 SEPTEMBER 2026".
+                // Nama file: "Update Laporan Pembukuan Harian <Cabang> <tanggal cetak>" —
+                // nama cabang ada di nama file, TANPA teks/redaksi terpisah saat dikirim ke WA.
                 const filenameHarian = <?= json_encode(
-                    'UPDATE LAPORAN PEMBUKUAN HARIAN ' . date('j') . ' ' . strtoupper(nama_bulan_id((int) date('n'))) . ' ' . date('Y') . '.pdf'
+                    'Update Laporan Pembukuan Harian ' . $nama_cabang . ' ' . date('j') . ' ' . nama_bulan_id((int) date('n')) . ' ' . date('Y') . '.pdf'
                 ) ?>;
                 if (mode === 'share') {
-                    await sharePdfToWA(doc, filenameHarian, 'Rekap Harian - ' + namaCabang + ' - ' + blnIni);
+                    await sharePdfToWA(doc, filenameHarian, '');
                 } else {
                     doc.save(filenameHarian);
                 }
