@@ -135,8 +135,12 @@ $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc() ?: [];
 $stmt->close();
 
+// Kolom kosong (belum pernah diisi) -> field kosong, BUKAN "0" — supaya PIC
+// tidak salah ketik jadi kelebihan nol (mis. ngetik di belakang "0" yang sudah
+// ada). Baris yang sudah pernah disimpan tetap tampil apa adanya, termasuk
+// kalau memang benar 0.
 function val($row, $key) {
-    return isset($row[$key]) ? (int) $row[$key] : 0;
+    return isset($row[$key]) ? (int) $row[$key] : '';
 }
 ?>
 
@@ -379,9 +383,11 @@ input.form-control-custom { text-align: right; }
 
 <script>
 function formatRupiahMask(angka) {
-    if (!angka) return '0';
+    // String kosong (field belum diisi) -> tetap kosong, jangan dipaksa jadi "0".
+    // Angka 0 asli (mis. total hasil hitung yang memang nol) tetap tampil "0".
+    if (angka === '' || angka === null || angka === undefined) return '';
     let cleanNumber = angka.toString().replace(/[^0-9]/g, '');
-    if (cleanNumber === '') return '0';
+    if (cleanNumber === '') return '';
     return parseInt(cleanNumber, 10).toLocaleString('en-US');
 }
 function formatRupiahWithMinus(angka) {
