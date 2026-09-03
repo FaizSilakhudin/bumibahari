@@ -22,7 +22,7 @@ if (!isset($conn, $rk_th, $rk_bl, $rk_id_cabang, $rk_tabel_id)) {
 }
 
 $rk_stmt = $conn->prepare("
-    SELECT l.tanggal, l.tunai, l.qris, l.go_food, l.grab_food,
+    SELECT l.tanggal, l.tunai, l.qris, l.pencairan_qris, l.sisa_qris, l.go_food, l.grab_food,
            l.total_omset, l.total_pengeluaran,
            l.belanja_pasar, l.belanja_beras, l.belanja_sembako, l.belanja_toko,
            l.sewa, l.gaji, l.listrik, l.air, l.sampah, l.keamanan, l.internet,
@@ -63,7 +63,7 @@ $rk_no = 1;
             <th></th>
             <th></th>
             <th></th>
-            <th class="text-end">QRIS</th>
+            <th class="text-end">QRIS (Sisa)</th>
             <th class="text-end">Go-Food</th>
             <th class="text-end">Grab-Food</th>
             <th></th>
@@ -95,7 +95,9 @@ $rk_no = 1;
 
                 $rk_num_lengkap++;
                 $rk_tunai     = (float) ($rk_h['tunai'] ?? 0);
-                $rk_qris      = (float) ($rk_h['qris'] ?? 0);
+                // Kolom "QRIS" di rekap harian menampilkan SISA QRIS (qris - pencairan_qris),
+                // sama seperti yang dilihat PIC saat input — bukan QRIS kotor masuk.
+                $rk_qris      = (float) ($rk_h['sisa_qris'] ?? 0);
                 $rk_gofood    = (float) ($rk_h['go_food'] ?? 0);
                 $rk_grab      = (float) ($rk_h['grab_food'] ?? 0);
                 $rk_omzet     = (float) ($rk_h['total_omset'] ?? 0);
@@ -137,7 +139,7 @@ $rk_no = 1;
                     <td class="text-center text-muted"><?= $rk_no++ ?></td>
                     <td class="fw-medium"><?= date('d/m/Y', strtotime($rk_h['tanggal'])) ?></td>
                     <td class="text-end"><?= number_format($rk_tunai, 0, ',', '.') ?></td>
-                    <td class="text-end"><?= $rk_qris > 0 ? number_format($rk_qris, 0, ',', '.') : '-' ?></td>
+                    <td class="text-end"><?= $rk_qris != 0 ? number_format($rk_qris, 0, ',', '.') : '-' ?></td>
                     <td class="text-end"><?= $rk_gofood > 0 ? number_format($rk_gofood, 0, ',', '.') : '-' ?></td>
                     <td class="text-end"><?= $rk_grab > 0 ? number_format($rk_grab, 0, ',', '.') : '-' ?></td>
                     <td class="text-end fw-semibold"><?= number_format($rk_omzet, 0, ',', '.') ?></td>
@@ -151,7 +153,7 @@ $rk_no = 1;
                     <td class="text-end fw-semibold text-danger"><?= number_format($rk_peng_hari, 0, ',', '.') ?></td>
                     <td class="text-end fw-semibold <?= $rk_sisa_hari < 0 ? 'text-danger' : '' ?>"><?= number_format($rk_sisa_hari, 0, ',', '.') ?></td>
                     <td class="text-end fw-bold text-success"><?= number_format($rk_laba, 0, ',', '.') ?></td>
-                    <td class="text-center fw-semibold"><?= number_format($rk_persen, 2) ?>%</td>
+                    <td class="text-center fw-semibold text-primary"><?= number_format($rk_persen, 2) ?>%</td>
                 </tr>
             <?php endwhile; ?>
         <?php else: ?>
@@ -180,9 +182,9 @@ $rk_no = 1;
                 <td class="text-end"><?= number_format($rk_t_gaji, 0, ',', '.') ?></td>
                 <td class="text-end"><?= number_format($rk_t_lain_bo, 0, ',', '.') ?></td>
                 <td class="text-end text-danger"><?= number_format($rk_t_pengeluaran, 0, ',', '.') ?></td>
-                <td class="text-end"><?= number_format($rk_t_sisa, 0, ',', '.') ?></td>
-                <td class="text-end"><?= number_format($rk_t_laba, 0, ',', '.') ?></td>
-                <td class="text-center"><?= number_format($rk_margin, 2) ?>%</td>
+                <td class="text-end <?= $rk_t_sisa < 0 ? 'text-danger' : '' ?>"><?= number_format($rk_t_sisa, 0, ',', '.') ?></td>
+                <td class="text-end text-success"><?= number_format($rk_t_laba, 0, ',', '.') ?></td>
+                <td class="text-center text-primary"><?= number_format($rk_margin, 2) ?>%</td>
             </tr>
         </tfoot>
     <?php endif; ?>

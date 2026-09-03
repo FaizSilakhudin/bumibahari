@@ -1,5 +1,26 @@
 <?php /** Partial: script export PDF (Harian & Bulanan) rekapitulasi.php — dipisah biar file utama tidak kegemukan. Butuh variabel PHP dari scope pemanggil (nama_cabang, pengelola, dst) via <?= ?> di dalamnya. */ ?>
         <script>
+            // Pewarnaan kolom tabel "1. Rekapitulasi Pendapatan & Pengeluaran Harian" saat
+            // di-export ke PDF — menyamai warna yang tampil di layar (lihat _rekap_tabel_harian.php).
+            // Kolom (index 0-based, sama untuk baris harian & baris JUMLAH):
+            //   14 Total Pengeluaran -> merah, 15 Sisa Tunai -> hitam (merah kalau minus),
+            //   16 Net Profit -> hijau, 17 Margin (%) -> biru.
+            function rekapHarianDidParseCell(data) {
+                if (data.section !== 'body' && data.section !== 'foot') return;
+                const idx = data.column.index;
+                if (idx === 14) {
+                    data.cell.styles.textColor = [220, 53, 69];
+                } else if (idx === 15) {
+                    if (String(data.cell.raw ?? '').indexOf('-') !== -1) {
+                        data.cell.styles.textColor = [220, 53, 69];
+                    }
+                } else if (idx === 16) {
+                    data.cell.styles.textColor = [25, 135, 84];
+                } else if (idx === 17) {
+                    data.cell.styles.textColor = [13, 110, 253];
+                }
+            }
+
             // =========================================================
             // EXPORT PDF HARIAN
             //  Hal.1 : 1. Rekapitulasi Pendapatan & Pengeluaran Harian - bulan sebelumnya
@@ -82,12 +103,12 @@
 
                 // Hal. 1 — Rekap harian bulan berjalan
                 let ty = kop('1. Rekapitulasi Pendapatan & Pengeluaran Harian - ' + blnIni, blnIni);
-                doc.autoTable({ html: '#tabelRekapHarian', startY: ty, ...baseStyles });
+                doc.autoTable({ html: '#tabelRekapHarian', startY: ty, ...baseStyles, didParseCell: rekapHarianDidParseCell });
 
                 // Hal. 2 — Rekap harian bulan sebelumnya
                 doc.addPage('a4', 'landscape');
                 ty = kop('1. Rekapitulasi Pendapatan & Pengeluaran Harian - ' + blnLalu, blnLalu);
-                doc.autoTable({ html: '#tabelRekapHarianPrev', startY: ty, ...baseStyles });
+                doc.autoTable({ html: '#tabelRekapHarianPrev', startY: ty, ...baseStyles, didParseCell: rekapHarianDidParseCell });
 
                 // Hal. 3 — Rincian Beban Operasional bulan berjalan
                 doc.addPage('a4', 'landscape');
@@ -182,7 +203,7 @@
                 let yLine = startYContent + 24; doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.4); doc.line(margin, yLine, 283, yLine);
                 let yTabelHarian = yLine + 7; doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
                 doc.text('1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>', margin, yTabelHarian);
-                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 7, cellPadding: 1.2 } });
+                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 7, cellPadding: 1.2 }, didParseCell: rekapHarianDidParseCell });
 
                 // HALAMAN 2
                 doc.addPage(); addWatermark(doc); let y = 15;
