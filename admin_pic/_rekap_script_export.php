@@ -2,16 +2,36 @@
         <script>
             // Pewarnaan kolom tabel "1. Rekapitulasi Pendapatan & Pengeluaran Harian" saat
             // di-export ke PDF — menyamai warna yang tampil di layar (lihat _rekap_tabel_harian.php).
-            // Kolom (index 0-based, sama untuk baris harian & baris JUMLAH):
-            //   14 Total Pengeluaran -> merah, 15 Sisa Tunai -> hitam (merah kalau minus),
-            //   16 Net Profit -> hijau, 17 Margin (%) -> biru.
+            // Baris harian, kolom (index 0-based): 14 Total Pengeluaran -> merah,
+            // 15 Sisa Tunai -> hitam (merah kalau minus), 16 Net Profit -> hijau, 17 Margin -> biru.
+            // Baris JUMLAH (tfoot): latar hijau, semua tulisan putih.
+            //
+            // Catatan: dengan sumber html:, data.cell.raw untuk sel dari HTML adalah elemen DOM
+            // <td> aslinya (BUKAN string) — jangan di-String()-kan langsung untuk cek isi teks,
+            // ambil .textContent-nya. Deteksi baris JUMLAH juga dicek langsung lewat
+            // tr.closest('tfoot') supaya tidak bergantung 100% pada data.section (beberapa versi
+            // jspdf-autotable kurang konsisten mengklasifikasikan baris tfoot lewat html:).
             function rekapHarianDidParseCell(data) {
-                if (data.section !== 'body' && data.section !== 'foot') return;
+                if (data.section === 'head') return;
+
+                const tr = data.row && data.row.raw;
+                const isFoot = data.section === 'foot' || !!(tr && typeof tr.closest === 'function' && tr.closest('tfoot'));
+
+                if (isFoot) {
+                    data.cell.styles.fillColor = [25, 135, 84];
+                    data.cell.styles.textColor = [255, 255, 255];
+                    return;
+                }
+
                 const idx = data.column.index;
                 if (idx === 14) {
                     data.cell.styles.textColor = [220, 53, 69];
                 } else if (idx === 15) {
-                    if (String(data.cell.raw ?? '').indexOf('-') !== -1) {
+                    const raw = data.cell.raw;
+                    const teks = (raw && typeof raw === 'object' && typeof raw.textContent === 'string')
+                        ? raw.textContent
+                        : (data.cell.text || []).join(' ');
+                    if (teks.indexOf('-') !== -1) {
                         data.cell.styles.textColor = [220, 53, 69];
                     }
                 } else if (idx === 16) {
