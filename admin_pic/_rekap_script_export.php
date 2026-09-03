@@ -99,8 +99,11 @@
                     doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(40, 40, 40);
                     doc.text('WARTEG BUMI BAHARI', textXPosition, textYStart);
                     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 100, 100);
-                    doc.text(ALAMAT, textXPosition, textYStart + 5);
-                    doc.text(PHONE, textXPosition, textYStart + 9);
+                    // Alamat dibatasi lebar 140mm supaya panjang jadi maks. 2 baris & tidak
+                    // menabrak blok keterangan Cabang/Pengelola/dst di sebelah kanan.
+                    const alamatLines = doc.splitTextToSize(ALAMAT, 140);
+                    doc.text(alamatLines, textXPosition, textYStart + 5);
+                    doc.text(PHONE, textXPosition, textYStart + 5 + alamatLines.length * 3.5);
                     doc.autoTable({
                         body: [
                             ['Cabang', ': ' + namaCabang],
@@ -112,7 +115,9 @@
                         startY: imgLogo ? startYContent + 1.5 : startYContent - 3, theme: 'plain',
                         styles: { fontSize: 8.5, cellPadding: 0.3, fontStyle: 'bold', textColor: [40, 40, 40] },
                         columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 80 } },
-                        margin: { left: 190 }
+                        // Kanan blok ini disamakan dengan ujung kanan garis pembatas di bawah kop
+                        // (doc.line(margin, yLine, 283, yLine)) -> 283 - (20+80) = 183.
+                        margin: { left: 183, right: margin }
                     });
                     const yLine = startYContent + 24;
                     doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.4); doc.line(margin, yLine, 283, yLine);
@@ -210,8 +215,11 @@
                 let textYStart = imgLogo ? startYContent + 4.5 : startYContent;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(40, 40, 40); doc.text('WARTEG BUMI BAHARI', textXPosition, textYStart);
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 100, 100);
-                doc.text(<?= json_encode($alamat_cabang ?? "Kantor Pusat : Jl. Pamulang Permai Raya, Pamulang Bar., Kec. Pamulang, Kota Tangerang Selatan, Banten 15417") ?>, textXPosition, textYStart + 5);
-                doc.text('Phone : <?= h($no_hp_cabang ?? "087784838769") ?>', textXPosition, textYStart + 9);
+                // Alamat dibatasi lebar 140mm supaya panjang jadi maks. 2 baris & tidak
+                // menabrak blok keterangan Cabang/Pengelola/dst di sebelah kanan.
+                let alamatLinesHal1 = doc.splitTextToSize(<?= json_encode($alamat_cabang ?? "Kantor Pusat : Jl. Pamulang Permai Raya, Pamulang Bar., Kec. Pamulang, Kota Tangerang Selatan, Banten 15417") ?>, 140);
+                doc.text(alamatLinesHal1, textXPosition, textYStart + 5);
+                doc.text('Phone : <?= h($no_hp_cabang ?? "087784838769") ?>', textXPosition, textYStart + 5 + alamatLinesHal1.length * 3.5);
                 let infoData = [
                     ['Cabang', ': <?= h($nama_cabang ?? "WBB Cabang") ?>'],
                     ['Periode', ': <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>'],
@@ -219,7 +227,7 @@
                     ['Investor', ': <?= h($cabang_info['investor'] ?? "-") ?>'],
                     ['PIC', ': <?= h($nama_pic ?? "-") ?>']
                 ];
-                doc.autoTable({ body: infoData, startY: imgLogo ? startYContent + 1.5 : startYContent - 3, theme: 'plain', styles: { fontSize: 8.5, cellPadding: 0.3, fontStyle: 'bold', textColor: [40, 40, 40] }, columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 80 } }, margin: { left: 190 } });
+                doc.autoTable({ body: infoData, startY: imgLogo ? startYContent + 1.5 : startYContent - 3, theme: 'plain', styles: { fontSize: 8.5, cellPadding: 0.3, fontStyle: 'bold', textColor: [40, 40, 40] }, columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 80 } }, margin: { left: 183, right: margin } });
                 let yLine = startYContent + 24; doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.4); doc.line(margin, yLine, 283, yLine);
                 let yTabelHarian = yLine + 7; doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
                 doc.text('1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>', margin, yTabelHarian);
