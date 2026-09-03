@@ -1,9 +1,12 @@
 <?php /** Partial: script kalkulasi matriks rekap (hitungCascade dkk) rekapitulasi.php — dipisah biar file utama tidak kegemukan. */ ?>
         <script>
             // Bagikan Blob PDF ke WhatsApp via menu share bawaan HP (Web Share API + file).
+            // Redaksi/teks pesan WA otomatis mengikuti nama file PDF-nya (tanpa ".pdf") —
+            // tidak perlu ditulis manual terpisah.
             // Fallback (desktop / browser tanpa dukungan share file): PDF didownload otomatis
             // dan WhatsApp Web dibuka dengan teks siap kirim, tinggal lampirkan filenya.
-            async function sharePdfToWA(doc, filename, teks) {
+            async function sharePdfToWA(doc, filename) {
+                const teks = filename.replace(/\.pdf$/i, '');
                 const blob = doc.output('blob');
                 const file = new File([blob], filename, { type: 'application/pdf' });
 

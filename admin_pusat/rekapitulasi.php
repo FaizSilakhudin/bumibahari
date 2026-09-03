@@ -253,8 +253,8 @@ if ($id_cabang != '') {
     }
 }
 
-// Format nama file export
-$nama_file_export = "Rekap Bulanan_" . str_replace(' ', '_', $nama_cabang) . "_" . $tahun . $bulan;
+// Format nama file export — manusiawi & jadi redaksi WA otomatis (lihat sharePdfToWA()).
+$nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id((int) $bulan) . " " . $tahun;
 ?>
 
 

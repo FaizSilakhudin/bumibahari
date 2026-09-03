@@ -104,7 +104,7 @@
                     'Update Laporan Pembukuan Harian ' . $nama_cabang . ' ' . date('j') . ' ' . nama_bulan_id((int) date('n')) . ' ' . date('Y') . '.pdf'
                 ) ?>;
                 if (mode === 'share') {
-                    await sharePdfToWA(doc, filenameHarian, '');
+                    await sharePdfToWA(doc, filenameHarian);
                 } else {
                     doc.save(filenameHarian);
                 }
@@ -265,7 +265,7 @@
                 }
                 const filenameFull = "<?= h($nama_file_export) ?>.pdf";
                 if (mode === 'share') {
-                    await sharePdfToWA(doc, filenameFull, 'Rekap Bulanan - <?= addslashes($nama_cabang ?? '') ?> - <?= date('F Y', strtotime("$tahun-$bulan-01")) ?>');
+                    await sharePdfToWA(doc, filenameFull);
                 } else {
                     doc.save(filenameFull);
                 }

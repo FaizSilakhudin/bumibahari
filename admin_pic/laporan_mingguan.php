@@ -141,11 +141,11 @@ if ($id_cabang) {
 $total_baris       = count($data_laporan);
 $jumlah_disetorkan = $total_sewa - $total_sisa_tunai;
 
-// Nama file PDF
-$clean_nama_cabang = preg_replace('/[^a-zA-Z0-9_-]/', '_', $nama_cabang);
-$nama_file_pdf     = 'Laporan_Mingguan_' . $clean_nama_cabang
-    . '_' . date('d-m-Y', strtotime($tgl_mulai))
-    . '_sd_' . date('d-m-Y', strtotime($tgl_selesai)) . '.pdf';
+// Nama file PDF — manusiawi & jadi redaksi WA otomatis (lihat bagikanWA() di bawah).
+$nama_file_pdf = 'Laporan Mingguan ' . $nama_cabang
+    . ' ' . date('j', strtotime($tgl_mulai)) . ' ' . nama_bulan_id((int) date('n', strtotime($tgl_mulai))) . ' ' . date('Y', strtotime($tgl_mulai))
+    . ' - ' . date('j', strtotime($tgl_selesai)) . ' ' . nama_bulan_id((int) date('n', strtotime($tgl_selesai))) . ' ' . date('Y', strtotime($tgl_selesai))
+    . '.pdf';
 
 /** Format angka rupiah tanpa simbol */
 function lm_rp($n): string
@@ -463,7 +463,7 @@ function bagikanWA(btn) {
     if (btn) { btn.disabled = true; btn.classList.add('disabled'); }
     area.classList.add('lm-print');
 
-    const teks = 'Laporan Mingguan &mdash; <?= addslashes($nama_cabang) ?> (<?= date('d/m/Y', strtotime($tgl_mulai)) ?> s/d <?= date('d/m/Y', strtotime($tgl_selesai)) ?>)'.replace('&mdash;', '-');
+    const teks = LM_PDF_FILENAME.replace(/\.pdf$/i, '');
 
     html2pdf().set(lmPdfOpt()).from(area).outputPdf('blob').then(async function (blob) {
         area.classList.remove('lm-print');
