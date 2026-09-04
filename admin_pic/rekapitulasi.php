@@ -969,7 +969,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
 <?php if (($jumlah_hari_data ?? 0) > 0): ?>
     <div class="row g-3 mt-4 mb-5">
         <div class="col-md-6">
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 mb-2">
                 <button onclick="exportPdfHarian('save')" class="btn btn-success flex-fill py-3 fw-semibold" style="border-radius: 10px; font-size: 1rem;">
                     <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF Harian
                 </button>
@@ -977,9 +977,12 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     <i class="bi bi-whatsapp"></i>
                 </button>
             </div>
+            <button onclick="exportExcelHarian()" class="btn btn-outline-success w-100 py-2 fw-semibold" style="border-radius: 10px;">
+                <i class="bi bi-file-earmark-excel me-2"></i>Export Excel Harian
+            </button>
         </div>
         <div class="col-md-6">
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 mb-2">
                 <button onclick="exportPDF('save')" class="btn btn-danger flex-fill py-3 fw-semibold" style="border-radius: 10px; font-size: 1rem;">
                     <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF
                 </button>
@@ -987,6 +990,9 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     <i class="bi bi-whatsapp"></i>
                 </button>
             </div>
+            <button onclick="exportExcel()" class="btn btn-outline-danger w-100 py-2 fw-semibold" style="border-radius: 10px;">
+                <i class="bi bi-file-earmark-excel me-2"></i>Export Excel
+            </button>
         </div>
     </div>
 <?php endif; ?>
@@ -998,6 +1004,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
 <!-- Library Export -->
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
