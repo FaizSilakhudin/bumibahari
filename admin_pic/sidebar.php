@@ -150,6 +150,11 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
                 <span>Rekapitulasi</span>
             </a>
 
+            <a class="nav-link-custom <?=($current_page=='backup_laporan')?'active':''?>" href="backup_laporan">
+                <i class="bi bi-life-preserver fs-5"></i>
+                <span>Backup Laporan</span>
+            </a>
+
             <a class="nav-link-custom nav-link-logout" href="../logout">
                 <i class="bi bi-box-arrow-right fs-5"></i>
                 <span>Keluar Aplikasi</span>
