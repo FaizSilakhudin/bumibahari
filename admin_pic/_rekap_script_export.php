@@ -144,10 +144,12 @@
                     doc.autoTable({ html: el2, startY: ty, ...baseStyles, styles: { fontSize: 8, cellPadding: 1.5 } });
                 }
 
-                // Nama file: "Update Laporan Pembukuan Harian <Cabang> <tanggal cetak>" —
-                // nama cabang ada di nama file, TANPA teks/redaksi terpisah saat dikirim ke WA.
+                // Nama file: "Update Laporan Pembukuan Harian <Cabang> <tanggal LAPORAN>" —
+                // pakai tanggal KEMARIN (bukan tanggal cetak/kirim), karena laporan harian
+                // selalu berisi data transaksi kemarin (cabang input hari ini untuk kemarin).
+                // Nama cabang ada di nama file, TANPA teks/redaksi terpisah saat dikirim ke WA.
                 const filenameHarian = <?= json_encode(
-                    'Update Laporan Pembukuan Harian ' . $nama_cabang . ' ' . date('j') . ' ' . nama_bulan_id((int) date('n')) . ' ' . date('Y') . '.pdf'
+                    'Update Laporan Pembukuan Harian ' . $nama_cabang . ' ' . date('j', strtotime('-1 day')) . ' ' . nama_bulan_id((int) date('n', strtotime('-1 day'))) . ' ' . date('Y', strtotime('-1 day')) . '.pdf'
                 ) ?>;
                 if (mode === 'share') {
                     await sharePdfToWA(doc, filenameHarian);
@@ -368,8 +370,9 @@
                 if (elBO) XLSX.utils.sheet_add_dom(wsBO, elBO, { origin: -1, raw: true });
                 XLSX.utils.book_append_sheet(wb, wsBO, 'Rincian BO');
 
+                // Tanggal KEMARIN juga di sini, samakan dengan filenameHarian (PDF) di atas.
                 const filenameHarianXLS = <?= json_encode(
-                    'Update Laporan Pembukuan Harian ' . $nama_cabang . ' ' . date('j') . ' ' . nama_bulan_id((int) date('n')) . ' ' . date('Y') . '.xlsx'
+                    'Update Laporan Pembukuan Harian ' . $nama_cabang . ' ' . date('j', strtotime('-1 day')) . ' ' . nama_bulan_id((int) date('n', strtotime('-1 day'))) . ' ' . date('Y', strtotime('-1 day')) . '.xlsx'
                 ) ?>;
                 XLSX.writeFile(wb, filenameHarianXLS);
             }
