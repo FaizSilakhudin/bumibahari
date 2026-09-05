@@ -5,8 +5,8 @@
             // Baris harian, kolom (index 0-based): 14 Total Pengeluaran -> merah,
             // 15 Sisa Tunai -> hitam (merah kalau minus), 16 Net Profit -> hijau (merah kalau minus),
             // 17 Margin -> biru (merah kalau minus).
-            // Baris JUMLAH (tfoot): latar hijau, semua tulisan putih — KECUALI kolom 16/17 yang
-            // ikut jadi merah kalau nilainya minus, menimpa putih, sama seperti di layar.
+            // Baris JUMLAH (tfoot): latar hijau, SEMUA tulisan putih tanpa kecuali
+            // (termasuk Net Profit/Margin walau minus) — beda dengan baris harian biasa.
             //
             // Catatan: dengan sumber html:, data.cell.raw untuk sel dari HTML adalah elemen DOM
             // <td> aslinya (BUKAN string) — jangan di-String()-kan langsung untuk cek isi teks,
@@ -31,9 +31,6 @@
                 if (isFoot) {
                     data.cell.styles.fillColor = [25, 135, 84];
                     data.cell.styles.textColor = [255, 255, 255];
-                    if ((idx === 16 || idx === 17) && minus()) {
-                        data.cell.styles.textColor = [220, 53, 69];
-                    }
                     return;
                 }
 
