@@ -459,26 +459,27 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                 </div>
             </div>
             <div class="col-xl-3 col-md-6">
-                <div class="card border-0 border-start border-4 border-secondary h-100">
+                <div class="card border-0 border-start border-4 border-danger h-100">
                     <div class="card-body p-3 d-flex align-items-center justify-content-between">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold" style="font-size: 0.75rem;">Total Pengeluaran</span>
-                            <h5 class="fw-bold text-secondary mb-0 mt-1">Rp <?= number_format($pengeluaran, 0, ',', '.') ?></h5>
+                            <h5 class="fw-bold text-danger mb-0 mt-1">Rp <?= number_format($pengeluaran, 0, ',', '.') ?></h5>
                         </div>
-                        <div class="bg-secondary bg-opacity-10 text-secondary p-2.5 rounded-3">
+                        <div class="bg-danger bg-opacity-10 text-danger p-2.5 rounded-3">
                             <i class="bi bi-receipt fs-5"></i>
                         </div>
                     </div>
                 </div>
             </div>
+            <?php $np_warna = $laba_bersih_dasar < 0 ? 'danger' : 'success'; ?>
             <div class="col-xl-3 col-md-6">
-                <div class="card border-0 border-start border-4 border-success h-100">
+                <div class="card border-0 border-start border-4 border-<?= $np_warna ?> h-100">
                     <div class="card-body p-3 d-flex align-items-center justify-content-between">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold" style="font-size: 0.75rem;">NET PROFIT / (Margin)</span>
-                            <h5 class="fw-bold text-success mb-0 mt-1">Rp <?= number_format($laba_bersih_dasar, 0, ',', '.') ?> <span class="fs-6 text-muted fw-normal">(<?= number_format($margin, 2) ?>%)</span></h5>
+                            <h5 class="fw-bold text-<?= $np_warna ?> mb-0 mt-1">Rp <?= number_format($laba_bersih_dasar, 0, ',', '.') ?> <span class="fs-6 text-muted fw-normal">(<?= number_format($margin, 2) ?>%)</span></h5>
                         </div>
-                        <div class="bg-success bg-opacity-10 text-success p-2.5 rounded-3">
+                        <div class="bg-<?= $np_warna ?> bg-opacity-10 text-<?= $np_warna ?> p-2.5 rounded-3">
                             <i class="bi bi-pie-chart fs-5"></i>
                         </div>
                     </div>
