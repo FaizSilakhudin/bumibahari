@@ -123,7 +123,9 @@ if ($id_cabang) {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $is_libur = $row['status_laporan'] === 'libur';
-        $sisa = abs((int) $row['sisa_tunai']);
+        // Simpan sisa_tunai APA ADANYA (boleh minus) — jangan di-abs() supaya kekurangan
+        // kas beneran mengurangi Jumlah yang Disetorkan, bukan malah menambahnya.
+        $sisa = (int) $row['sisa_tunai'];
         if (!$is_libur) {
             $total_sewa       += (int) $row['sewa'];
             $total_sisa_tunai += $sisa;
@@ -385,7 +387,7 @@ function lm_rp($n): string
                             <td class="c"><?= $no++ ?></td>
                             <td class="c"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
                             <td class="num"><?= lm_rp($row['sewa']) ?></td>
-                            <td class="num lm-neg"><?= $row['sisa_tunai'] > 0 ? '-' . lm_rp($row['sisa_tunai']) : '0' ?></td>
+                            <td class="num <?= $row['sisa_tunai'] < 0 ? 'lm-neg' : '' ?>"><?= $row['sisa_tunai'] < 0 ? '-' . lm_rp(abs($row['sisa_tunai'])) : lm_rp($row['sisa_tunai']) ?></td>
                         </tr>
                         <?php endif; ?>
                     <?php endforeach; ?>
@@ -396,7 +398,7 @@ function lm_rp($n): string
                 <tr class="lm-total">
                     <td class="c" colspan="2">TOTAL &mdash; <?= $total_baris ?> HARI</td>
                     <td class="num"><?= lm_rp($total_sewa) ?></td>
-                    <td class="num lm-neg"><?= $total_sisa_tunai > 0 ? '-' . lm_rp($total_sisa_tunai) : '0' ?></td>
+                    <td class="num <?= $total_sisa_tunai < 0 ? 'lm-neg' : '' ?>"><?= $total_sisa_tunai < 0 ? '-' . lm_rp(abs($total_sisa_tunai)) : lm_rp($total_sisa_tunai) ?></td>
                 </tr>
             </tbody>
         </table>
