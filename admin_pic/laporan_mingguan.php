@@ -139,7 +139,7 @@ if ($id_cabang) {
 }
 
 $total_baris       = count($data_laporan);
-$jumlah_disetorkan = $total_sewa - $total_sisa_tunai;
+$jumlah_disetorkan = $total_sewa + $total_sisa_tunai;
 
 // Nama file PDF — manusiawi & jadi redaksi WA otomatis (lihat bagikanWA() di bawah).
 $nama_file_pdf = 'Laporan Mingguan ' . $nama_cabang
@@ -240,6 +240,7 @@ function lm_rp($n): string
         background: #dbeafe; color: #1e3a8a; font-weight: 800;
         border-color: #93c5fd;
     }
+    .lm-table tr.lm-total td.lm-neg { color: var(--lm-red); }
     .lm-empty td { text-align: center; color: var(--lm-muted); padding: 26px; }
 
     /* Callout jumlah disetorkan */
@@ -388,7 +389,7 @@ function lm_rp($n): string
                             <td class="c"><?= $no++ ?></td>
                             <td class="c"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
                             <td class="num"><?= lm_rp($row['sewa']) ?></td>
-                            <td class="num lm-neg"><?= $row['sisa_tunai'] > 0 ? '(' . lm_rp($row['sisa_tunai']) . ')' : '0' ?></td>
+                            <td class="num lm-neg"><?= $row['sisa_tunai'] > 0 ? '-' . lm_rp($row['sisa_tunai']) : '0' ?></td>
                         </tr>
                         <?php endif; ?>
                     <?php endforeach; ?>
@@ -399,7 +400,7 @@ function lm_rp($n): string
                 <tr class="lm-total">
                     <td class="c" colspan="2">TOTAL &mdash; <?= $total_baris ?> HARI</td>
                     <td class="num"><?= lm_rp($total_sewa) ?></td>
-                    <td class="num"><?= $total_sisa_tunai > 0 ? '(' . lm_rp($total_sisa_tunai) . ')' : '0' ?></td>
+                    <td class="num lm-neg"><?= $total_sisa_tunai > 0 ? '-' . lm_rp($total_sisa_tunai) : '0' ?></td>
                 </tr>
             </tbody>
         </table>
