@@ -152,8 +152,8 @@ $rk_no = 1;
                     <td class="text-end"><?= number_format($rk_lain_op, 0, ',', '.') ?></td>
                     <td class="text-end fw-semibold text-danger"><?= number_format($rk_peng_hari, 0, ',', '.') ?></td>
                     <td class="text-end fw-semibold <?= $rk_sisa_hari < 0 ? 'text-danger' : '' ?>"><?= number_format($rk_sisa_hari, 0, ',', '.') ?></td>
-                    <td class="text-end fw-bold text-success"><?= number_format($rk_laba, 0, ',', '.') ?></td>
-                    <td class="text-center fw-semibold text-primary"><?= number_format($rk_persen, 2) ?>%</td>
+                    <td class="text-end fw-bold <?= $rk_laba < 0 ? 'text-danger' : 'text-success' ?>"><?= number_format($rk_laba, 0, ',', '.') ?></td>
+                    <td class="text-center fw-semibold <?= $rk_persen < 0 ? 'text-danger' : 'text-primary' ?>"><?= number_format($rk_persen, 2) ?>%</td>
                 </tr>
             <?php endwhile; ?>
         <?php else: ?>
@@ -183,8 +183,8 @@ $rk_no = 1;
                 <td class="text-end"><?= number_format($rk_t_lain_bo, 0, ',', '.') ?></td>
                 <td class="text-end text-danger"><?= number_format($rk_t_pengeluaran, 0, ',', '.') ?></td>
                 <td class="text-end <?= $rk_t_sisa < 0 ? 'text-danger' : '' ?>"><?= number_format($rk_t_sisa, 0, ',', '.') ?></td>
-                <td class="text-end text-success"><?= number_format($rk_t_laba, 0, ',', '.') ?></td>
-                <td class="text-center text-primary"><?= number_format($rk_margin, 2) ?>%</td>
+                <td class="text-end <?= $rk_t_laba < 0 ? 'text-danger' : 'text-success' ?>"><?= number_format($rk_t_laba, 0, ',', '.') ?></td>
+                <td class="text-center <?= $rk_margin < 0 ? 'text-danger' : 'text-primary' ?>"><?= number_format($rk_margin, 2) ?>%</td>
             </tr>
         </tfoot>
     <?php endif; ?>

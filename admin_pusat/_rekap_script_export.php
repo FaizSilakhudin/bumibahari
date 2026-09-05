@@ -3,8 +3,10 @@
             // Pewarnaan kolom tabel "1. Rekapitulasi Pendapatan & Pengeluaran Harian" saat
             // di-export ke PDF — menyamai warna yang tampil di layar (lihat _rekap_tabel_harian.php).
             // Baris harian, kolom (index 0-based): 14 Total Pengeluaran -> merah,
-            // 15 Sisa Tunai -> hitam (merah kalau minus), 16 Net Profit -> hijau, 17 Margin -> biru.
-            // Baris JUMLAH (tfoot): latar hijau, semua tulisan putih.
+            // 15 Sisa Tunai -> hitam (merah kalau minus), 16 Net Profit -> hijau (merah kalau minus),
+            // 17 Margin -> biru (merah kalau minus).
+            // Baris JUMLAH (tfoot): latar hijau, semua tulisan putih — KECUALI kolom 16/17 yang
+            // ikut jadi merah kalau nilainya minus, menimpa putih, sama seperti di layar.
             //
             // Catatan: dengan sumber html:, data.cell.raw untuk sel dari HTML adalah elemen DOM
             // <td> aslinya (BUKAN string) — jangan di-String()-kan langsung untuk cek isi teks,
@@ -14,30 +16,35 @@
             function rekapHarianDidParseCell(data) {
                 if (data.section === 'head') return;
 
+                function teksSel() {
+                    const raw = data.cell.raw;
+                    return (raw && typeof raw === 'object' && typeof raw.textContent === 'string')
+                        ? raw.textContent
+                        : (data.cell.text || []).join(' ');
+                }
+                function minus() { return teksSel().indexOf('-') !== -1; }
+
                 const tr = data.row && data.row.raw;
                 const isFoot = data.section === 'foot' || !!(tr && typeof tr.closest === 'function' && tr.closest('tfoot'));
+                const idx = data.column.index;
 
                 if (isFoot) {
                     data.cell.styles.fillColor = [25, 135, 84];
                     data.cell.styles.textColor = [255, 255, 255];
+                    if ((idx === 16 || idx === 17) && minus()) {
+                        data.cell.styles.textColor = [220, 53, 69];
+                    }
                     return;
                 }
 
-                const idx = data.column.index;
                 if (idx === 14) {
                     data.cell.styles.textColor = [220, 53, 69];
                 } else if (idx === 15) {
-                    const raw = data.cell.raw;
-                    const teks = (raw && typeof raw === 'object' && typeof raw.textContent === 'string')
-                        ? raw.textContent
-                        : (data.cell.text || []).join(' ');
-                    if (teks.indexOf('-') !== -1) {
-                        data.cell.styles.textColor = [220, 53, 69];
-                    }
+                    if (minus()) data.cell.styles.textColor = [220, 53, 69];
                 } else if (idx === 16) {
-                    data.cell.styles.textColor = [25, 135, 84];
+                    data.cell.styles.textColor = minus() ? [220, 53, 69] : [25, 135, 84];
                 } else if (idx === 17) {
-                    data.cell.styles.textColor = [13, 110, 253];
+                    data.cell.styles.textColor = minus() ? [220, 53, 69] : [13, 110, 253];
                 }
             }
 
