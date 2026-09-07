@@ -10,7 +10,37 @@ $stmt->execute();
 $nama_investor = $stmt->get_result()->fetch_assoc()['nama_investor'] ?? current_username();
 $stmt->close();
 
-$cabang_ids = investor_cabang_ids($conn, $id_investor);
+$cabang_ids_all = investor_cabang_ids($conn, $id_investor);
+
+// Daftar cabang milik investor ini, untuk dropdown filter cabang.
+$daftar_cabang_investor = [];
+if (!empty($cabang_ids_all)) {
+    $ph0 = implode(',', array_fill(0, count($cabang_ids_all), '?'));
+    $st0 = $conn->prepare("SELECT id_cabang, nama_cabang FROM cabang WHERE id_cabang IN ($ph0) ORDER BY nama_cabang ASC");
+    $st0->bind_param(str_repeat('i', count($cabang_ids_all)), ...$cabang_ids_all);
+    $st0->execute();
+    $daftar_cabang_investor = $st0->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+
+// Filter cabang terpilih — 'semua' (default) atau id_cabang spesifik.
+// Divalidasi terhadap cabang_ids_all supaya investor tidak bisa lihat cabang orang lain.
+$sel_cabang = $_GET['cabang'] ?? 'semua';
+if ($sel_cabang !== 'semua') {
+    $sel_cabang = (int) $sel_cabang;
+    if (!in_array($sel_cabang, $cabang_ids_all, true)) {
+        $sel_cabang = 'semua';
+    }
+}
+$cabang_ids = $sel_cabang === 'semua' ? $cabang_ids_all : [$sel_cabang];
+$nama_cabang_terpilih = 'Semua Cabang';
+if ($sel_cabang !== 'semua') {
+    foreach ($daftar_cabang_investor as $dc) {
+        if ((int) $dc['id_cabang'] === $sel_cabang) {
+            $nama_cabang_terpilih = $dc['nama_cabang'];
+            break;
+        }
+    }
+}
 
 // =====================================================================
 // FILTER PERIODE
@@ -232,17 +262,25 @@ if (!empty($cabang_ids)) {
                     <div class="inv-hero-since"><i class="bi bi-calendar-week me-1"></i> Periode <?= h($nama_periode) ?></div>
                 </div>
             </div>
-            <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
-                <select name="bulan" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
-                    <?php for ($m = 1; $m <= 12; $m++): ?>
-                        <option value="<?= $m ?>" <?= $sel_bulan == $m ? 'selected' : '' ?>><?= date('F', mktime(0, 0, 0, $m, 1)) ?></option>
-                    <?php endfor; ?>
+            <form method="GET" class="d-flex flex-column align-items-stretch align-items-lg-end gap-2">
+                <select name="cabang" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
+                    <option value="semua" <?= $sel_cabang === 'semua' ? 'selected' : '' ?>>Semua Cabang</option>
+                    <?php foreach ($daftar_cabang_investor as $dc): ?>
+                        <option value="<?= (int) $dc['id_cabang'] ?>" <?= $sel_cabang === (int) $dc['id_cabang'] ? 'selected' : '' ?>><?= h($dc['nama_cabang']) ?></option>
+                    <?php endforeach; ?>
                 </select>
-                <select name="tahun" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
-                    <?php for ($y = (int) date('Y') + 1; $y >= tahun_data_paling_lama($conn); $y--): ?>
-                        <option value="<?= $y ?>" <?= $sel_tahun == $y ? 'selected' : '' ?>><?= $y ?></option>
-                    <?php endfor; ?>
-                </select>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <select name="bulan" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
+                        <?php for ($m = 1; $m <= 12; $m++): ?>
+                            <option value="<?= $m ?>" <?= $sel_bulan == $m ? 'selected' : '' ?>><?= date('F', mktime(0, 0, 0, $m, 1)) ?></option>
+                        <?php endfor; ?>
+                    </select>
+                    <select name="tahun" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
+                        <?php for ($y = (int) date('Y') + 1; $y >= tahun_data_paling_lama($conn); $y--): ?>
+                            <option value="<?= $y ?>" <?= $sel_tahun == $y ? 'selected' : '' ?>><?= $y ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
             </form>
         </div>
     </div>
@@ -329,7 +367,7 @@ if (!empty($cabang_ids)) {
                 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
                     <div>
                         <h6 class="fw-bold mb-0" style="color: #1e1b2e; font-size: 16px;">Trend Performa <?= h($label_periode_tren) ?></h6>
-                        <span class="text-muted small">Omzet vs Net Profit &mdash; cabang Anda</span>
+                        <span class="text-muted small">Omzet vs Net Profit &mdash; <?= h($nama_cabang_terpilih) ?></span>
                     </div>
                     <select class="form-select form-select-filter" style="width:auto; min-width:auto;" onchange="gantiTren(this.value)">
                         <option value="harian" <?= $granularitas_tren === 'harian' ? 'selected' : '' ?>>Harian</option>
@@ -399,7 +437,7 @@ if (!empty($cabang_ids)) {
     <div class="saas-card p-0 overflow-hidden mb-4">
         <div class="px-4 pt-4 pb-3 border-bottom" style="border-color: #f5f0fb !important;">
             <h6 class="fw-bold mb-0" style="color: #1e1b2e; font-size: 16px;"><i class="bi bi-file-earmark-check-fill text-success me-1"></i> Laporan Cabang Sudah Diinput PIC</h6>
-            <p class="text-muted small mb-0 mt-1">Laporan harian yang sudah diverifikasi &amp; difinalisasi PIC pada <?= h($nama_periode) ?>.</p>
+            <p class="text-muted small mb-0 mt-1">Laporan harian yang sudah diverifikasi &amp; difinalisasi PIC pada <?= h($nama_periode) ?> &mdash; <?= h($nama_cabang_terpilih) ?>.</p>
         </div>
 
         <div class="table-responsive">
