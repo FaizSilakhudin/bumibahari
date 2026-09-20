@@ -17,7 +17,7 @@ $antrian = [];
 $ringkasan = ['total' => 0, 'lengkap' => 0, 'menunggu' => 0, 'belum_nota' => 0, 'libur' => 0];
 
 // Paginasi — 10 per halaman, sama persis dengan render_pagination() yang dipakai admin_pusat.
-$limit  = 10;
+$limit  = 20;
 $page   = max(1, (int) ($_GET['page'] ?? 1));
 $offset = ($page - 1) * $limit;
 $total_pages = 1;

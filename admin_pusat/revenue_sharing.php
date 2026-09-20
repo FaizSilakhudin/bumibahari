@@ -156,16 +156,17 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   .rs-table tbody tr:hover td { background: #f8fafc !important; }
   .rs-table tbody tr:last-child td { border-bottom: none !important; }
 
-  /* Lebar kolom sesuai colgroup — total 956px agar muat di viewport ≥1280px
-     (sidebar 260 + padding 64 + tabel 956 + sisa = 1280). */
-  .rs-col-no    { width: 36px; text-align: center; }
-  .rs-col-pgl   { width: 130px; }
-  .rs-col-cbg   { width: 155px; }
-  .rs-col-np    { width: 100px; text-align: right; }
-  .rs-col-af    { width: 100px; text-align: right; font-weight: 700; }
-  .rs-col-prs   { width: 140px; text-align: center; }
+  /* Lebar kolom sesuai colgroup — total 892px agar 8 kolom muat utuh di viewport
+     ≥1280px TANPA scroll horizontal. (sidebar 260 + .content padding 64 + tabel
+     892 = 1216, sisa 64px di viewport 1280. Header teks pendek supaya pas.) */
+  .rs-col-no    { width: 32px;  text-align: center; }
+  .rs-col-pgl   { width: 110px; }
+  .rs-col-cbg   { width: 130px; }
+  .rs-col-np    { width: 95px;  text-align: right; }
+  .rs-col-af    { width: 85px;  text-align: right; font-weight: 700; }
+  .rs-col-prs   { width: 125px; text-align: center; }
   .rs-col-sf    { width: 100px; text-align: right; font-weight: 700; color: #0ea5e9; }
-  .rs-col-stt   { width: 195px; text-align: center; }
+  .rs-col-stt   { width: 215px; text-align: center; }
 
   /* Tombol presentase (3/5/7,5) & status — compact pills */
   .rs-btn-group { display: inline-flex; gap: 3px; }
@@ -315,13 +316,13 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
                 <thead>
                     <tr>
                         <th class="rs-col-no">No</th>
-                        <th class="rs-col-pgl">Nama Pengelola</th>
+                        <th class="rs-col-pgl">Pengelola</th>
                         <th class="rs-col-cbg">Cabang</th>
                         <th class="rs-col-np">Net Profit</th>
-                        <th class="rs-col-af">Admin Fee (3%)</th>
+                        <th class="rs-col-af">Admin Fee</th>
                         <th class="rs-col-prs">Presentase</th>
-                        <th class="rs-col-sf">Nominal Service Fee</th>
-                        <th class="rs-col-stt">Status Pembayaran</th>
+                        <th class="rs-col-sf">Service Fee</th>
+                        <th class="rs-col-stt">Status</th>
                     </tr>
                 </thead>
                 <tbody>
