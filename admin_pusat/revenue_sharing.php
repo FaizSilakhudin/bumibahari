@@ -127,16 +127,8 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   .form-select-filter option { color: #0f172a; background: #fff; }
   .form-select-filter:focus  { border-color: rgba(255,255,255,.5); box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
 
-  /* Override .content dari sidebar_pusat.php supaya box halaman benar-benar
-     "berjejeran" (nempel) dengan sidebar — padding-left jadi 0.
-     Padding top/right/bottom tetap untuk breathing room vertikal & kanan.
-     Sidebar (260px) tetap utuh seperti halaman lain. */
-  .content {
-      padding-top: 18px !important;
-      padding-right: 18px !important;
-      padding-bottom: 18px !important;
-      padding-left: 0 !important;
-  }
+  /* Halaman ini pakai padding default .content dari sidebar_pusat.php
+     (padding: 32px, margin-left: 260px) — box konsisten dengan halaman lain. */
 
   /* ===== Tabel compact fixed-width (8 kolom muat di desktop) ===== */
   /* Lebar kolom total = 956px dari colgroup. table-layout:fixed memastikan
