@@ -104,25 +104,19 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
 
   /* ===== Header strip — gradient halus, copy informatif ===== */
   .rs-hero {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
-      color: #fff; border-radius: 16px; padding: 24px 28px;
-      box-shadow: 0 16px 40px -12px rgba(15, 23, 42, .35);
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      color: #fff; border-radius: 16px; padding: 22px 26px;
+      box-shadow: 0 12px 32px -10px rgba(15, 23, 42, .35);
       position: relative; overflow: hidden;
-      border: 1px solid rgba(255,255,255,.06);
   }
   .rs-hero::before {
-      content: ""; position: absolute; top: -60px; right: -60px;
-      width: 220px; height: 220px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(99,102,241,.22) 0%, transparent 70%);
+      content: ""; position: absolute; top: -40px; right: -40px;
+      width: 180px; height: 180px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(99,102,241,.18) 0%, transparent 70%);
   }
-  .rs-hero::after {
-      content: ""; position: absolute; bottom: -40px; left: 20%;
-      width: 280px; height: 60px; border-radius: 50%;
-      background: radial-gradient(ellipse, rgba(56,189,248,.10) 0%, transparent 70%);
-  }
-  .rs-hero .eyebrow { font-size: 11px; letter-spacing: 1.8px; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 700; }
-  .rs-hero .title    { font-size: 26px; font-weight: 800; letter-spacing: -.6px; margin-top: 6px; }
-  .rs-hero .desc     { font-size: 13px; color: rgba(255,255,255,.72); font-weight: 500; margin-top: 8px; max-width: 620px; line-height: 1.55; }
+  .rs-hero .eyebrow { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,.65); font-weight: 700; }
+  .rs-hero .title    { font-size: 24px; font-weight: 800; letter-spacing: -.5px; margin-top: 4px; }
+  .rs-hero .desc     { font-size: 12.5px; color: rgba(255,255,255,.7); font-weight: 500; margin-top: 6px; max-width: 600px; }
 
   /* ===== Filter dropdown ===== */
   .form-select-filter {
@@ -138,7 +132,7 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
      dengan halaman lain dan tidak nempel ke sidebar. */
 
   /* ===== Tabel compact fixed-width (8 kolom muat di desktop) ===== */
-  /* Lebar kolom total = 902px dari colgroup. table-layout:fixed memastikan
+  /* Lebar kolom total = 956px dari colgroup. table-layout:fixed memastikan
      browser尊重 lebar kolom — JANGAN pasang min-width di sini atau tabel
      dipaksa lebih lebar dari colgroup dan overflow ke scroll horizontal. */
   .rs-table {
@@ -146,36 +140,34 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
       width: 100%; max-width: 100%;
   }
   .rs-table thead th {
-      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+      background: #f8fafc !important;
       color: #475569 !important;
-      font-size: 10px !important; text-transform: uppercase; letter-spacing: 0.7px;
-      font-weight: 800; padding: 14px 10px !important;
-      border-bottom: 2px solid #cbd5e1 !important; white-space: nowrap;
+      font-size: 10px !important; text-transform: uppercase; letter-spacing: 0.6px;
+      font-weight: 800; padding: 12px 10px !important;
+      border-bottom: 2px solid #e2e8f0 !important; white-space: nowrap;
       position: sticky; top: 0; z-index: 2;
   }
   .rs-table tbody td {
-      padding: 11px 10px !important;
-      border-bottom: 1px solid #e2e8f0 !important;
-      font-size: 12.5px !important;
+      padding: 10px !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+      font-size: 12px !important;
       vertical-align: middle;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  /* Zebra stripe halus supaya mata gampang scan antar baris */
-  .rs-table tbody tr:nth-child(even) td { background: #fafbfc; }
-  .rs-table tbody tr:hover td { background: #eef2ff !important; transition: background .15s ease; }
+  .rs-table tbody tr:hover td { background: #f8fafc !important; }
   .rs-table tbody tr:last-child td { border-bottom: none !important; }
 
   /* Lebar kolom sesuai colgroup — total 902px agar muat di viewport ≥1280px
      TANPA scroll horizontal. (sidebar 260 + .content padding 64 + tabel 902 = 1226,
      sisa ~54px untuk breathing room di viewport 1280). */
-  .rs-col-no    { width: 30px;  text-align: center; }
-  .rs-col-pgl   { width: 115px; }
-  .rs-col-cbg   { width: 140px; }
-  .rs-col-np    { width: 90px;  text-align: right; }
-  .rs-col-af    { width: 90px;  text-align: right; font-weight: 700; }
-  .rs-col-prs   { width: 130px; text-align: center; }
-  .rs-col-sf    { width: 110px; text-align: right; font-weight: 700; color: #0ea5e9; }
-  .rs-col-stt   { width: 197px; text-align: center; }
+  .rs-col-no    { width: 32px; text-align: center; }
+  .rs-col-pgl   { width: 125px; }
+  .rs-col-cbg   { width: 145px; }
+  .rs-col-np    { width: 95px; text-align: right; }
+  .rs-col-af    { width: 95px; text-align: right; font-weight: 700; }
+  .rs-col-prs   { width: 135px; text-align: center; }
+  .rs-col-sf    { width: 95px; text-align: right; font-weight: 700; color: #0ea5e9; }
+  .rs-col-stt   { width: 180px; text-align: center; }
 
   /* Tombol presentase (3/5/7,5) & status — compact pills */
   .rs-btn-group { display: inline-flex; gap: 3px; }
@@ -204,34 +196,28 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   }
 
   /* ===== Footer ringkasan ===== */
-  .rs-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .rs-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
   @media (max-width: 767.98px) { .rs-summary { grid-template-columns: 1fr; } }
 
   .rs-summary-card {
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
-      padding: 18px 20px; position: relative; overflow: hidden;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      padding: 16px 18px; position: relative; overflow: hidden;
       transition: transform .2s ease, box-shadow .2s ease;
-      box-shadow: 0 2px 8px rgba(15,23,42,.04);
   }
-  .rs-summary-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -10px rgba(15,23,42,.18); }
-  .rs-summary-card .label { font-size: 10.5px; letter-spacing: 0.9px; text-transform: uppercase; color: #64748b; font-weight: 800; }
-  .rs-summary-card .value { font-size: 23px; font-weight: 800; color: #0f172a; letter-spacing: -.6px; margin-top: 8px; }
+  .rs-summary-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px -10px rgba(15,23,42,.15); }
+  .rs-summary-card .label { font-size: 10.5px; letter-spacing: 0.8px; text-transform: uppercase; color: #64748b; font-weight: 800; }
+  .rs-summary-card .value { font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -.5px; margin-top: 6px; }
   .rs-summary-card .icon  {
-      position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
-      width: 46px; height: 46px; border-radius: 13px; display: flex; align-items: center;
-      justify-content: center; color: #fff; font-size: 21px;
-      box-shadow: 0 6px 14px -4px rgba(15,23,42,.3);
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center;
+      justify-content: center; color: #fff; font-size: 20px;
   }
-  .rs-summary-card.tone-admin   .icon { background: linear-gradient(135deg, #fbbf24, #d97706); }
-  .rs-summary-card.tone-service .icon { background: linear-gradient(135deg, #38bdf8, #0369a1); }
-  .rs-summary-card.tone-total   .icon { background: linear-gradient(135deg, #4ade80, #15803d); }
+  .rs-summary-card.tone-admin   .icon { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .rs-summary-card.tone-service .icon { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+  .rs-summary-card.tone-total   .icon { background: linear-gradient(135deg, #16a34a, #15803d); }
   .rs-summary-card.tone-total   .value { color: #15803d; }
   .rs-summary-card.tone-service .value { color: #0369a1; }
   .rs-summary-card.tone-admin   .value { color: #b45309; }
-  /* Aksen strip warna di kiri kartu summary — visual cue kategori */
-  .rs-summary-card.tone-admin   { border-left: 4px solid #f59e0b; }
-  .rs-summary-card.tone-service { border-left: 4px solid #0ea5e9; }
-  .rs-summary-card.tone-total   { border-left: 4px solid #16a34a; }
 
   /* ===== Tombol export ===== */
   .btn-export {
@@ -256,57 +242,17 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   @media (max-width: 767.98px) {
       .rs-table { min-width: 0; }
       .rs-table thead { display: none; }
-      /* Setiap baris tabel jadi kartu mobile yang elegan — cabang sebagai judul,
-         net profit ditampilkan menonjol, tombol edit inline mudah di-tap. */
-      .rs-table tbody tr {
-          display: block;
-          border: 1px solid #e2e8f0;
-          border-radius: 14px;
-          margin: 12px 0;
-          padding: 16px 18px;
-          background: #fff;
-          box-shadow: 0 2px 10px rgba(15,23,42,.05);
-      }
+      .rs-table tbody tr { display: block; border: 1px solid #e2e8f0; border-radius: 12px; margin: 10px 0; padding: 12px; background: #fff; }
       .rs-table tbody td {
           display: flex; justify-content: space-between; align-items: center;
-          padding: 9px 0 !important;
-          border-bottom: 1px solid #f1f5f9 !important;
+          padding: 7px 0 !important; border-bottom: 1px dashed #f1f5f9 !important;
           white-space: normal; text-align: left !important;
           overflow: visible; text-overflow: clip;
-          font-size: 13px !important;
       }
       .rs-table tbody td::before {
           content: attr(data-label); font-weight: 700; color: #64748b;
           font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;
-          flex-shrink: 0; margin-right: 14px;
-      }
-      /* Sorot khusus: kolom Cabang jadi judul kartu */
-      .rs-table tbody td.rs-col-cbg {
-          font-weight: 800; color: #0f172a; font-size: 14px !important;
-          border-bottom: 2px solid #e2e8f0 !important;
-          padding-bottom: 12px !important; margin-bottom: 4px;
-      }
-      .rs-table tbody td.rs-col-cbg::before { font-size: 10px; }
-      /* Sorot khusus: kolom Net Profit prominent */
-      .rs-table tbody td.rs-col-np { font-weight: 700; color: #1e3a8a; }
-      .rs-table tbody td.rs-col-af { font-weight: 700; color: #b45309; }
-      .rs-table tbody td.rs-col-sf { font-weight: 800; color: #0369a1; font-size: 14px !important; }
-      /* Tombol di mobile full-width dengan tap area cukup */
-      .rs-table tbody td.rs-col-prs,
-      .rs-table tbody td.rs-col-stt {
-          flex-direction: column; align-items: stretch;
-      }
-      .rs-table tbody td.rs-col-prs::before,
-      .rs-table tbody td.rs-col-stt::before {
-          margin-bottom: 8px; margin-right: 0;
-      }
-      .rs-table tbody td.rs-col-prs .rs-btn-group,
-      .rs-table tbody td.rs-col-stt .rs-btn-group {
-          display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
-      }
-      .rs-table tbody td.rs-col-prs .rs-btn,
-      .rs-table tbody td.rs-col-stt .rs-btn {
-          width: 100%; min-width: 0; padding: 9px 4px; font-size: 11.5px;
+          flex-shrink: 0; margin-right: 12px;
       }
       .rs-table tbody td:last-child { border-bottom: none !important; }
       .rs-col-no, .rs-col-pgl, .rs-col-cbg, .rs-col-np, .rs-col-af, .rs-col-prs, .rs-col-sf, .rs-col-stt { width: auto; }
@@ -332,15 +278,18 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
       .rs-hero form { width: 100%; }
       .rs-hero .form-select-filter { font-size: 13px; padding: 7px 12px; }
 
-      /* Tombol inline-edit (presentase / status) yang bukan di dalam kartu
-         mobile — minimum tap area 40px sesuai pedoman Material Design */
+      /* Tombol inline-edit (presentase / status) — minimum tap area 40px */
       .rs-btn { padding: 8px 10px; font-size: 11.5px; min-width: 40px; min-height: 40px; }
+      .rs-btn-group { flex-wrap: wrap; gap: 6px; }
 
       /* Export buttons: stack vertikal, full width, lebih tinggi untuk tap */
       .btn-export { padding: 12px 16px; font-size: 13.5px; width: 100%; justify-content: center; }
 
       /* Counter info di bawah tabel */
       .rs-export-info { font-size: 12px; }
+
+      /* Padding card lebih kecil */
+      .rs-table tbody tr { padding: 14px; }
   }
   /* Handphone kecil (≤480px): tombol status/presentase full-width stack
      vertikal supaya gak mudah salah tap */
@@ -404,7 +353,7 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
                         <th class="rs-col-np">Net Profit</th>
                         <th class="rs-col-af">Admin Fee (3%)</th>
                         <th class="rs-col-prs">Presentase</th>
-                        <th class="rs-col-sf">Service Fee</th>
+                        <th class="rs-col-sf">Nominal Service Fee</th>
                         <th class="rs-col-stt">Status Pembayaran</th>
                     </tr>
                 </thead>
