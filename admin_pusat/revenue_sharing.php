@@ -150,15 +150,16 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   .rs-table tbody tr:hover td { background: #f8fafc !important; }
   .rs-table tbody tr:last-child td { border-bottom: none !important; }
 
-  /* Lebar kolom sesuai colgroup */
-  .rs-col-no    { width: 38px; text-align: center; }
-  .rs-col-pgl   { width: 140px; }
-  .rs-col-cbg   { width: 165px; }
-  .rs-col-np    { width: 105px; text-align: right; }
-  .rs-col-af    { width: 105px; text-align: right; font-weight: 700; }
-  .rs-col-prs   { width: 150px; text-align: center; }
-  .rs-col-sf    { width: 105px; text-align: right; font-weight: 700; color: #0ea5e9; }
-  .rs-col-stt   { width: 210px; text-align: center; }
+  /* Lebar kolom sesuai colgroup — total 956px agar muat di viewport ≥1280px
+     (sidebar 260 + padding 64 + tabel 956 + sisa = 1280). */
+  .rs-col-no    { width: 36px; text-align: center; }
+  .rs-col-pgl   { width: 130px; }
+  .rs-col-cbg   { width: 155px; }
+  .rs-col-np    { width: 100px; text-align: right; }
+  .rs-col-af    { width: 100px; text-align: right; font-weight: 700; }
+  .rs-col-prs   { width: 140px; text-align: center; }
+  .rs-col-sf    { width: 100px; text-align: right; font-weight: 700; color: #0ea5e9; }
+  .rs-col-stt   { width: 195px; text-align: center; }
 
   /* Tombol presentase (3/5/7,5) & status — compact pills */
   .rs-btn-group { display: inline-flex; gap: 3px; }
@@ -232,7 +233,7 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
       background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
       align-items: center; gap: 6px;
   }
-  @media (max-width: 1199.98px) { .rs-scroll-hint { display: flex; } }
+  @media (max-width: 1279.98px) { .rs-scroll-hint { display: flex; } }
 
   /* Mobile: tumpuk jadi kartu */
   @media (max-width: 767.98px) {
@@ -256,7 +257,9 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
 </style>
 
 <div class="content">
-<div class="container-fluid py-4 px-3 px-md-4">
+<!-- container-fluid tanpa padding horizontal: .content sudah punya padding 32px dari sidebar_pusat.php.
+     Padding ekstra dari px-3 px-md-4 memakan ~48px yang bikin kolom terpotong di viewport standar. -->
+<div class="container-fluid py-4" style="padding-left: 0; padding-right: 0;">
 
     <!-- ===== HERO STRIP ===== -->
     <div class="rs-hero mb-4">
@@ -504,6 +507,15 @@ window.sharePdfToWA = async function (doc, filename) {
 };
 
 // Pewarnaan sel khusus saat di-export ke PDF.
+// Untuk kolom Presentase (idx 5) dan Status Pembayaran (idx 7), sel HTML berisi
+// 3 tombol (rs-btn) di mana hanya 1 yang aktif (.is-active). Untuk PDF, kita:
+//   1. Hanya render TEKS tombol aktif saja (override data.cell.text) — bukan semua
+//      "3% 5% 7,5%" atau "Pending Belum Lunas Lunas" yang akan menyulitkan pembaca.
+//   2. Warnai background sel sesuai warna sistem di UI agar visualnya konsisten:
+//        - Presentase aktif  → bold, biru, teks hitam
+//        - Status pending   → bold, oranye (amber-700), teks putih
+//        - Status belum lunas → bold, merah (red-700), teks putih
+//        - Status lunas     → bold, hijau (green-700), teks putih
 window.rsDidParseCell = function (data) {
     if (data.section === 'head') {
         data.cell.styles.fillColor = [15, 23, 42];
@@ -517,11 +529,42 @@ window.rsDidParseCell = function (data) {
         data.cell.styles.textColor = [255, 255, 255];
         return;
     }
-    const teks = (data.cell.text || []).join(' ');
-    const idx  = data.column.index;
+    const raw = data.cell.raw;
+    const idx = data.column.index;
+
+    // Kolom Service Fee (idx 6): merah kalau minus, default biru.
     if (idx === 6) {
-        // Kolom Service Fee (idx 6): merah kalau minus, default biru.
+        const teks = (data.cell.text || []).join(' ');
         data.cell.styles.textColor = teks.indexOf('-') !== -1 ? [220, 53, 69] : [14, 165, 233];
+    }
+
+    // Kolom Presentase (idx 5) & Status (idx 7): render hanya tombol aktif dengan style tombol.
+    if ((idx === 5 || idx === 7) && raw && typeof raw.querySelector === 'function') {
+        const active = raw.querySelector('.rs-btn.is-active');
+        if (active) {
+            data.cell.text = [active.textContent.trim()];
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.halign = 'center';
+
+            if (idx === 5) {
+                // Presentase aktif — biru + teks hitam (sesuai permintaan)
+                data.cell.styles.fillColor = [79, 70, 229];   // indigo-600
+                data.cell.styles.textColor = [0, 0, 0];         // hitam
+            } else {
+                // Status aktif — warna sesuai nilai
+                const status = active.dataset.value;
+                if (status === 'pending') {
+                    data.cell.styles.fillColor = [180, 83, 9];    // amber-700
+                    data.cell.styles.textColor = [255, 255, 255]; // putih
+                } else if (status === 'belum_lunas') {
+                    data.cell.styles.fillColor = [185, 28, 28];   // red-700
+                    data.cell.styles.textColor = [255, 255, 255]; // putih
+                } else if (status === 'lunas') {
+                    data.cell.styles.fillColor = [21, 128, 61];   // green-700
+                    data.cell.styles.textColor = [255, 255, 255]; // putih
+                }
+            }
+        }
     }
 };
 
