@@ -477,53 +477,64 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
 
 <div class="container-fluid py-4 px-3 px-md-4">
     <!-- HEADER & FILTER -->
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
-        <div>
-            <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 11px; letter-spacing: 1px; color:#94a3b8!important;">RINGKASAN BISNIS &bull; <?= strtoupper($nama_periode) ?></span>
-            <h3 class="fw-extrabold mb-0 mt-1" style="color: #0f172a!important; font-size: 24px; letter-spacing: -0.5px; font-weight: 800;">
-                Dashboard Pusat <?= $nama_cabang_terpilih ? "<span style='color: #4318ff;'>• ".h($nama_cabang_terpilih)."</span>" : '' ?><?= $nama_filter ? ($nama_cabang_terpilih ? ' <span style="color:#94a3b8;font-weight:600;">/</span> ' : ' <span style="color:#94a3b8;font-weight:600;">•</span> ')."<span style=\"color: #4318ff;\">".h($nama_filter)."</span>" : '' ?>
-            </h3>
+    <div class="mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-3 gap-2">
+            <div>
+                <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 11px; letter-spacing: 1px; color:#94a3b8!important;">RINGKASAN BISNIS &bull; <?= strtoupper($nama_periode) ?></span>
+                <h3 class="fw-extrabold mb-0 mt-1" style="color: #0f172a!important; font-size: 24px; letter-spacing: -0.5px; font-weight: 800;">
+                    Dashboard Pusat <?= $nama_cabang_terpilih ? "<span style='color: #4318ff;'>• ".h($nama_cabang_terpilih)."</span>" : '' ?><?= $nama_filter ? ($nama_cabang_terpilih ? ' <span style="color:#94a3b8;font-weight:600;">/</span> ' : ' <span style="color:#94a3b8;font-weight:600;">•</span> ')."<span style=\"color: #4318ff;\">".h($nama_filter)."</span>" : '' ?>
+                </h3>
+            </div>
+            <?php if($sel_cabang || $filter_investor):?>
+            <a href="?bulan=<?= $sel_bulan ?>&tahun=<?= $sel_tahun ?>" class="btn btn-light d-inline-flex align-items-center gap-1" style="border-radius: 10px; padding: 6px 12px; border: 1px solid #e2e8f0; background: #fff; font-size: 12px;" title="Reset Filter Cabang &amp; Investor">
+                <i class="bi bi-x-lg text-danger"></i><span class="text-muted fw-semibold">Reset Filter</span>
+            </a>
+            <?php endif;?>
         </div>
-        
-        <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 w-100 w-lg-auto">
-            <form method="GET" class="d-flex flex-wrap align-items-center gap-2 flex-grow-1 flex-sm-grow-0">
-                <select name="cabang" class="form-select form-select-filter" onchange="this.form.submit()">
-                    <option value="0">Semua Cabang</option>
-                    <?php foreach($list_cabang as $lc):?>
-                    <option value="<?= (int) $lc['id_cabang']?>" <?= $sel_cabang==(int)$lc['id_cabang']?'selected':''?>>
-                        <?= h($lc['nama_cabang'])?>
-                    </option>
-                    <?php endforeach;?>
-                </select>
 
-                <select name="investor" class="form-select form-select-filter" onchange="this.form.submit()">
-                    <option value="0">Semua Investor</option>
-                    <?php foreach($list_investor as $inv):?>
-                    <option value="<?= $inv['id_investor']?>" <?= $filter_investor==$inv['id_investor']?'selected':''?>>
-                        <?= h($inv['nama_investor'])?>
-                    </option>
-                    <?php endforeach;?>
-                </select>
-
-                <select name="bulan" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
-                    <?php for($m=1;$m<=12;$m++):?>
-                    <option value="<?= $m ?>" <?= $sel_bulan==$m?'selected':''?>><?= date('F', mktime(0,0,0,$m,1)) ?></option>
-                    <?php endfor;?>
-                </select>
-
-                <select name="tahun" class="form-select form-select-filter" style="min-width:auto;" onchange="this.form.submit()">
-                    <?php for($y=(int)date('Y')+1; $y>=tahun_data_paling_lama($conn); $y--):?>
-                    <option value="<?= $y ?>" <?= $sel_tahun==$y?'selected':''?>><?= $y ?></option>
-                    <?php endfor;?>
-                </select>
-
-                <?php if($sel_cabang || $filter_investor):?>
-                <a href="?bulan=<?= $sel_bulan ?>&tahun=<?= $sel_tahun ?>" class="btn btn-light d-flex align-items-center justify-content-center" style="border-radius: 12px; padding: 9px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter Cabang &amp; Investor">
-                    <i class="bi bi-x-lg text-danger"></i>
-                </a>
-                <?php endif;?>
-            </form>
-        </div>
+        <!-- Filter sejajar satu baris (4 kolom), pola sama dengan laporan_mingguan.php -->
+        <form method="GET" class="mb-0">
+            <div class="row g-2 align-items-end">
+                <div class="col-lg-3 col-sm-6 col-12">
+                    <label class="form-label fw-semibold text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Pilih Cabang</label>
+                    <select name="cabang" class="form-select form-select-filter" onchange="this.form.submit()">
+                        <option value="0">Semua Cabang</option>
+                        <?php foreach($list_cabang as $lc):?>
+                        <option value="<?= (int) $lc['id_cabang']?>" <?= $sel_cabang==(int)$lc['id_cabang']?'selected':''?>>
+                            <?= h($lc['nama_cabang'])?>
+                        </option>
+                        <?php endforeach;?>
+                    </select>
+                </div>
+                <div class="col-lg-3 col-sm-6 col-12">
+                    <label class="form-label fw-semibold text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Pilih Investor</label>
+                    <select name="investor" class="form-select form-select-filter" onchange="this.form.submit()">
+                        <option value="0">Semua Investor</option>
+                        <?php foreach($list_investor as $inv):?>
+                        <option value="<?= $inv['id_investor']?>" <?= $filter_investor==$inv['id_investor']?'selected':''?>>
+                            <?= h($inv['nama_investor'])?>
+                        </option>
+                        <?php endforeach;?>
+                    </select>
+                </div>
+                <div class="col-lg-3 col-sm-6 col-12">
+                    <label class="form-label fw-semibold text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Pilih Bulan</label>
+                    <select name="bulan" class="form-select form-select-filter" onchange="this.form.submit()">
+                        <?php for($m=1;$m<=12;$m++):?>
+                        <option value="<?= $m ?>" <?= $sel_bulan==$m?'selected':''?>><?= date('F', mktime(0,0,0,$m,1)) ?></option>
+                        <?php endfor;?>
+                    </select>
+                </div>
+                <div class="col-lg-3 col-sm-6 col-12">
+                    <label class="form-label fw-semibold text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Pilih Tahun</label>
+                    <select name="tahun" class="form-select form-select-filter" onchange="this.form.submit()">
+                        <?php for($y=(int)date('Y')+1; $y>=tahun_data_paling_lama($conn); $y--):?>
+                        <option value="<?= $y ?>" <?= $sel_tahun==$y?'selected':''?>><?= $y ?></option>
+                        <?php endfor;?>
+                    </select>
+                </div>
+            </div>
+        </form>
     </div>
 
     <!-- ROW KPI CARDS -->
@@ -692,7 +703,31 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
         </div>
     </div>
 
-    <!-- TABEL PERINGATAN DINI (DENGAN SCROLL SAMPING STANDARD) -->
+    <!-- KONTEN BAWAH — KONTEXTUAL BERDASARKAN FILTER -->
+    <?php if ($sel_cabang): ?>
+    <!-- Cabang dipilih: ganti Peringatan Dini dengan Rekapitulasi Pendapatan & Pengeluaran Harian cabang tsb -->
+    <div class="card border-0 mt-4 mb-4" style="overflow: hidden;">
+        <div class="card-header bg-dark text-white py-3 d-flex align-items-center justify-content-between">
+            <span class="fw-bold"><i class="bi bi-calendar3 me-2"></i>Rekapitulasi Pendapatan &amp; Pengeluaran Harian - <?= date('F Y', strtotime("$sel_tahun-$sel_bulan-01")) ?> &mdash; <?= h($nama_cabang_terpilih) ?></span>
+            <span class="badge bg-light text-dark fw-medium px-3 py-1.5 rounded-pill">Detail per tanggal</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <?php
+                // Panggil partial tabel harian — variabel input sesuai dokumentasi di _rekap_tabel_harian.php.
+                // Partial akan meng-set $rk_num_rows, $rk_num_lengkap, dan variabel total_* yang dipakai
+                // di tempat lain (tidak dipakai di sini, tapi partial mengharapnya ada).
+                $rk_th = (int) $sel_tahun;
+                $rk_bl = (int) $sel_bulan;
+                $rk_id_cabang = (int) $sel_cabang;
+                $rk_tabel_id = 'tabelRekapHarianCabangDashboard';
+                include '_rekap_tabel_harian.php';
+                ?>
+            </div>
+        </div>
+    </div>
+    <?php else: ?>
+    <!-- Tanpa pilih cabang: tampilkan Peringatan Dini seperti biasa (sesuai filter investor jika ada) -->
     <div class="saas-card p-0 overflow-hidden mb-4">
         <div class="px-4 pt-4 pb-3 border-bottom" style="border-color: #f1f5f9!important;">
             <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">🚨 Peringatan Dini Operasional</h6>
@@ -725,7 +760,7 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                             // yang tidak pernah ikut ter-update) — ini widget kontak operasional hari ini.
                             $p['nama_pengelola'] = pengelola_pada_tanggal($conn, (int) $p['id_cabang'], date('Y-m-d'));
                             $hari_telat = $p['selisih_hari']?? 0;
-                            
+
                             if ($hari_telat == 0 || $p['input_terakhir'] == NULL) {
                                 $status_badge = '<span class="badge-modern-danger"><i class="bi bi-exclamation-circle-fill me-1"></i> Terlambat</span>';
                                 $masalah_text = '<span class="text-danger fw-semibold">Belum mengirim laporan hari ini</span>';
@@ -756,6 +791,7 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
             <?php render_pagination($page_peringatan, $total_pages_peringatan, ['from' => $offset_peringatan + 1, 'to' => min($offset_peringatan + $limit_peringatan, $total_peringatan), 'total' => $total_peringatan, 'label' => 'cabang'], 'page_peringatan'); ?>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
