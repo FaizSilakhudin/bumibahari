@@ -127,16 +127,9 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   .form-select-filter option { color: #0f172a; background: #fff; }
   .form-select-filter:focus  { border-color: rgba(255,255,255,.5); box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
 
-  /* Override .content dari sidebar_pusat.php supaya box halaman benar-benar
-     "berjejeran" (nempel) dengan sidebar — padding-left jadi 0.
-     Padding top/right/bottom tetap untuk breathing room vertikal & kanan.
-     Sidebar (260px) tetap utuh seperti halaman lain. */
-  .content {
-      padding-top: 18px !important;
-      padding-right: 18px !important;
-      padding-bottom: 18px !important;
-      padding-left: 0 !important;
-  }
+  /* Halaman ini pakai padding default dari .content di sidebar_pusat.php
+     (padding: 32px, margin-left: 260px). Tidak ada override — box konsisten
+     dengan halaman lain dan tidak nempel ke sidebar. */
 
   /* ===== Tabel compact fixed-width (8 kolom muat di desktop) ===== */
   /* Lebar kolom total = 956px dari colgroup. table-layout:fixed memastikan
@@ -267,6 +260,46 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
       }
       .rs-table tbody td:last-child { border-bottom: none !important; }
       .rs-col-no, .rs-col-pgl, .rs-col-cbg, .rs-col-np, .rs-col-af, .rs-col-prs, .rs-col-sf, .rs-col-stt { width: auto; }
+  }
+
+  /* === Mobile Android optimizations === */
+  /* Tablet (768-991px): summary cards jadi 2 kolom, sisanya masih sama */
+  @media (max-width: 991.98px) {
+      .rs-summary { grid-template-columns: repeat(2, 1fr); }
+  }
+  /* Handphone (≤767px): summary cards 1 kolom, hero title lebih kecil,
+     filter form full-width, export buttons stack vertikal, tombol inline-edit
+     lebih besar agar mudah di-tap (min 44px sesuai pedoman Material Design). */
+  @media (max-width: 767.98px) {
+      .rs-summary { grid-template-columns: 1fr; gap: 10px; }
+      .rs-summary-card { padding: 14px 16px; }
+      .rs-summary-card .value { font-size: 19px; }
+      .rs-summary-card .icon { width: 36px; height: 36px; font-size: 17px; right: 12px; }
+
+      .rs-hero { padding: 18px 20px; border-radius: 12px; }
+      .rs-hero .title { font-size: 19px; }
+      .rs-hero .desc { font-size: 11.5px; line-height: 1.45; }
+      .rs-hero form { width: 100%; }
+      .rs-hero .form-select-filter { font-size: 13px; padding: 7px 12px; }
+
+      /* Tombol inline-edit (presentase / status) — minimum tap area 40px */
+      .rs-btn { padding: 8px 10px; font-size: 11.5px; min-width: 40px; min-height: 40px; }
+      .rs-btn-group { flex-wrap: wrap; gap: 6px; }
+
+      /* Export buttons: stack vertikal, full width, lebih tinggi untuk tap */
+      .btn-export { padding: 12px 16px; font-size: 13.5px; width: 100%; justify-content: center; }
+
+      /* Counter info di bawah tabel */
+      .rs-export-info { font-size: 12px; }
+
+      /* Padding card lebih kecil */
+      .rs-table tbody tr { padding: 14px; }
+  }
+  /* Handphone kecil (≤480px): tombol status/presentase full-width stack
+     vertikal supaya gak mudah salah tap */
+  @media (max-width: 479.98px) {
+      .rs-btn-group { flex-direction: column; width: 100%; }
+      .rs-btn-group .rs-btn { width: 100%; }
   }
 </style>
 
