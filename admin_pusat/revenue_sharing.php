@@ -130,19 +130,12 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   /* Override .content dari sidebar_pusat.php supaya box halaman benar-benar
      "berjejeran" (nempel) dengan sidebar — padding-left jadi 0.
      Padding top/right/bottom tetap untuk breathing room vertikal & kanan.
-     Sidebar (260px) tetap utuh seperti halaman lain.
-     !important untuk memastikan override shorthand `padding: 32px` di sidebar. */
+     Sidebar (260px) tetap utuh seperti halaman lain. */
   .content {
-      padding: 18px 18px 18px 0 !important;
-  }
-  /* Nol-kan border-radius pojok kiri di semua box supaya pojoknya benar-benar
-     nempel ke sidebar (tidak ada whitespace dari background body di antara
-     sidebar dan pojok kiri yang melengkung). */
-  .rs-hero,
-  .rs-page-card,
-  .rs-export-card {
-      border-top-left-radius: 0 !important;
-      border-bottom-left-radius: 0 !important;
+      padding-top: 18px !important;
+      padding-right: 18px !important;
+      padding-bottom: 18px !important;
+      padding-left: 0 !important;
   }
 
   /* ===== Tabel compact fixed-width (8 kolom muat di desktop) ===== */
@@ -310,7 +303,7 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
 
     <!-- ===== TABEL ===== -->
     <!-- Wrapper HANYA untuk scroll — tanpa overflow:hidden supaya tidak motong kolom -->
-    <div class="card border-0 rs-page-card mb-4" style="border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.05);">
+    <div class="card border-0 mb-4" style="border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.05);">
         <div class="rs-scroll-hint">
             <i class="bi bi-arrow-left-right"></i>
             Geser ke samping untuk melihat kolom Presentase &amp; Status
@@ -425,7 +418,7 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
     </div>
 
     <!-- ===== TOMBOL EXPORT ===== -->
-    <div class="card border-0 rs-export-card" style="border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.05);">
+    <div class="card border-0" style="border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.05);">
         <div class="card-body p-3">
             <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-3">
                 <div class="text-muted small">
