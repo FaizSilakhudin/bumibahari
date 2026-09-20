@@ -157,16 +157,17 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   .rs-table tbody tr:hover td { background: #f8fafc !important; }
   .rs-table tbody tr:last-child td { border-bottom: none !important; }
 
-  /* Lebar kolom sesuai colgroup — total 956px agar muat di viewport ≥1280px
-     (sidebar 260 + padding 64 + tabel 956 + sisa = 1280). */
-  .rs-col-no    { width: 36px; text-align: center; }
-  .rs-col-pgl   { width: 130px; }
-  .rs-col-cbg   { width: 155px; }
-  .rs-col-np    { width: 100px; text-align: right; }
-  .rs-col-af    { width: 100px; text-align: right; font-weight: 700; }
-  .rs-col-prs   { width: 140px; text-align: center; }
-  .rs-col-sf    { width: 100px; text-align: right; font-weight: 700; color: #0ea5e9; }
-  .rs-col-stt   { width: 195px; text-align: center; }
+  /* Lebar kolom sesuai colgroup — total 902px agar muat di viewport ≥1280px
+     TANPA scroll horizontal. (sidebar 260 + .content padding 64 + tabel 902 = 1226,
+     sisa ~54px untuk breathing room di viewport 1280). */
+  .rs-col-no    { width: 32px; text-align: center; }
+  .rs-col-pgl   { width: 125px; }
+  .rs-col-cbg   { width: 145px; }
+  .rs-col-np    { width: 95px; text-align: right; }
+  .rs-col-af    { width: 95px; text-align: right; font-weight: 700; }
+  .rs-col-prs   { width: 135px; text-align: center; }
+  .rs-col-sf    { width: 95px; text-align: right; font-weight: 700; color: #0ea5e9; }
+  .rs-col-stt   { width: 180px; text-align: center; }
 
   /* Tombol presentase (3/5/7,5) & status — compact pills */
   .rs-btn-group { display: inline-flex; gap: 3px; }
@@ -233,14 +234,9 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   .btn-export-excel  { background: #fff; color: #16a34a; border: 1.5px solid #16a34a !important; }
   .btn-export-excel:hover  { background: #f0fdf4; color: #15803d; }
 
-  /* Hint scroll horizontal di mobile / layar sempit */
-  .rs-scroll-hint {
-      display: none;
-      font-size: 11px; color: #64748b; padding: 6px 12px;
-      background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
-      align-items: center; gap: 6px;
-  }
-  @media (max-width: 1279.98px) { .rs-scroll-hint { display: flex; } }
+  /* Hint scroll horizontal — TIDAK dipakai lagi. Tabel sudah fit di desktop tanpa
+     scroll (lebar colgroup 902px < area konten 940px di viewport 1280px). Di
+     mobile, tabel stack jadi 1 blok per row dengan data-label, bukan scroll. */
 
   /* Mobile: tumpuk jadi kartu */
   @media (max-width: 767.98px) {
@@ -337,11 +333,7 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
     <!-- ===== TABEL ===== -->
     <!-- Wrapper HANYA untuk scroll — tanpa overflow:hidden supaya tidak motong kolom -->
     <div class="card border-0 mb-4" style="border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.05);">
-        <div class="rs-scroll-hint">
-            <i class="bi bi-arrow-left-right"></i>
-            Geser ke samping untuk melihat kolom Presentase &amp; Status
-        </div>
-        <div class="table-responsive" style="border-radius: 14px;">
+        <div style="border-radius: 14px;">
             <table class="table rs-table align-middle mb-0" id="tabelRevenueSharing">
                 <colgroup>
                     <col class="rs-col-no">
