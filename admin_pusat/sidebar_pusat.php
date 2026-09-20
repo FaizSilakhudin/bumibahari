@@ -205,6 +205,12 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
         </li>
 
         <li class="nav-item">
+            <a class="nav-link <?=($current_page=='revenue_sharing')?'active':''?>" href="revenue_sharing">
+                <i class="bi bi-cash-stack"></i> Revenue Sharing
+            </a>
+        </li>
+
+        <li class="nav-item">
             <a class="nav-link <?=($current_page=='backup_laporan')?'active':''?>" href="backup_laporan">
                 <i class="bi bi-life-preserver"></i> Backup Laporan
             </a>

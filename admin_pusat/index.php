@@ -27,6 +27,19 @@ $kemarin  = date('Y-m-d', strtotime('-1 day'));
 // ---- Filter investor (lewat tabel relasi cabang_investor) ----
 $filter_investor = ctype_digit((string) ($_GET['investor'] ?? '')) ? (int) $_GET['investor'] : 0;
 
+// ---- Filter cabang (pusat lihat SEMUA cabang; pilih 1 untuk drill-down performa) ----
+$sel_cabang = ctype_digit((string) ($_GET['cabang'] ?? '')) ? (int) $_GET['cabang'] : 0;
+$list_cabang = $conn->query("SELECT id_cabang, nama_cabang FROM cabang ORDER BY nama_cabang ASC")
+                    ->fetch_all(MYSQLI_ASSOC);
+$nama_cabang_terpilih = '';
+if ($sel_cabang) {
+    foreach ($list_cabang as $lc) {
+        if ((int) $lc['id_cabang'] === $sel_cabang) { $nama_cabang_terpilih = $lc['nama_cabang']; break; }
+    }
+    // Sanitasi: kalau id_cabang tidak ditemukan di DB, fallback ke "semua".
+    if ($nama_cabang_terpilih === '') $sel_cabang = 0;
+}
+
 // Dashboard pusat hanya menghitung laporan yang sudah difinalisasi PIC (status 'lengkap'),
 // supaya baris nota-only (belum diisi PIC) tidak ikut ke angka KPI.
 $where_filter        = "AND l.status_laporan = 'lengkap'";   // untuk query yang JOIN/pakai laporan_cabang l
@@ -47,18 +60,49 @@ $cabang_of_investor = "SELECT c2.id_cabang FROM cabang c2 WHERE (
         ORDER BY ci.tgl_mulai DESC, ci.id DESC LIMIT 1
     ) = ?";
 
+// Filter cabang — scope laporan_cabang l (KPI/grafik/peringatan) DAN query yang
+// langsung pakai tabel cabang c. Cabang dipilih duluan di UI supaya user bisa
+// drill-down performa satu cabang spesifik.
+if ($sel_cabang) {
+    $where_filter        .= " AND l.id_cabang = ?";
+    $where_filter_cabang .= " AND c.id_cabang = ?";
+    $params[] = $sel_cabang;
+    $types   .= "i";
+}
+
 if ($filter_investor) {
     $where_filter        .= " AND l.id_cabang IN ($cabang_of_investor)";
-    $where_filter_cabang = "AND c.id_cabang IN ($cabang_of_investor)";
+    $where_filter_cabang .= " AND c.id_cabang IN ($cabang_of_investor)";
     $params[] = $filter_investor;
     $types   .= "i";
 }
-$bind_types = "s" . $types; // 1 string (tanggal/periode) + param investor
+$bind_types = "s" . $types; // 1 string (tanggal/periode) + param cabang + param investor
 
-// ---- Daftar & nama investor ----
-$list_investor = [];
-$res_inv = $conn->query("SELECT id_investor, nama_investor FROM investor ORDER BY nama_investor ASC");
-while ($r = $res_inv->fetch_assoc()) $list_investor[] = $r;
+// ---- Daftar investor — kalau cabang dipilih, dropdown HANYA tampilkan investor
+//      yang pernah/sedang berinvestasi di cabang tsb (ci.tgl_selesai NULL/mendatang).
+//      Ini mencegah user memilih kombinasi "cabang X + investor yang tidak pegang X".
+if ($sel_cabang) {
+    $st = $conn->prepare("SELECT DISTINCT i.id_investor, i.nama_investor
+        FROM investor i
+        JOIN cabang_investor ci ON ci.id_investor = i.id_investor
+        WHERE ci.id_cabang = ? AND (ci.tgl_selesai IS NULL OR ci.tgl_selesai >= CURDATE())
+        ORDER BY i.nama_investor ASC");
+    $st->bind_param("i", $sel_cabang);
+    $st->execute();
+    $list_investor = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+    $st->close();
+    // Kalau investor yang sebelumnya terpilih sudah bukan investor cabang ini,
+    // bersihkan supaya tidak terjadi scope kosong tanpa sepengetahuan user.
+    if ($filter_investor) {
+        $valid = false;
+        foreach ($list_investor as $li) if ((int) $li['id_investor'] === $filter_investor) { $valid = true; break; }
+        if (!$valid) $filter_investor = 0;
+    }
+} else {
+    $list_investor = [];
+    $res_inv = $conn->query("SELECT id_investor, nama_investor FROM investor ORDER BY nama_investor ASC");
+    while ($r = $res_inv->fetch_assoc()) $list_investor[] = $r;
+}
 
 $nama_filter = '';
 if ($filter_investor) {
@@ -101,8 +145,12 @@ $st->bind_param($bind_types, ...array_merge([$periode_ini], $params));
 $st->execute();
 $cabang_aktif = (int) $st->get_result()->fetch_assoc()['total'];
 
-// 4. Total cabang (ikut filter investor)
-if ($filter_investor) {
+// 4. Total cabang (ikut filter cabang + filter investor)
+//    Cabang dipilih = 1 cabang. Cabang tidak dipilih + investor dipilih = cabang
+//    yang dipegang investor tsb. Tidak ada filter = semua cabang.
+if ($sel_cabang) {
+    $total_cabang = 1;
+} elseif ($filter_investor) {
     $st = $conn->prepare("SELECT COUNT(DISTINCT c.id_cabang) total FROM cabang c WHERE 1=1 $where_filter_cabang");
     $st->bind_param("i", $filter_investor);
     $st->execute();
@@ -158,22 +206,29 @@ $st->execute();
 $peringatan = $st->get_result();
 
 // =====================================================================
-// 7. Admin Fee Pusat = 3% dari total net profit (periode terpilih, ikut investor)
+// 7. Admin Fee Pusat = 3% dari total net profit (periode terpilih, ikut cabang+investor)
 // =====================================================================
-$filter_cabang_by_inv = $filter_investor ? "AND c.id_cabang IN ($cabang_of_investor)" : "";
+$filter_cabang_admin = $sel_cabang ? "AND c.id_cabang = ?" : "";
+$filter_cabang_admin .= $filter_investor ? " AND c.id_cabang IN ($cabang_of_investor)" : "";
 
 $st = $conn->prepare("SELECT COALESCE(SUM(l.net_profit),0) tot
     FROM cabang c
     LEFT JOIN laporan_cabang l ON l.id_cabang = c.id_cabang
         AND YEAR(l.tanggal) = $sel_tahun AND MONTH(l.tanggal) = $sel_bulan AND l.status_laporan = 'lengkap'
-    WHERE 1=1 $filter_cabang_by_inv");
-if ($filter_investor) $st->bind_param("i", $filter_investor);
+    WHERE 1=1 $filter_cabang_admin");
+$admin_bind_types = ($sel_cabang ? 'i' : '') . ($filter_investor ? 'i' : '');
+if ($admin_bind_types !== '') {
+    $admin_params = [];
+    if ($sel_cabang) $admin_params[] = $sel_cabang;
+    if ($filter_investor) $admin_params[] = $filter_investor;
+    $st->bind_param($admin_bind_types, ...$admin_params);
+}
 $st->execute();
 $total_net_profit = (float) $st->get_result()->fetch_assoc()['tot'];
 $admin_fee = $total_net_profit > 0 ? $total_net_profit * 3 / 100 : 0;
 
 // =====================================================================
-// 8. Ranking cabang (periode terpilih, ikut investor)
+// 8. Ranking cabang (periode terpilih, ikut cabang+investor)
 // =====================================================================
 $ranking_cabang = [];
 $st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola,
@@ -182,10 +237,10 @@ $st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola,
     FROM cabang c
     LEFT JOIN laporan_cabang l ON l.id_cabang = c.id_cabang
         AND YEAR(l.tanggal) = $sel_tahun AND MONTH(l.tanggal) = $sel_bulan AND l.status_laporan = 'lengkap'
-    WHERE 1=1 $filter_cabang_by_inv
+    WHERE 1=1 $filter_cabang_admin
     GROUP BY c.id_cabang
     ORDER BY total_omset DESC");
-if ($filter_investor) $st->bind_param("i", $filter_investor);
+if ($admin_bind_types !== '') $st->bind_param($admin_bind_types, ...$admin_params);
 $st->execute();
 $res_rank = $st->get_result();
 $no = 1;
@@ -426,14 +481,23 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
         <div>
             <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 11px; letter-spacing: 1px; color:#94a3b8!important;">RINGKASAN BISNIS &bull; <?= strtoupper($nama_periode) ?></span>
             <h3 class="fw-extrabold mb-0 mt-1" style="color: #0f172a!important; font-size: 24px; letter-spacing: -0.5px; font-weight: 800;">
-                Dashboard Pusat <?= $nama_filter? "<span style='color: #4318ff;'>• ".h($nama_filter)."</span>" : ""?>
+                Dashboard Pusat <?= $nama_cabang_terpilih ? "<span style='color: #4318ff;'>• ".h($nama_cabang_terpilih)."</span>" : '' ?><?= $nama_filter ? ($nama_cabang_terpilih ? ' <span style="color:#94a3b8;font-weight:600;">/</span> ' : ' <span style="color:#94a3b8;font-weight:600;">•</span> ')."<span style=\"color: #4318ff;\">".h($nama_filter)."</span>" : '' ?>
             </h3>
         </div>
         
         <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 w-100 w-lg-auto">
             <form method="GET" class="d-flex flex-wrap align-items-center gap-2 flex-grow-1 flex-sm-grow-0">
+                <select name="cabang" class="form-select form-select-filter" onchange="this.form.submit()">
+                    <option value="0">Semua Cabang</option>
+                    <?php foreach($list_cabang as $lc):?>
+                    <option value="<?= (int) $lc['id_cabang']?>" <?= $sel_cabang==(int)$lc['id_cabang']?'selected':''?>>
+                        <?= h($lc['nama_cabang'])?>
+                    </option>
+                    <?php endforeach;?>
+                </select>
+
                 <select name="investor" class="form-select form-select-filter" onchange="this.form.submit()">
-                    <option value="">Semua Investor</option>
+                    <option value="0">Semua Investor</option>
                     <?php foreach($list_investor as $inv):?>
                     <option value="<?= $inv['id_investor']?>" <?= $filter_investor==$inv['id_investor']?'selected':''?>>
                         <?= h($inv['nama_investor'])?>
@@ -453,8 +517,8 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                     <?php endfor;?>
                 </select>
 
-                <?php if($filter_investor):?>
-                <a href="?bulan=<?= $sel_bulan ?>&tahun=<?= $sel_tahun ?>" class="btn btn-light d-flex align-items-center justify-content-center" style="border-radius: 12px; padding: 9px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter Investor">
+                <?php if($sel_cabang || $filter_investor):?>
+                <a href="?bulan=<?= $sel_bulan ?>&tahun=<?= $sel_tahun ?>" class="btn btn-light d-flex align-items-center justify-content-center" style="border-radius: 12px; padding: 9px 14px; border: 1px solid #e2e8f0; background: #fff;" title="Reset Filter Cabang &amp; Investor">
                     <i class="bi bi-x-lg text-danger"></i>
                 </a>
                 <?php endif;?>
