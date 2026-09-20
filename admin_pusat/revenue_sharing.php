@@ -6,9 +6,10 @@
  * (3/5/7,5% dari sisi pengelola, bisa dipilih per cabang per bulan) +
  * status pembayaran (pending / belum lunas / lunas, editable inline).
  *
- * Tampilan: 1 halaman = semua cabang (tanpa pagination), compact columns,
- * footer Total Admin Fee + Total Service Fee + Total Keseluruhan, dan
- * tombol bawah: Export PDF / Excel / Share WA (pola sama dengan rekapitulasi).
+ * Tampilan: 1 halaman = semua cabang (tanpa pagination), layout fixed-width
+ * supaya 8 kolom muat di desktop standar. Mobile: stack jadi kartu.
+ * Footer: Total Admin Fee + Total Service Fee + Total Keseluruhan + counter.
+ * Bawah: Export PDF / Excel / Share ke WhatsApp (pola sama dengan rekapitulasi).
  */
 
 require '../config/koneksi.php';
@@ -85,98 +86,99 @@ foreach ($rs_rows as $r) {
 }
 $total_keseluruhan = $total_admin_fee_all + $total_service_fee_all;
 $jml_total         = count($baris);
-$jml_belum_lunas   = 0;
-foreach ($baris as $b) if ($b['status_pembayaran'] !== 'lunas') $jml_belum_lunas++;
+$jml_belum_lunas   = $jml_total - $jml_lunas;
 
 // ----- Token CSRF untuk FormData AJAX -----
 $csrf_token = csrf_token();
+
+// Stats untuk header strip
+$net_profit_total = 0.0;
+foreach ($baris as $b) $net_profit_total += $b['net_profit'];
 ?>
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
 <style>
-  body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f8fafc; color: #0f172a; }
+  body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f1f5f9; color: #0f172a; }
 
-  /* Hero ringkas — bukan full-bleed, hanya sebagai strip informasi */
+  /* ===== Header strip — gradient halus, copy informatif ===== */
   .rs-hero {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: #fff;
-      border-radius: 14px;
-      padding: 18px 22px;
-      box-shadow: 0 10px 30px -10px rgba(15, 23, 42, .35);
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      color: #fff; border-radius: 16px; padding: 22px 26px;
+      box-shadow: 0 12px 32px -10px rgba(15, 23, 42, .35);
+      position: relative; overflow: hidden;
   }
-  .rs-hero .label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.55); font-weight: 700; }
-  .rs-hero .value { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
-  .rs-hero .sub   { font-size: 12px; color: rgba(255,255,255,.65); font-weight: 500; }
+  .rs-hero::before {
+      content: ""; position: absolute; top: -40px; right: -40px;
+      width: 180px; height: 180px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(99,102,241,.18) 0%, transparent 70%);
+  }
+  .rs-hero .eyebrow { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,.65); font-weight: 700; }
+  .rs-hero .title    { font-size: 24px; font-weight: 800; letter-spacing: -.5px; margin-top: 4px; }
+  .rs-hero .desc     { font-size: 12.5px; color: rgba(255,255,255,.7); font-weight: 500; margin-top: 6px; max-width: 600px; }
 
-  /* KPI ringkas untuk footer (Total Admin Fee / Service Fee / Keseluruhan) */
-  .rs-summary {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-  }
-  @media (max-width: 767.98px) { .rs-summary { grid-template-columns: 1fr; } }
-  .rs-summary-card {
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-      padding: 14px 16px; position: relative; overflow: hidden;
-  }
-  .rs-summary-card .label { font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; color: #64748b; font-weight: 700; }
-  .rs-summary-card .value { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -.5px; margin-top: 4px; }
-  .rs-summary-card .icon  {
-      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-      width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center;
-      justify-content: center; color: #fff; font-size: 18px;
-  }
-  .rs-summary-card.tone-admin .icon { background: linear-gradient(135deg, #f59e0b, #d97706); }
-  .rs-summary-card.tone-service .icon { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
-  .rs-summary-card.tone-total .icon { background: linear-gradient(135deg, #16a34a, #15803d); }
-  .rs-summary-card.tone-total .value { color: #15803d; }
-
-  /* Filter dropdown — disamakan dengan halaman dashboard pusat */
+  /* ===== Filter dropdown ===== */
   .form-select-filter {
-      border-radius: 10px; border: 1px solid #e2e8f0;
-      padding: 8px 14px; font-size: 13.5px; font-weight: 600; color: #0f172a;
-      background-color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.02);
+      border-radius: 10px; border: 1px solid rgba(255,255,255,.18);
+      padding: 8px 14px; font-size: 13.5px; font-weight: 600; color: #fff;
+      background-color: rgba(255,255,255,.08); backdrop-filter: blur(4px);
   }
-  .form-select-filter:focus { border-color: #4318ff; box-shadow: 0 0 0 3px rgba(67,24,255,.15); }
+  .form-select-filter option { color: #0f172a; background: #fff; }
+  .form-select-filter:focus  { border-color: rgba(255,255,255,.5); box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
 
-  /* Tabel compact — 100+ cabang muat dalam 1 halaman tanpa ngelag */
+  /* ===== Tabel compact fixed-width (8 kolom muat di desktop) ===== */
+  /* Lebar kolom total = 1020px. Desktop standar 1280px setelah sidebar masih sisa. */
+  .rs-table {
+      table-layout: fixed; min-width: 1020px; border-collapse: separate; border-spacing: 0;
+  }
   .rs-table thead th {
-      background: #0f172a !important;
-      color: #fff !important;
-      font-size: 10.5px !important;
-      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
-      padding: 10px 12px !important;
-      border-bottom: 1px solid #1e293b !important;
-      white-space: nowrap;
+      background: #f8fafc !important;
+      color: #475569 !important;
+      font-size: 10px !important; text-transform: uppercase; letter-spacing: 0.6px;
+      font-weight: 800; padding: 12px 10px !important;
+      border-bottom: 2px solid #e2e8f0 !important; white-space: nowrap;
+      position: sticky; top: 0; z-index: 2;
   }
   .rs-table tbody td {
-      padding: 8px 12px !important;
+      padding: 10px !important;
       border-bottom: 1px solid #f1f5f9 !important;
-      font-size: 12.5px !important;
-      white-space: nowrap;
+      font-size: 12px !important;
       vertical-align: middle;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .rs-table tbody tr:hover td { background: #f8fafc !important; }
+  .rs-table tbody tr:last-child td { border-bottom: none !important; }
 
-  /* Tombol presentase (3/5/7,5) & status — radio-button look inline */
+  /* Lebar kolom sesuai colgroup */
+  .rs-col-no    { width: 38px; text-align: center; }
+  .rs-col-pgl   { width: 140px; }
+  .rs-col-cbg   { width: 165px; }
+  .rs-col-np    { width: 105px; text-align: right; }
+  .rs-col-af    { width: 105px; text-align: right; font-weight: 700; }
+  .rs-col-prs   { width: 150px; text-align: center; }
+  .rs-col-sf    { width: 105px; text-align: right; font-weight: 700; color: #0ea5e9; }
+  .rs-col-stt   { width: 210px; text-align: center; }
+
+  /* Tombol presentase (3/5/7,5) & status — compact pills */
   .rs-btn-group { display: inline-flex; gap: 3px; }
   .rs-btn {
       border: 1px solid #cbd5e1; background: #fff; color: #475569;
-      font-weight: 700; font-size: 11px;
-      padding: 4px 9px; border-radius: 6px; cursor: pointer; transition: all .15s ease;
-      min-width: 36px; text-align: center;
+      font-weight: 700; font-size: 10.5px;
+      padding: 4px 8px; border-radius: 6px; cursor: pointer;
+      transition: all .15s ease; min-width: 32px; text-align: center; line-height: 1.2;
   }
   .rs-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
-  .rs-btn.is-active { background: #4318ff; border-color: #4318ff; color: #fff; box-shadow: 0 3px 8px -2px rgba(67,24,255,.4); }
-  .rs-btn.is-active:hover { background: #3311db; }
+  .rs-btn.is-active { background: #4f46e5; border-color: #4f46e5; color: #fff; box-shadow: 0 2px 6px -1px rgba(79,70,229,.45); }
+  .rs-btn.is-active:hover { background: #4338ca; }
   .rs-btn[disabled] { opacity: .55; cursor: wait; }
 
-  .status-pending     { background: #fffbeb; color: #d97706; border-color: #fde68a; }
-  .status-pending.is-active { background: #d97706; border-color: #d97706; color: #fff; box-shadow: 0 3px 8px -2px rgba(217,119,6,.4); }
-  .status-belum_lunas { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
-  .status-belum_lunas.is-active { background: #dc2626; border-color: #dc2626; color: #fff; box-shadow: 0 3px 8px -2px rgba(220,38,38,.4); }
-  .status-lunas       { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
-  .status-lunas.is-active { background: #16a34a; border-color: #16a34a; color: #fff; box-shadow: 0 3px 8px -2px rgba(22,163,74,.4); }
+  .status-pending     { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+  .status-pending.is-active { background: #b45309; border-color: #b45309; color: #fff; box-shadow: 0 2px 6px -1px rgba(180,83,9,.4); }
+  .status-belum_lunas { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+  .status-belum_lunas.is-active { background: #b91c1c; border-color: #b91c1c; color: #fff; box-shadow: 0 2px 6px -1px rgba(185,28,28,.4); }
+  .status-lunas       { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+  .status-lunas.is-active { background: #15803d; border-color: #15803d; color: #fff; box-shadow: 0 2px 6px -1px rgba(21,128,61,.4); }
 
   tr.rs-flash { animation: rsFlash 600ms ease-out; }
   @keyframes rsFlash {
@@ -184,141 +186,203 @@ $csrf_token = csrf_token();
       100% { background: transparent; }
   }
 
-  /* Tombol export di bawah tabel */
+  /* ===== Footer ringkasan ===== */
+  .rs-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 767.98px) { .rs-summary { grid-template-columns: 1fr; } }
+
+  .rs-summary-card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      padding: 16px 18px; position: relative; overflow: hidden;
+      transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .rs-summary-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px -10px rgba(15,23,42,.15); }
+  .rs-summary-card .label { font-size: 10.5px; letter-spacing: 0.8px; text-transform: uppercase; color: #64748b; font-weight: 800; }
+  .rs-summary-card .value { font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -.5px; margin-top: 6px; }
+  .rs-summary-card .icon  {
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center;
+      justify-content: center; color: #fff; font-size: 20px;
+  }
+  .rs-summary-card.tone-admin   .icon { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .rs-summary-card.tone-service .icon { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+  .rs-summary-card.tone-total   .icon { background: linear-gradient(135deg, #16a34a, #15803d); }
+  .rs-summary-card.tone-total   .value { color: #15803d; }
+  .rs-summary-card.tone-service .value { color: #0369a1; }
+  .rs-summary-card.tone-admin   .value { color: #b45309; }
+
+  /* ===== Tombol export ===== */
   .btn-export {
       border-radius: 10px; padding: 10px 18px; font-weight: 700;
       font-size: 13px; display: inline-flex; align-items: center; gap: 8px;
       transition: all .15s ease; box-shadow: 0 2px 6px rgba(0,0,0,.04);
+      border: none;
   }
-  .btn-export:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,.08); }
+  .btn-export:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(0,0,0,.1); }
+  .btn-export-pdf    { background: #dc2626; color: #fff; }
+  .btn-export-pdf:hover    { background: #b91c1c; color: #fff; }
+  .btn-export-wa     { background: #16a34a; color: #fff; }
+  .btn-export-wa:hover     { background: #15803d; color: #fff; }
+  .btn-export-excel  { background: #fff; color: #16a34a; border: 1.5px solid #16a34a !important; }
+  .btn-export-excel:hover  { background: #f0fdf4; color: #15803d; }
+
+  /* Hint scroll horizontal di mobile / layar sempit */
+  .rs-scroll-hint {
+      display: none;
+      font-size: 11px; color: #64748b; padding: 6px 12px;
+      background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
+      align-items: center; gap: 6px;
+  }
+  @media (max-width: 1199.98px) { .rs-scroll-hint { display: flex; } }
 
   /* Mobile: tumpuk jadi kartu */
   @media (max-width: 767.98px) {
+      .rs-table { min-width: 0; }
       .rs-table thead { display: none; }
       .rs-table tbody tr { display: block; border: 1px solid #e2e8f0; border-radius: 12px; margin: 10px 0; padding: 12px; background: #fff; }
-      .rs-table tbody td { display: flex; justify-content: space-between; align-items: center; padding: 7px 0 !important; border-bottom: 1px dashed #f1f5f9 !important; white-space: normal; }
-      .rs-table tbody td::before { content: attr(data-label); font-weight: 700; color: #64748b; font-size: 10.5px; text-transform: uppercase; }
+      .rs-table tbody td {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 7px 0 !important; border-bottom: 1px dashed #f1f5f9 !important;
+          white-space: normal; text-align: left !important;
+          overflow: visible; text-overflow: clip;
+      }
+      .rs-table tbody td::before {
+          content: attr(data-label); font-weight: 700; color: #64748b;
+          font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;
+          flex-shrink: 0; margin-right: 12px;
+      }
       .rs-table tbody td:last-child { border-bottom: none !important; }
+      .rs-col-no, .rs-col-pgl, .rs-col-cbg, .rs-col-np, .rs-col-af, .rs-col-prs, .rs-col-sf, .rs-col-stt { width: auto; }
   }
 </style>
 
 <div class="content">
 <div class="container-fluid py-4 px-3 px-md-4">
 
-    <!-- HERO RINGKAS + FILTER SEJAJAR -->
-    <div class="rs-hero mb-3 d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
-        <div>
-            <div class="label">Revenue Sharing &bull; <?= strtoupper($nama_periode) ?></div>
-            <div class="value mt-1">Admin Fee &amp; Service Fee Bulanan</div>
-            <div class="sub mt-1"><i class="bi bi-info-circle me-1"></i> Admin Fee <strong>3%</strong> otomatis dari net profit. Service Fee dari <strong>50% sisi pengelola</strong>, presentase dipilih per cabang.</div>
-        </div>
-        <form method="GET" class="d-flex flex-wrap gap-2" style="min-width: 280px;">
-            <select name="bulan" class="form-select form-select-filter" style="flex:1; min-width: 120px;" onchange="this.form.submit()">
-                <?php for ($m = 1; $m <= 12; $m++): ?>
-                <option value="<?= $m ?>" <?= $sel_bulan == $m ? 'selected' : '' ?>><?= nama_bulan_id($m) ?></option>
-                <?php endfor; ?>
-            </select>
-            <select name="tahun" class="form-select form-select-filter" style="flex:1; min-width: 100px;" onchange="this.form.submit()">
-                <?php for ($y = (int) date('Y') + 1; $y >= tahun_data_paling_lama($conn); $y--): ?>
-                <option value="<?= $y ?>" <?= $sel_tahun == $y ? 'selected' : '' ?>><?= $y ?></option>
-                <?php endfor; ?>
-            </select>
-        </form>
-    </div>
-
-    <!-- TABEL -->
-    <div class="card border-0 mb-3" style="overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.04);">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table rs-table align-middle mb-0" id="tabelRevenueSharing">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px;">No</th>
-                            <th>Nama Pengelola</th>
-                            <th>Cabang</th>
-                            <th class="text-end">Net Profit</th>
-                            <th class="text-end">Admin Fee (3%)</th>
-                            <th class="text-center" style="width: 170px;">Presentase</th>
-                            <th class="text-end">Nominal Service Fee</th>
-                            <th class="text-center" style="width: 290px;">Status Pembayaran</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($baris)): ?>
-                        <tr>
-                            <td colspan="8" class="text-center text-muted py-5">
-                                <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>
-                                Belum ada data untuk periode ini.
-                            </td>
-                        </tr>
-                        <?php else:
-                            $no = 1;
-                            foreach ($baris as $b):
-                                $row_id = 'rs-row-' . $b['id_cabang'];
-                                $nom_id = 'rs-nom-'  . $b['id_cabang'];
-                        ?>
-                        <tr id="<?= $row_id ?>"
-                            data-id-cabang="<?= $b['id_cabang'] ?>"
-                            data-tahun="<?= $sel_tahun ?>"
-                            data-bulan="<?= $sel_bulan ?>">
-                            <td data-label="No" class="fw-semibold text-muted"><?= $no++ ?></td>
-                            <td data-label="Pengelola" class="fw-bold" style="color:#0f172a;">
-                                <i class="bi bi-person-badge me-1 text-primary" style="color:#4318ff!important;"></i>
-                                <?= h($b['nama_pengelola']) ?>
-                            </td>
-                            <td data-label="Cabang"><?= h($b['nama_cabang']) ?></td>
-                            <td data-label="Net Profit" class="text-end text-muted">
-                                Rp <?= number_format($b['net_profit'], 0, ',', '.') ?>
-                            </td>
-                            <td data-label="Admin Fee" class="text-end fw-bold" style="color:#0f172a;">
-                                Rp <?= number_format($b['admin_fee'], 0, ',', '.') ?>
-                            </td>
-                            <td data-label="Presentase" class="text-center">
-                                <div class="rs-btn-group" data-field="persen" role="group">
-                                    <?php foreach ([3.0, 5.0, 7.5] as $p):
-                                        $active = abs($b['persen_service_fee'] - $p) < 0.01;
-                                    ?>
-                                    <button type="button"
-                                        class="rs-btn <?= $active ? 'is-active' : '' ?>"
-                                        data-value="<?= $p ?>"
-                                        title="Service Fee <?= rtrim(rtrim(number_format($p, 2, ',', '.'), '0'), ',') ?>%">
-                                        <?= rtrim(rtrim(number_format($p, 2, ',', '.'), '0'), ',') ?>%
-                                    </button>
-                                    <?php endforeach; ?>
-                                </div>
-                            </td>
-                            <td data-label="Service Fee" id="<?= $nom_id ?>" class="text-end fw-bold" style="color:#0ea5e9;">
-                                Rp <?= number_format($b['nominal_service_fee'], 0, ',', '.') ?>
-                            </td>
-                            <td data-label="Status" class="text-center">
-                                <div class="rs-btn-group" data-field="status" role="group">
-                                    <?php
-                                    $statuses = [
-                                        'pending'      => 'Pending',
-                                        'belum_lunas'  => 'Belum Lunas',
-                                        'lunas'        => 'Lunas',
-                                    ];
-                                    foreach ($statuses as $key => $label):
-                                        $active = $b['status_pembayaran'] === $key;
-                                    ?>
-                                    <button type="button"
-                                        class="rs-btn status-<?= $key ?> <?= $active ? 'is-active' : '' ?>"
-                                        data-value="<?= $key ?>">
-                                        <?= $label ?>
-                                    </button>
-                                    <?php endforeach; ?>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
+    <!-- ===== HERO STRIP ===== -->
+    <div class="rs-hero mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3" style="position: relative; z-index: 1;">
+            <div>
+                <div class="eyebrow">Revenue Sharing &bull; <?= strtoupper($nama_periode) ?></div>
+                <div class="title">Admin Fee &amp; Service Fee Bulanan</div>
+                <div class="desc">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Admin Fee <strong>3%</strong> otomatis dari net profit keseluruhan. Service Fee dihitung dari <strong>50% sisi pengelola</strong> dengan presentase yang bisa dipilih per cabang.
+                </div>
             </div>
+            <form method="GET" class="d-flex flex-wrap gap-2" style="min-width: 280px;">
+                <select name="bulan" class="form-select form-select-filter" style="flex:1; min-width: 130px;" onchange="this.form.submit()">
+                    <?php for ($m = 1; $m <= 12; $m++): ?>
+                    <option value="<?= $m ?>" <?= $sel_bulan == $m ? 'selected' : '' ?>><?= nama_bulan_id($m) ?></option>
+                    <?php endfor; ?>
+                </select>
+                <select name="tahun" class="form-select form-select-filter" style="flex:1; min-width: 100px;" onchange="this.form.submit()">
+                    <?php for ($y = (int) date('Y') + 1; $y >= tahun_data_paling_lama($conn); $y--): ?>
+                    <option value="<?= $y ?>" <?= $sel_tahun == $y ? 'selected' : '' ?>><?= $y ?></option>
+                    <?php endfor; ?>
+                </select>
+            </form>
         </div>
     </div>
 
-    <!-- FOOTER RINGKASAN TOTAL -->
-    <div class="rs-summary mb-3">
+    <!-- ===== TABEL ===== -->
+    <!-- Wrapper HANYA untuk scroll — tanpa overflow:hidden supaya tidak motong kolom -->
+    <div class="card border-0 mb-4" style="border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.05);">
+        <div class="rs-scroll-hint">
+            <i class="bi bi-arrow-left-right"></i>
+            Geser ke samping untuk melihat kolom Presentase &amp; Status
+        </div>
+        <div class="table-responsive" style="border-radius: 14px;">
+            <table class="table rs-table align-middle mb-0" id="tabelRevenueSharing">
+                <colgroup>
+                    <col class="rs-col-no">
+                    <col class="rs-col-pgl">
+                    <col class="rs-col-cbg">
+                    <col class="rs-col-np">
+                    <col class="rs-col-af">
+                    <col class="rs-col-prs">
+                    <col class="rs-col-sf">
+                    <col class="rs-col-stt">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th class="rs-col-no">No</th>
+                        <th class="rs-col-pgl">Nama Pengelola</th>
+                        <th class="rs-col-cbg">Cabang</th>
+                        <th class="rs-col-np">Net Profit</th>
+                        <th class="rs-col-af">Admin Fee (3%)</th>
+                        <th class="rs-col-prs">Presentase</th>
+                        <th class="rs-col-sf">Nominal Service Fee</th>
+                        <th class="rs-col-stt">Status Pembayaran</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($baris)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>
+                            Belum ada data untuk periode ini.
+                        </td>
+                    </tr>
+                    <?php else:
+                        $no = 1;
+                        foreach ($baris as $b):
+                            $row_id = 'rs-row-' . $b['id_cabang'];
+                            $nom_id = 'rs-nom-'  . $b['id_cabang'];
+                    ?>
+                    <tr id="<?= $row_id ?>"
+                        data-id-cabang="<?= $b['id_cabang'] ?>"
+                        data-tahun="<?= $sel_tahun ?>"
+                        data-bulan="<?= $sel_bulan ?>">
+                        <td class="rs-col-no text-muted fw-semibold" data-label="No"><?= $no++ ?></td>
+                        <td class="rs-col-pgl fw-bold" style="color:#0f172a;" data-label="Pengelola" title="<?= h($b['nama_pengelola']) ?>">
+                            <i class="bi bi-person-badge me-1" style="color:#4f46e5;"></i><?= h($b['nama_pengelola']) ?>
+                        </td>
+                        <td class="rs-col-cbg" data-label="Cabang" title="<?= h($b['nama_cabang']) ?>"><?= h($b['nama_cabang']) ?></td>
+                        <td class="rs-col-np text-muted" data-label="Net Profit">Rp <?= number_format($b['net_profit'], 0, ',', '.') ?></td>
+                        <td class="rs-col-af" data-label="Admin Fee" style="color:#0f172a;">Rp <?= number_format($b['admin_fee'], 0, ',', '.') ?></td>
+                        <td class="rs-col-prs" data-label="Presentase">
+                            <div class="rs-btn-group" data-field="persen" role="group">
+                                <?php foreach ([3.0, 5.0, 7.5] as $p):
+                                    $active = abs($b['persen_service_fee'] - $p) < 0.01;
+                                ?>
+                                <button type="button"
+                                    class="rs-btn <?= $active ? 'is-active' : '' ?>"
+                                    data-value="<?= $p ?>"
+                                    title="Service Fee <?= rtrim(rtrim(number_format($p, 2, ',', '.'), '0'), ',') ?>%">
+                                    <?= rtrim(rtrim(number_format($p, 2, ',', '.'), '0'), ',') ?>%
+                                </button>
+                                <?php endforeach; ?>
+                            </div>
+                        </td>
+                        <td class="rs-col-sf" id="<?= $nom_id ?>" data-label="Service Fee">Rp <?= number_format($b['nominal_service_fee'], 0, ',', '.') ?></td>
+                        <td class="rs-col-stt" data-label="Status">
+                            <div class="rs-btn-group" data-field="status" role="group">
+                                <?php
+                                $statuses = [
+                                    'pending'      => 'Pending',
+                                    'belum_lunas'  => 'Belum Lunas',
+                                    'lunas'        => 'Lunas',
+                                ];
+                                foreach ($statuses as $key => $label):
+                                    $active = $b['status_pembayaran'] === $key;
+                                ?>
+                                <button type="button"
+                                    class="rs-btn status-<?= $key ?> <?= $active ? 'is-active' : '' ?>"
+                                    data-value="<?= $key ?>">
+                                    <?= $label ?>
+                                </button>
+                                <?php endforeach; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER RINGKASAN ===== -->
+    <div class="rs-summary mb-4">
         <div class="rs-summary-card tone-admin">
             <div class="label">Total Admin Fee</div>
             <div class="value">Rp <?= number_format($total_admin_fee_all, 0, ',', '.') ?></div>
@@ -336,24 +400,25 @@ $csrf_token = csrf_token();
         </div>
     </div>
 
-    <!-- TOMBOL EXPORT DI BAWAH (sama gaya dengan rekapitulasi.php) -->
-    <div class="card border-0" style="box-shadow: 0 4px 20px rgba(0,0,0,0.04);">
+    <!-- ===== TOMBOL EXPORT ===== -->
+    <div class="card border-0" style="border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.05);">
         <div class="card-body p-3">
             <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-3">
                 <div class="text-muted small">
                     <i class="bi bi-info-circle me-1"></i>
-                    <?= $jml_total ?> cabang &mdash;
+                    <strong class="text-dark"><?= $jml_total ?></strong> cabang &mdash;
                     <span class="text-success fw-semibold"><?= $jml_lunas ?> lunas</span>,
-                    <span class="text-warning fw-semibold"><?= $jml_total - $jml_lunas ?> belum lunas</span>
+                    <span class="text-danger fw-semibold"><?= $jml_belum_lunas ?> belum lunas</span>
+                    <span class="ms-2 text-muted">| Net profit agregat: <strong>Rp <?= number_format($net_profit_total, 0, ',', '.') ?></strong></span>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <button type="button" onclick="exportExcel()" class="btn btn-outline-success btn-export">
+                    <button type="button" onclick="exportExcel()" class="btn btn-export btn-export-excel" id="btnExportExcel">
                         <i class="bi bi-file-earmark-excel"></i> Export Excel
                     </button>
-                    <button type="button" onclick="exportPDF('share')" class="btn btn-outline-danger btn-export" title="Cetak PDF lalu bagikan via WhatsApp">
+                    <button type="button" onclick="shareToWA()" class="btn btn-export btn-export-wa" id="btnShareWA">
                         <i class="bi bi-whatsapp"></i> Share ke WhatsApp
                     </button>
-                    <button type="button" onclick="exportPDF('save')" class="btn btn-danger btn-export">
+                    <button type="button" onclick="exportPDF()" class="btn btn-export btn-export-pdf" id="btnExportPDF">
                         <i class="bi bi-file-earmark-pdf"></i> Cetak PDF
                     </button>
                 </div>
@@ -370,11 +435,11 @@ $csrf_token = csrf_token();
 
 <script>
 (function () {
+    // ===== Inline edit presentase/status (delegation; tidak butuh global) =====
     const csrfToken  = <?= json_encode($csrf_token) ?>;
     const handlerUrl = 'revenue_sharing_handler.php';
     const fmtRp      = (n) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
-    // ---- Inline edit presentase/status ----
     document.querySelectorAll('.rs-btn-group').forEach((grp) => {
         grp.addEventListener('click', (ev) => {
             const btn = ev.target.closest('.rs-btn');
@@ -420,106 +485,118 @@ $csrf_token = csrf_token();
                 });
         });
     });
+})();
 
-    // ---- Helper: ambil nama file export ----
-    const namaPeriode = <?= json_encode($nama_periode) ?>;
-
-    // ---- Helper: sharePdfToWA — pola sama dengan rekapitulasi.php ----
-    async function sharePdfToWA(doc, filename) {
-        const teks = filename.replace(/\.pdf$/i, '');
-        const blob = doc.output('blob');
-        const file = new File([blob], filename, { type: 'application/pdf' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            try { await navigator.share({ files: [file], title: 'Laporan WBB', text: teks }); return; }
-            catch (e) { if (e && e.name === 'AbortError') return; }
-        }
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob); a.download = filename; a.click();
-        window.open('https://wa.me/?text=' + encodeURIComponent(teks + ' (PDF terlampir, silakan unggah manual)'), '_blank');
+// ===== Export functions — di window scope supaya onclick= bisa reach =====
+// Pola sama dengan rekapitulasi.php: jsPDF + autoTable untuk render tabel HTML.
+window.sharePdfToWA = async function (doc, filename) {
+    const teks  = filename.replace(/\.pdf$/i, '');
+    const blob  = doc.output('blob');
+    const file  = new File([blob], filename, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'Laporan WBB', text: teks }); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
     }
+    // Fallback desktop: download PDF + buka wa.me dengan teks
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+    window.open('https://wa.me/?text=' + encodeURIComponent(teks + ' (PDF terlampir, silakan unggah manual)'), '_blank');
+};
 
-    // ---- Pewarnaan sel tabel khusus saat di-export PDF ----
-    // - Baris JUMLAH (tfoot, kalau ada) → hijau, semua tulisan putih
-    // - Kolom Net Profit → abu, Admin Fee → hitam tebal
-    // - Service Fee → biru (merah kalau minus)
-    // - Baris dengan status 'lunas' → badge hijau
-    function rsDidParseCell(data) {
-        if (data.section === 'head') {
-            data.cell.styles.fillColor = [15, 23, 42];
-            data.cell.styles.textColor = [255, 255, 255];
-            return;
-        }
-        const tr = data.row && data.row.raw;
-        const isFoot = data.section === 'foot' || !!(tr && typeof tr.closest === 'function' && tr.closest('tfoot'));
-        if (isFoot) {
-            data.cell.styles.fillColor = [22, 163, 74];
-            data.cell.styles.textColor = [255, 255, 255];
-            return;
-        }
-        const idx = data.column.index;
-        const teks = (data.cell.text || []).join(' ');
-        if (idx === 6) {
-            // Service Fee (kolom 0-based idx=6): merah kalau minus, default biru
-            data.cell.styles.textColor = teks.indexOf('-') !== -1 ? [220, 53, 69] : [14, 165, 233];
-        }
+// Pewarnaan sel khusus saat di-export ke PDF.
+window.rsDidParseCell = function (data) {
+    if (data.section === 'head') {
+        data.cell.styles.fillColor = [15, 23, 42];
+        data.cell.styles.textColor = [255, 255, 255];
+        return;
     }
-
-    // ---- EXPORT PDF ----
-    async function exportPDF(mode) {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('landscape', 'mm', 'a4');
-        const filename = 'Revenue Sharing ' + namaPeriode + '.pdf';
-
-        // Kop sederhana (tanpa logo untuk ringkas; user bisa tambah watermark nanti)
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(15, 23, 42);
-        doc.text('WARTEG BUMI BAHARI', 14, 14);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
-        doc.text('Revenue Sharing - ' + namaPeriode, 14, 19);
-
-        doc.autoTable({
-            html: '#tabelRevenueSharing',
-            startY: 24,
-            theme: 'grid',
-            styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak', halign: 'left', valign: 'middle' },
-            headStyles: { fillColor: [15, 23, 42], textColor: 255, halign: 'center', fontSize: 8.5, fontStyle: 'bold' },
-            columnStyles: {
-                0: { halign: 'center', cellWidth: 10 },
-                3: { halign: 'right' },
-                4: { halign: 'right' },
-                5: { halign: 'center' },
-                6: { halign: 'right' },
-                7: { halign: 'center' },
-            },
-            didParseCell: rsDidParseCell,
-            includeHiddenHtml: true,
-        });
-
-        const finalY = doc.lastAutoTable.finalY || 24;
-
-        // Ringkasan total di bawah tabel
-        const totals = [
-            ['Total Admin Fee', <?= json_encode('Rp ' . number_format($total_admin_fee_all, 0, ',', '.')) ?>],
-            ['Total Service Fee', <?= json_encode('Rp ' . number_format($total_service_fee_all, 0, ',', '.')) ?>],
-            ['Total Keseluruhan', <?= json_encode('Rp ' . number_format($total_keseluruhan, 0, ',', '.')) ?>],
-        ];
-        doc.autoTable({
-            body: totals,
-            startY: finalY + 6,
-            theme: 'plain',
-            styles: { fontSize: 10, cellPadding: 2, fontStyle: 'bold' },
-            columnStyles: { 0: { textColor: [100, 116, 139] }, 1: { halign: 'right', textColor: [15, 23, 42] } },
-            tableWidth: 100,
-        });
-
-        if (mode === 'share') {
-            await sharePdfToWA(doc, filename);
-        } else {
-            doc.save(filename);
-        }
+    const tr = data.row && data.row.raw;
+    const isFoot = data.section === 'foot' || !!(tr && typeof tr.closest === 'function' && tr.closest('tfoot'));
+    if (isFoot) {
+        data.cell.styles.fillColor = [22, 163, 74];
+        data.cell.styles.textColor = [255, 255, 255];
+        return;
     }
+    const teks = (data.cell.text || []).join(' ');
+    const idx  = data.column.index;
+    if (idx === 6) {
+        // Kolom Service Fee (idx 6): merah kalau minus, default biru.
+        data.cell.styles.textColor = teks.indexOf('-') !== -1 ? [220, 53, 69] : [14, 165, 233];
+    }
+};
 
-    // ---- EXPORT EXCEL (CSV sederhana, buka langsung di Excel; tidak butuh library) ----
-    function exportExcel() {
+// Bangun dokumen PDF — dipakai oleh Cetak PDF & Share WA.
+function buildPDFDoc() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const filename = 'Revenue Sharing ' + <?= json_encode($nama_periode) ?> + '.pdf';
+
+    // Kop
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(15, 23, 42);
+    doc.text('WARTEG BUMI BAHARI', 14, 14);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 116, 139);
+    doc.text('Revenue Sharing - ' + <?= json_encode($nama_periode) ?>, 14, 19);
+
+    // Tabel utama (lebar kolom di-scale supaya muat di A4 landscape)
+    doc.autoTable({
+        html: '#tabelRevenueSharing',
+        startY: 24,
+        theme: 'grid',
+        styles: { fontSize: 7.5, cellPadding: 1.4, overflow: 'linebreak', halign: 'left', valign: 'middle' },
+        headStyles: { fillColor: [15, 23, 42], textColor: 255, halign: 'center', fontSize: 8, fontStyle: 'bold' },
+        columnStyles: {
+            0: { halign: 'center', cellWidth: 12 },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'center' },
+            6: { halign: 'right' },
+            7: { halign: 'center' },
+        },
+        didParseCell: window.rsDidParseCell,
+        includeHiddenHtml: true,
+    });
+
+    const finalY = doc.lastAutoTable.finalY || 24;
+
+    // Ringkasan total di bawah tabel
+    doc.autoTable({
+        body: [
+            ['Total Admin Fee',         <?= json_encode('Rp ' . number_format($total_admin_fee_all, 0, ',', '.')) ?>],
+            ['Total Service Fee',       <?= json_encode('Rp ' . number_format($total_service_fee_all, 0, ',', '.')) ?>],
+            ['Total Keseluruhan',       <?= json_encode('Rp ' . number_format($total_keseluruhan, 0, ',', '.')) ?>],
+        ],
+        startY: finalY + 6,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2, fontStyle: 'bold' },
+        columnStyles: { 0: { textColor: [100, 116, 139] }, 1: { halign: 'right', textColor: [21, 128, 61] } },
+        tableWidth: 110,
+    });
+
+    return { doc, filename };
+}
+
+window.exportPDF = function () {
+    try {
+        const { doc, filename } = buildPDFDoc();
+        doc.save(filename);
+    } catch (e) {
+        console.error('exportPDF error:', e);
+        alert('Gagal membuat PDF: ' + e.message);
+    }
+};
+
+window.shareToWA = async function () {
+    try {
+        const { doc, filename } = buildPDFDoc();
+        await window.sharePdfToWA(doc, filename);
+    } catch (e) {
+        console.error('shareToWA error:', e);
+        alert('Gagal membagikan ke WhatsApp: ' + e.message);
+    }
+};
+
+window.exportExcel = function () {
+    try {
         const rows = [['No', 'Nama Pengelola', 'Cabang', 'Net Profit', 'Admin Fee (3%)', 'Presentase Service Fee', 'Nominal Service Fee', 'Status Pembayaran']];
         const trs = document.querySelectorAll('#tabelRevenueSharing tbody tr');
         trs.forEach((tr) => {
@@ -527,24 +604,26 @@ $csrf_token = csrf_token();
             if (cells.length < 8) return;
             const statusBtn = tr.querySelector('.rs-btn-group[data-field="status"] .rs-btn.is-active');
             const status = statusBtn ? statusBtn.textContent.trim() : '-';
+            const persenBtn = tr.querySelector('.rs-btn-group[data-field="persen"] .rs-btn.is-active');
+            const persen = persenBtn ? persenBtn.textContent.trim() : '-';
             rows.push([
                 cells[0].textContent.trim(),
                 cells[1].textContent.replace(/\s+/g, ' ').trim(),
                 cells[2].textContent.trim(),
                 cells[3].textContent.trim(),
                 cells[4].textContent.trim(),
-                cells[5].textContent.replace(/\s+/g, ' ').trim(),
+                persen,
                 cells[6].textContent.trim(),
                 status,
             ]);
         });
         // Baris total
         rows.push([]);
-        rows.push(['', '', '', '', 'TOTAL ADMIN FEE', <?= json_encode('Rp ' . number_format($total_admin_fee_all, 0, ',', '.')) ?>, '', '']);
-        rows.push(['', '', '', '', 'TOTAL SERVICE FEE', <?= json_encode('Rp ' . number_format($total_service_fee_all, 0, ',', '.')) ?>, '', '']);
-        rows.push(['', '', '', '', 'TOTAL KESELURUHAN', <?= json_encode('Rp ' . number_format($total_keseluruhan, 0, ',', '.')) ?>, '', '']);
+        rows.push(['', '', '', '', 'TOTAL ADMIN FEE',         <?= json_encode('Rp ' . number_format($total_admin_fee_all, 0, ',', '.')) ?>, '', '']);
+        rows.push(['', '', '', '', 'TOTAL SERVICE FEE',       <?= json_encode('Rp ' . number_format($total_service_fee_all, 0, ',', '.')) ?>, '', '']);
+        rows.push(['', '', '', '', 'TOTAL KESELURUHAN',       <?= json_encode('Rp ' . number_format($total_keseluruhan, 0, ',', '.')) ?>, '', '']);
 
-        // Build CSV dengan BOM supaya Excel Indonesia auto-detect UTF-8
+        // BOM supaya Excel Indonesia auto-detect UTF-8
         const csv = '﻿' + rows.map((r) => r.map((c) => {
             const s = String(c).replace(/"/g, '""');
             return /[",\n]/.test(s) ? '"' + s + '"' : s;
@@ -553,11 +632,16 @@ $csrf_token = csrf_token();
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'Revenue Sharing ' + namaPeriode + '.csv';
+        a.download = 'Revenue Sharing ' + <?= json_encode($nama_periode) ?> + '.csv';
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(a.href);
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (e) {
+        console.error('exportExcel error:', e);
+        alert('Gagal membuat Excel: ' + e.message);
     }
-})();
+};
 </script>
 
 <?php include '../config/notifikasi_bell.php'; ?>
