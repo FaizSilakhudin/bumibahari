@@ -133,7 +133,7 @@ if (!empty($cabang_ids)) {
                                 Belum ada data pada <?= date('F Y', strtotime($tgl_awal)) ?>
                             </td>
                         </tr>
-                    <?php else: $no = 1; foreach ($rows as $row):
+                    <?php else: $no = $offset + 1; foreach ($rows as $row):
                         $lengkap = ($row['status_laporan'] ?? 'lengkap') === 'lengkap';
                         $libur   = ($row['status_laporan'] ?? '') === 'libur';
                     ?>

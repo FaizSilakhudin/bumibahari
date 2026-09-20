@@ -158,7 +158,7 @@ if (!empty($cabang_ids)) {
                     <tr><td colspan="5" class="text-center py-5 text-muted fw-semibold">
                         <i class="bi bi-inbox fs-2 d-block mb-2"></i> Tidak ada data untuk tanggal ini.
                     </td></tr>
-                <?php else: $no = 1; foreach ($antrian as $row): ?>
+                <?php else: $no = $offset + 1; foreach ($antrian as $row): ?>
                     <tr>
                         <td class="text-center text-muted fw-semibold"><?= $no++ ?></td>
                         <td><span class="fw-bold text-dark"><?= h($row['nama_cabang']) ?></span></td>

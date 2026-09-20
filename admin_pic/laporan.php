@@ -20,7 +20,7 @@ if ($id_cabang !== '' && !in_array((int) $id_cabang, $cabang_ids_pic, true)) {
 }
 
 $page  = max(1, (int) ($_GET['page'] ?? 1));
-$limit = 10;
+$limit = 20;
 $offset = ($page - 1) * $limit;
 
 $total_data = 0;

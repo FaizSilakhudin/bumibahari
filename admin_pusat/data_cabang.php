@@ -188,7 +188,7 @@ if (isset($_POST['hapus'])) {
 }
 
 // PAGINATION
-$limit = 10;
+$limit = 20;
 $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $limit;
 

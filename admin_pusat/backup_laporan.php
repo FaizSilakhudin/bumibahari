@@ -233,7 +233,7 @@ if (isset($_POST['simpan'], $_POST['id_cabang'], $_POST['tanggal'])) {
 // -----------------------------------------------------------------------------
 // DAFTAR CABANG + STATUS PADA TANGGAL TERPILIH (dengan pencarian & pagination)
 // -----------------------------------------------------------------------------
-$limit  = 10;
+$limit  = 20;
 $page   = max(1, (int) ($_GET['page'] ?? 1));
 $offset = ($page - 1) * $limit;
 

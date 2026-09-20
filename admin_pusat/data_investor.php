@@ -176,7 +176,7 @@ if ($search != '') {
     $types = "ss";
 }
 
-$limit  = 10;
+$limit  = 20;
 $page   = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $page   = $page < 1 ? 1 : $page;
 $offset = ($page - 1) * $limit;
