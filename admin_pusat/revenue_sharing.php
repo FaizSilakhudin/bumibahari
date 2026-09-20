@@ -127,10 +127,18 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
   .form-select-filter option { color: #0f172a; background: #fff; }
   .form-select-filter:focus  { border-color: rgba(255,255,255,.5); box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
 
+  /* Override padding .content dari sidebar_pusat.php (32px) jadi lebih kecil di
+     halaman ini, supaya tabel benar-benar full-width dan 8 kolom muat di viewport
+     standar 1280px tanpa scroll horizontal. Sidebar tetap utuh 260px. */
+  .content { padding: 18px !important; }
+
   /* ===== Tabel compact fixed-width (8 kolom muat di desktop) ===== */
-  /* Lebar kolom total = 1020px. Desktop standar 1280px setelah sidebar masih sisa. */
+  /* Lebar kolom total = 956px dari colgroup. table-layout:fixed memastikan
+     browser尊重 lebar kolom — JANGAN pasang min-width di sini atau tabel
+     dipaksa lebih lebar dari colgroup dan overflow ke scroll horizontal. */
   .rs-table {
-      table-layout: fixed; min-width: 1020px; border-collapse: separate; border-spacing: 0;
+      table-layout: fixed; border-collapse: separate; border-spacing: 0;
+      width: 100%; max-width: 100%;
   }
   .rs-table thead th {
       background: #f8fafc !important;
@@ -546,12 +554,10 @@ window.rsDidParseCell = function (data) {
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.halign = 'center';
 
-            if (idx === 5) {
-                // Presentase aktif — biru + teks hitam (sesuai permintaan)
-                data.cell.styles.fillColor = [79, 70, 229];   // indigo-600
-                data.cell.styles.textColor = [0, 0, 0];         // hitam
-            } else {
-                // Status aktif — warna sesuai nilai
+            // Presentase aktif: TANPA background warna (sesuai permintaan),
+            // cuma teks tebal menampilkan nilai yang dipilih (3% / 5% / 7,5%).
+            // Warna blok HANYA dipakai di kolom Status Pembayaran di bawah.
+            if (idx === 7) {
                 const status = active.dataset.value;
                 if (status === 'pending') {
                     data.cell.styles.fillColor = [180, 83, 9];    // amber-700
