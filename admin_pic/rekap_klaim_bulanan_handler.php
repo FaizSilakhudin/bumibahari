@@ -46,12 +46,14 @@ try {
     $del->execute();
     $del->close();
 
-    $ins = $conn->prepare('INSERT INTO klaim_bulanan (id_cabang, tahun, bulan, urutan_pengelola, urutan, uraian, nominal, keterangan, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    $ins = $conn->prepare('INSERT INTO klaim_bulanan (id_cabang, tahun, bulan, urutan_pengelola, urutan, uraian, nominal, sumber_dana, keterangan, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $total = 0.0;
+    $total_dana_investor = 0.0;
     $jumlah_baris = 0;
     foreach ($rows_raw as $r) {
         $uraian = trim((string) ($r['uraian'] ?? ''));
         $nominal = (float) ($r['nominal'] ?? 0);
+        $sumber_dana = (($r['sumber_dana'] ?? 'warung') === 'investor') ? 'investor' : 'warung';
         $keterangan = trim((string) ($r['keterangan'] ?? ''));
         $urutan = (int) ($r['urutan'] ?? 0);
         if ($uraian === '' && $nominal == 0 && $keterangan === '') {
@@ -59,9 +61,10 @@ try {
         }
         $uraian = mb_substr($uraian, 0, 255);
         $keterangan = $keterangan !== '' ? mb_substr($keterangan, 0, 255) : null;
-        $ins->bind_param('iiiiisdsi', $id_cabang, $tahun, $bulan, $urutan_pengelola, $urutan, $uraian, $nominal, $keterangan, $uid);
+        $ins->bind_param('iiiiisdssi', $id_cabang, $tahun, $bulan, $urutan_pengelola, $urutan, $uraian, $nominal, $sumber_dana, $keterangan, $uid);
         $ins->execute();
         $total += $nominal;
+        if ($sumber_dana === 'investor') $total_dana_investor += $nominal;
         $jumlah_baris++;
     }
     $ins->close();
@@ -74,7 +77,8 @@ try {
 }
 
 audit($conn, 'rekap_klaim_bulanan_simpan', 'klaim_bulanan', $id_cabang, [
-    'id_cabang' => $id_cabang, 'tahun' => $tahun, 'bulan' => $bulan, 'urutan_pengelola' => $urutan_pengelola, 'jumlah_baris' => $jumlah_baris, 'total' => $total,
+    'id_cabang' => $id_cabang, 'tahun' => $tahun, 'bulan' => $bulan, 'urutan_pengelola' => $urutan_pengelola,
+    'jumlah_baris' => $jumlah_baris, 'total' => $total, 'total_dana_investor' => $total_dana_investor,
 ]);
 
-echo json_encode(['ok' => true, 'total' => $total, 'jumlah_baris' => $jumlah_baris]);
+echo json_encode(['ok' => true, 'total' => $total, 'total_dana_investor' => $total_dana_investor, 'jumlah_baris' => $jumlah_baris]);

@@ -247,25 +247,35 @@ $persen_pengelola = 50;
 $persen_admin = 3; // Admin Fee Pusat: 3%
 
 // Klaim Bulanan (baris manual, lihat "10. Klaim Bulanan" & _rekap_klaim_bulanan.php)
-// — nominalnya mengurangi Net Profit SETELAH admin fee 3% dipotong, SEBELUM
-// split 50/50 investor-pengelola. urutan_pengelola_aktif = segmen pengelola
-// yang sedang dipilih (1 kalau cuma 1 pengelola di periode ini).
+// — nominalnya (SEMUA baris, apapun sumber dananya) mengurangi Net Profit
+// SEBELUM admin fee 3% dipotong. Baris ber-sumber_dana='investor' JUGA
+// otomatis masuk ke "Pengembalian Dana Talangan" (Koreksi Dividen: Sisi
+// Investor) — menambah Total Bersih Investor, di luar potongan Net Profit
+// di atas. urutan_pengelola_aktif = segmen pengelola yang sedang dipilih
+// (1 kalau cuma 1 pengelola di periode ini).
 $total_klaim_bulanan = 0.0;
+$total_klaim_dana_investor = 0.0;
 $daftar_klaim_bulanan = [];
 if ($id_cabang !== '') {
-    $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ? ORDER BY urutan ASC, id ASC");
+    $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, sumber_dana, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ? ORDER BY urutan ASC, id ASC");
     $stmt_kb->bind_param('iiii', $id_cabang, $tahun, $bulan, $urutan_pengelola_aktif);
     $stmt_kb->execute();
     $daftar_klaim_bulanan = $stmt_kb->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt_kb->close();
     foreach ($daftar_klaim_bulanan as $kb) {
         $total_klaim_bulanan += (float) $kb['nominal'];
+        if (($kb['sumber_dana'] ?? 'warung') === 'investor') {
+            $total_klaim_dana_investor += (float) $kb['nominal'];
+        }
     }
 }
 
 // Perhitungan Laba Default (Sebelum pilihan dinamis di UI)
-$share_admin = $laba_bersih_dasar * $persen_admin / 100;
-$laba_setelah_admin = $laba_bersih_dasar - $share_admin - $total_klaim_bulanan;
+// Urutan: Net Profit -> dikurangi Klaim Bulanan -> BARU admin fee 3% dihitung
+// dari sisanya -> split 50/50 investor-pengelola.
+$laba_bersih_setelah_klaim = $laba_bersih_dasar - $total_klaim_bulanan;
+$share_admin = $laba_bersih_setelah_klaim * $persen_admin / 100;
+$laba_setelah_admin = $laba_bersih_setelah_klaim - $share_admin;
 $share_investor = $laba_setelah_admin * $persen_investor / 100;
 $share_pengelola = $laba_setelah_admin * $persen_pengelola / 100;
 
@@ -906,6 +916,19 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                             </td>
                         </tr>
 
+                        <!-- KLAIM BULANAN (dipotong SEBELUM admin fee) -->
+                        <tr>
+                            <td class="px-3 fw-medium text-dark">
+                                <i class="bi bi-receipt-cutoff text-warning me-2"></i>Klaim Bulanan
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-warning bg-opacity-10 text-warning-emphasis px-2.5 py-1.5 fw-bold" style="font-size: 0.8rem;">(-)</span>
+                            </td>
+                            <td class="text-end fw-bold text-warning-emphasis px-3" id="rev_klaim_bulanan">
+                                Rp <?= number_format($total_klaim_bulanan ?? 0, 0, ',', '.') ?>
+                            </td>
+                        </tr>
+
                         <!-- ADMIN FEE -->
                         <tr>
                             <td class="px-3 fw-medium text-dark">
@@ -985,7 +1008,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                         <i class="bi bi-info-circle me-1 text-primary"></i><strong>Skema Pembagian:</strong>
                     </div>
                     <div class="ms-3">
-                        Net Profit dipotong terlebih dahulu dengan <strong>Admin Fee <?= $persen_admin ?? 3 ?>%</strong>.
+                        Net Profit dipotong terlebih dahulu dengan <strong>Klaim Bulanan</strong> (kalau ada), baru sisanya dipotong <strong>Admin Fee <?= $persen_admin ?? 3 ?>%</strong>.
                         Setelah Admin Fee dipotong, sisa laba dibagi secara <strong>50% untuk Investor</strong> dan <strong>50% untuk Pengelola</strong>.
                     </div>
                 </div>
@@ -1075,26 +1098,19 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     </div>
 
                     <div class="col-sm-6">
-                        <label class="form-label text-muted small fw-semibold">Asal Dana Talangan</label>
-                        <select id="inv_sumber_talangan" class="form-select border-2" style="border-radius: 8px;" onchange="hitungCascade()">
-                            <option value="investor" selected>Dana Investor</option>
-                            <option value="warung">Dana Warung</option>
-                        </select>
-                    </div>
-
-                    <div class="col-sm-6">
-                        <label class="form-label text-muted small fw-semibold">Pengembalian Dana Talangan</label>
-                        <input type="number" id="inv_modal" class="form-control border-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungCascade()">
+                        <label class="form-label text-muted small fw-semibold">
+                            Pengembalian Dana Talangan
+                            <i class="bi bi-info-circle text-muted" title="Otomatis dari total baris &quot;Dana Investor&quot; di Klaim Bulanan — tidak bisa diisi manual di sini."></i>
+                        </label>
+                        <div class="form-control border-2 bg-light d-flex align-items-center" style="border-radius: 8px; height: 38px;">
+                            <span id="inv_modal_val" class="fw-bold text-primary">Rp <?= number_format($total_klaim_dana_investor ?? 0, 0, ',', '.') ?></span>
+                            <input type="hidden" id="inv_modal" value="<?= (float) ($total_klaim_dana_investor ?? 0) ?>">
+                        </div>
                     </div>
 
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Kasbon Pengelola</label>
                         <input type="number" id="inv_kasbon" class="form-control border-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungCascade()">
-                    </div>
-
-                    <div class="col-sm-6">
-                        <label class="form-label text-muted small fw-semibold">Keterangan Dana Talangan</label>
-                        <input type="text" id="inv_modal_ket" class="form-control border-2" style="border-radius: 8px;" placeholder="Opsional...">
                     </div>
                 </div>
 

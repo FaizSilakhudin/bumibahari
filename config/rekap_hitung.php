@@ -70,14 +70,18 @@ if (!function_exists('hitung_rekap_segmen')) {
         // closing periode ini), konsisten dgn bagaimana revenue_sharing juga dikunci per tahun/bulan.
         $tahun_kb = (int) date('Y', strtotime($tgl_selesai));
         $bulan_kb = (int) date('n', strtotime($tgl_selesai));
-        $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ? ORDER BY urutan ASC, id ASC");
+        $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, sumber_dana, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ? ORDER BY urutan ASC, id ASC");
         $stmt_kb->bind_param('iiii', $id_cabang, $tahun_kb, $bulan_kb, $urutan_pengelola);
         $stmt_kb->execute();
         $daftar_klaim_bulanan = $stmt_kb->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt_kb->close();
         $total_klaim_bulanan = 0.0;
+        $total_klaim_dana_investor = 0.0;
         foreach ($daftar_klaim_bulanan as $kb) {
             $total_klaim_bulanan += (float) $kb['nominal'];
+            if (($kb['sumber_dana'] ?? 'warung') === 'investor') {
+                $total_klaim_dana_investor += (float) $kb['nominal'];
+            }
         }
 
         // ----- Keterangan Beban Operasional (segmen ini saja) -----
@@ -91,12 +95,13 @@ if (!function_exists('hitung_rekap_segmen')) {
         }
         $stmt_ket->close();
 
-        // ----- Revenue sharing: admin fee 3% tetap, dikurangi klaim, split 50/50 -----
+        // ----- Revenue sharing: Klaim Bulanan dipotong SEBELUM admin fee 3%, baru split 50/50 -----
         $persen_admin = 3;
         $persen_investor = 50;
         $persen_pengelola = 50;
-        $share_admin = $laba_bersih_dasar * $persen_admin / 100;
-        $laba_setelah_admin = $laba_bersih_dasar - $share_admin - $total_klaim_bulanan;
+        $laba_bersih_setelah_klaim = $laba_bersih_dasar - $total_klaim_bulanan;
+        $share_admin = $laba_bersih_setelah_klaim * $persen_admin / 100;
+        $laba_setelah_admin = $laba_bersih_setelah_klaim - $share_admin;
         $share_investor = $laba_setelah_admin * $persen_investor / 100;
         $share_pengelola = $laba_setelah_admin * $persen_pengelola / 100;
 
@@ -125,6 +130,7 @@ if (!function_exists('hitung_rekap_segmen')) {
             'ket_bo'               => $ket_bo,
             'daftar_klaim_bulanan' => $daftar_klaim_bulanan,
             'total_klaim_bulanan'  => $total_klaim_bulanan,
+            'total_klaim_dana_investor' => $total_klaim_dana_investor,
             'persen_admin'         => $persen_admin,
             'persen_investor'      => $persen_investor,
             'persen_pengelola'     => $persen_pengelola,

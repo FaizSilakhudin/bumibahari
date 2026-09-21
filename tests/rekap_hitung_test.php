@@ -70,20 +70,34 @@ try {
     dekat('share_pengelola = 873.000 (50%)', $hasil['share_pengelola'], 873000);
     echo "\n";
 
-    // ----- Klaim Bulanan mengurangi laba_setelah_admin -----
+    // ----- Klaim Bulanan dipotong SEBELUM admin fee (urutan baru) -----
     $tahun_kb = 2026;
     $bulan_kb = 5; // akhir segmen (2026-05-15) jatuh di bulan 5
-    $stmt = $conn->prepare("INSERT INTO klaim_bulanan (id_cabang, tahun, bulan, urutan_pengelola, urutan, uraian, nominal) VALUES (?, ?, ?, 1, 0, 'Test klaim', 46000)");
+    $stmt = $conn->prepare("INSERT INTO klaim_bulanan (id_cabang, tahun, bulan, urutan_pengelola, urutan, uraian, nominal, sumber_dana) VALUES (?, ?, ?, 1, 0, 'Test klaim warung', 46000, 'warung')");
     $stmt->bind_param('iii', $id_cabang, $tahun_kb, $bulan_kb);
     $stmt->execute();
     $stmt->close();
 
-    echo "[hitung_rekap_segmen — Klaim Bulanan mengurangi laba_setelah_admin]\n";
+    echo "[hitung_rekap_segmen — Klaim Bulanan dipotong SEBELUM admin fee 3%]\n";
     $hasil2 = hitung_rekap_segmen($conn, $id_cabang, '2026-05-01', '2026-05-15', 1);
     dekat('total_klaim_bulanan = 46.000', $hasil2['total_klaim_bulanan'], 46000);
     cek('jumlah baris klaim = 1', count($hasil2['daftar_klaim_bulanan']), 1);
-    dekat('laba_setelah_admin = 1.700.000 (1.746.000 - 46.000)', $hasil2['laba_setelah_admin'], 1700000);
-    dekat('share_investor = 850.000 (50% dari yg sudah dikurangi klaim)', $hasil2['share_investor'], 850000);
+    dekat('total_klaim_dana_investor = 0 (baris ini "warung", bukan "investor")', $hasil2['total_klaim_dana_investor'], 0);
+    dekat('share_admin = 52.620 (3% dari [1.800.000-46.000]=1.754.000, BUKAN dari 1.800.000)', $hasil2['share_admin'], 52620);
+    dekat('laba_setelah_admin = 1.701.380 (1.754.000-52.620)', $hasil2['laba_setelah_admin'], 1701380);
+    dekat('share_investor = 850.690 (50% dari 1.701.380)', $hasil2['share_investor'], 850690);
+    echo "\n";
+
+    // ----- sumber_dana='investor' dihitung terpisah (total_klaim_dana_investor) -----
+    $stmt = $conn->prepare("INSERT INTO klaim_bulanan (id_cabang, tahun, bulan, urutan_pengelola, urutan, uraian, nominal, sumber_dana) VALUES (?, ?, ?, 1, 1, 'Test klaim investor', 20000, 'investor')");
+    $stmt->bind_param('iii', $id_cabang, $tahun_kb, $bulan_kb);
+    $stmt->execute();
+    $stmt->close();
+
+    echo "[hitung_rekap_segmen — sumber_dana='investor' dijumlah terpisah]\n";
+    $hasil2b = hitung_rekap_segmen($conn, $id_cabang, '2026-05-01', '2026-05-15', 1);
+    dekat('total_klaim_bulanan = 66.000 (46.000 warung + 20.000 investor)', $hasil2b['total_klaim_bulanan'], 66000);
+    dekat('total_klaim_dana_investor = 20.000 (cuma baris "investor")', $hasil2b['total_klaim_dana_investor'], 20000);
     echo "\n";
 
     // ----- urutan_pengelola berbeda tidak saling bocor -----
@@ -94,7 +108,7 @@ try {
 
     echo "[hitung_rekap_segmen — urutan_pengelola berbeda TIDAK saling bocor]\n";
     $hasil_seg1 = hitung_rekap_segmen($conn, $id_cabang, '2026-05-01', '2026-05-15', 1);
-    dekat('segmen 1 total_klaim_bulanan tetap 46.000 (bukan +99.999)', $hasil_seg1['total_klaim_bulanan'], 46000);
+    dekat('segmen 1 total_klaim_bulanan tetap 66.000 (bukan +99.999)', $hasil_seg1['total_klaim_bulanan'], 66000);
     $hasil_seg2 = hitung_rekap_segmen($conn, $id_cabang, '2026-05-01', '2026-05-15', 2);
     dekat('segmen 2 total_klaim_bulanan = 99.999 (punya sendiri)', $hasil_seg2['total_klaim_bulanan'], 99999);
     echo "\n";

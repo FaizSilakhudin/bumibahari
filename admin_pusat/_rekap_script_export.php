@@ -54,6 +54,14 @@
                 if (data.section !== 'body') return;
                 const raw = data.cell.raw;
                 if (!raw || typeof raw.querySelector !== 'function') return;
+                const select = raw.querySelector('select');
+                if (select) {
+                    // <select> textContent = SEMUA <option> digabung (bukan cuma yg
+                    // aktif) — ambil teks opsi yang benar-benar terpilih saja.
+                    const opt = select.options[select.selectedIndex];
+                    data.cell.text = [opt ? opt.textContent.trim() : '-'];
+                    return;
+                }
                 const input = raw.querySelector('input');
                 if (input) {
                     const nilai = (input.value || '').trim();
@@ -202,7 +210,11 @@
                 const bo_akumulasi = <?= (float)$bo_akumulasi ?>;
                 const pengeluaran_akumulasi = <?= (float)$pengeluaran_akumulasi ?>;
 
-                // Net Profit awal 100% dikurangi Modal Awal (manual) + Pengembalian Dana Talangan
+                // Net Profit awal 100% dikurangi Modal Awal (manual) saja. Klaim Bulanan
+                // (SEMUA baris) dipotong SEBELUM admin fee dihitung — Pengembalian Dana
+                // Talangan (inv_modal, sekarang read-only = subset klaim ber-sumber
+                // 'investor') TIDAK ikut mengurangi di sini lagi, cuma dipakai di
+                // breakdown Koreksi Dividen Investor di bawah (talangan_val).
                 const net_profit_100  = <?= (float) ($laba_bersih_dasar ?? 0) ?>;
                 const persen_admin    = <?= (float) ($persen_admin ?? 3) ?>;
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
@@ -210,9 +222,10 @@
                 const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan"
                 const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
-                const laba_akumulasi  = net_profit_100 - modal_awal - talangan_val;   // = Net Profit efektif
-                const admin_fee_val   = laba_akumulasi * persen_admin / 100;
-                const laba_setelah_admin = laba_akumulasi - admin_fee_val - total_klaim_bulanan;
+                const laba_akumulasi  = net_profit_100 - modal_awal;   // = Net Profit efektif (sebelum klaim)
+                const net_profit_setelah_klaim = laba_akumulasi - total_klaim_bulanan;
+                const admin_fee_val   = net_profit_setelah_klaim * persen_admin / 100;
+                const laba_setelah_admin = net_profit_setelah_klaim - admin_fee_val;
                 const share_inv_base  = laba_setelah_admin * persen_investor / 100;
                 const share_pgl_base  = laba_setelah_admin * persen_pengelola / 100;
 
@@ -254,24 +267,16 @@
                 let yLine = startYContent + 24; doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.4); doc.line(margin, yLine, 283, yLine);
                 let yTabelHarian = yLine + 7; doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
                 doc.text('1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>', margin, yTabelHarian);
-                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 7, cellPadding: 1.2 }, didParseCell: rekapHarianDidParseCell });
+                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 5.8, cellPadding: 0.9 }, didParseCell: rekapHarianDidParseCell });
 
-                // HALAMAN 2
+                // HALAMAN 2 — Rincian Beban Operasional SAJA
                 doc.addPage(); addWatermark(doc); let y = 15;
                 doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('2. Rincian Beban Operasional', margin, y);
                 let t2 = document.querySelector('.table-clean-input'); let elTabel2 = t2?.tagName === 'TABLE' ? t2 : t2?.querySelector('table');
-                if (elTabel2) { doc.autoTable({ html: elTabel2, startY: y + 5, ...baseTableStyles, didParseCell: isiInputKeCellText }); y = doc.lastAutoTable.finalY + 12; } else { y += 15; }
+                if (elTabel2) { doc.autoTable({ html: elTabel2, startY: y + 5, ...baseTableStyles, didParseCell: isiInputKeCellText }); }
 
-                // "10. Klaim Bulanan" — tabel input dinamis (No/Uraian/Nominal/Keterangan),
-                // ikut di-export persis seperti tampil di layar.
-                const elTabelKlaim = document.getElementById('tabelKlaimBulanan');
-                if (elTabelKlaim) {
-                    if (y > 170) { doc.addPage(); addWatermark(doc); y = 15; }
-                    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('10. Klaim Bulanan', margin, y);
-                    doc.autoTable({ html: elTabelKlaim, startY: y + 5, ...baseTableStyles, didParseCell: isiInputKeCellText });
-                    y = doc.lastAutoTable.finalY + 12;
-                }
-
+                // HALAMAN 3 — Matriks Akumulasi + Klaim Bulanan
+                doc.addPage(); addWatermark(doc); y = 15;
                 doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('3. Matriks Akumulasi', margin, y);
                 let dataMatriks = [
                     ['Omzet Penjualan', formatRupiahPDF(omzet_akumulasi), 'Pendapatan bruto masuk'],
@@ -279,11 +284,24 @@
                     ['Beban Operasional', formatRupiahPDF(bo_akumulasi), 'Total BO 1 bulan'],
                     ['Total Pengeluaran', formatRupiahPDF(pengeluaran_akumulasi), 'Belanja + BO'],
                     ['Modal Awal', formatRupiahPDF(modal_awal), 'Diisi manual, mengurangi Net Profit awal'],
-                    ['Laba Bersih (Net Profit efektif)', formatRupiahPDF(laba_akumulasi), 'Net Profit 100% - Modal Awal - Dana Talangan'],
+                    ['Laba Bersih (Net Profit efektif)', formatRupiahPDF(laba_akumulasi), 'Net Profit 100% - Modal Awal'],
+                    ['Klaim Bulanan', formatRupiahPDF(total_klaim_bulanan), 'Lihat rincian "10. Klaim Bulanan" di bawah'],
                 ];
                 doc.autoTable({ head: [['Komponen Pokok', 'Jumlah', 'Catatan Ringkas']], body: dataMatriks, startY: y + 5, ...baseTableStyles });
+                y = doc.lastAutoTable.finalY + 12;
 
-                // HALAMAN 3 - FIX
+                // "10. Klaim Bulanan" — tabel input dinamis (No/Iuran Beban/Jumlah
+                // Akhir/Sumber Dana/Keterangan), ikut di-export persis seperti tampil
+                // di layar. Kalau tidak muat di halaman ini, lanjut ke halaman baru
+                // (jarang terjadi, cuma jaga-jaga kalau barisnya banyak).
+                const elTabelKlaim = document.getElementById('tabelKlaimBulanan');
+                if (elTabelKlaim) {
+                    if (y > 170) { doc.addPage(); addWatermark(doc); y = 15; }
+                    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('10. Klaim Bulanan', margin, y);
+                    doc.autoTable({ html: elTabelKlaim, startY: y + 5, ...baseTableStyles, didParseCell: isiInputKeCellText });
+                }
+
+                // HALAMAN 4 — Koreksi Dividen Investor + Pengelola + Rekapan Hasil Akhir
                 doc.addPage(); addWatermark(doc); y = 15;
                 doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('4. Koreksi Dividen: Sisi Investor', margin, y);
 
@@ -292,19 +310,17 @@
                 const inv_modal = talangan_val;
                 const inv_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
                 const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
-                const inv_sumber = document.getElementById('inv_sumber_talangan')?.value || 'investor';
-                const inv_modal_ket = (document.getElementById('inv_modal_ket')?.value || '').trim();
 
                 let inv_total_val = inv_profit;
                 if (operatorSewa === 'plus') inv_total_val += inv_sewa; else inv_total_val -= inv_sewa;
                 inv_total_val += inv_kasbon;
-                if (inv_sumber === 'investor') inv_total_val += inv_modal;   // pengembalian talangan kembali ke investor
+                inv_total_val += inv_modal;   // Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor") — selalu ditambahkan
                 inv_total_val = Math.max(0, inv_total_val);
 
                 let dataInvestor = [
                     ['Profit Investor (50%)', formatRupiahPDF(inv_profit)],
                     ['Potongan Sewa Ruko ' + (operatorSewa === 'plus' ? '(+)' : '(-)'), formatRupiahPDF(inv_sewa)],
-                    ['Pengembalian Dana Talangan (' + (inv_sumber === 'investor' ? 'Dana Investor' : 'Dana Warung') + ')' + (inv_modal_ket ? ' — ' + inv_modal_ket : ''), formatRupiahPDF(inv_modal)],
+                    ['Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor")', formatRupiahPDF(inv_modal)],
                     ['Penambahan/Pengembalian Kasbon Pengelola', formatRupiahPDF(inv_kasbon)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahPDF(inv_total_val)],
                 ];
@@ -432,9 +448,10 @@
                 const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan"
                 const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
-                const laba_akumulasi  = net_profit_100 - modal_awal - talangan_val;
-                const admin_fee_val   = laba_akumulasi * persen_admin / 100;
-                const laba_setelah_admin = laba_akumulasi - admin_fee_val - total_klaim_bulanan;
+                const laba_akumulasi  = net_profit_100 - modal_awal;
+                const net_profit_setelah_klaim = laba_akumulasi - total_klaim_bulanan;
+                const admin_fee_val   = net_profit_setelah_klaim * persen_admin / 100;
+                const laba_setelah_admin = net_profit_setelah_klaim - admin_fee_val;
                 const share_inv_base  = laba_setelah_admin * persen_investor / 100;
                 const share_pgl_base  = laba_setelah_admin * persen_pengelola / 100;
 
@@ -469,6 +486,14 @@
                 if (elBO) XLSX.utils.sheet_add_dom(ws2, elBO, { origin: -1, raw: true });
                 XLSX.utils.book_append_sheet(wb, ws2, 'Rincian BO');
 
+                // Sheet: 10. Klaim Bulanan
+                const elKlaimX = document.getElementById('tabelKlaimBulanan');
+                if (elKlaimX) {
+                    const wsKlaim = XLSX.utils.aoa_to_sheet([['10. Klaim Bulanan'], []]);
+                    XLSX.utils.sheet_add_dom(wsKlaim, elKlaimX, { origin: -1, raw: true });
+                    XLSX.utils.book_append_sheet(wb, wsKlaim, 'Klaim Bulanan');
+                }
+
                 // Sheet 3: Matriks Akumulasi
                 const dataMatriksX = [
                     ['Komponen Pokok', 'Jumlah', 'Catatan Ringkas'],
@@ -477,7 +502,8 @@
                     ['Beban Operasional', formatRupiahXLS(bo_akumulasi), 'Total BO 1 bulan'],
                     ['Total Pengeluaran', formatRupiahXLS(pengeluaran_akumulasi), 'Belanja + BO'],
                     ['Modal Awal', formatRupiahXLS(modal_awal), 'Diisi manual, mengurangi Net Profit awal'],
-                    ['Laba Bersih (Net Profit efektif)', formatRupiahXLS(laba_akumulasi), 'Net Profit 100% - Modal Awal - Dana Talangan'],
+                    ['Laba Bersih (Net Profit efektif)', formatRupiahXLS(laba_akumulasi), 'Net Profit 100% - Modal Awal'],
+                    ['Klaim Bulanan', formatRupiahXLS(total_klaim_bulanan), 'Lihat rincian "10. Klaim Bulanan" di sheet lain'],
                 ];
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['3. Matriks Akumulasi'], [], ...dataMatriksX]), 'Matriks Akumulasi');
 
@@ -487,20 +513,18 @@
                 const inv_modal = talangan_val;
                 const inv_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
                 const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
-                const inv_sumber = document.getElementById('inv_sumber_talangan')?.value || 'investor';
-                const inv_modal_ket = (document.getElementById('inv_modal_ket')?.value || '').trim();
 
                 let inv_total_val = inv_profit;
                 if (operatorSewa === 'plus') inv_total_val += inv_sewa; else inv_total_val -= inv_sewa;
                 inv_total_val += inv_kasbon;
-                if (inv_sumber === 'investor') inv_total_val += inv_modal;
+                inv_total_val += inv_modal; // Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor") — selalu ditambahkan
                 inv_total_val = Math.max(0, inv_total_val);
 
                 const dataInvestorX = [
                     ['Keterangan Komponen', 'Nilai'],
                     ['Profit Investor (50%)', formatRupiahXLS(inv_profit)],
                     ['Potongan Sewa Ruko ' + (operatorSewa === 'plus' ? '(+)' : '(-)'), formatRupiahXLS(inv_sewa)],
-                    ['Pengembalian Dana Talangan (' + (inv_sumber === 'investor' ? 'Dana Investor' : 'Dana Warung') + ')' + (inv_modal_ket ? ' — ' + inv_modal_ket : ''), formatRupiahXLS(inv_modal)],
+                    ['Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor")', formatRupiahXLS(inv_modal)],
                     ['Penambahan/Pengembalian Kasbon Pengelola', formatRupiahXLS(inv_kasbon)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahXLS(inv_total_val)],
                 ];
