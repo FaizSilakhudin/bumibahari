@@ -363,6 +363,131 @@ if (!function_exists('investor_pada_tanggal')) {
 }
 
 // ---------------------------------------------------------------------------
+// 5a-1b. Resolusi periode "bulanan" untuk Rekapitulasi — closing digabung
+//        sekali di awal kalau cabang baru mulai pembukuan >= tanggal 20, dan
+//        pemecahan periode per pengelola kalau ada rotasi di tengah periode.
+// ---------------------------------------------------------------------------
+if (!function_exists('cabang_mulai_pembukuan')) {
+    // Tanggal laporan PERTAMA cabang ini (berapapun status_laporan-nya —
+    // menunggu/lengkap/libur tetap dihitung "sudah mulai pembukuan"). Dipakai
+    // sebagai pengganti kolom created_at yang memang tidak ada di tabel
+    // cabang — diturunkan dari data, bukan disimpan terpisah.
+    function cabang_mulai_pembukuan(mysqli $conn, int $id_cabang): ?string
+    {
+        $stmt = $conn->prepare("SELECT MIN(tanggal) AS mulai FROM laporan_cabang WHERE id_cabang = ?");
+        $stmt->bind_param('i', $id_cabang);
+        $stmt->execute();
+        $mulai = $stmt->get_result()->fetch_assoc()['mulai'] ?? null;
+        $stmt->close();
+        return $mulai;
+    }
+}
+
+if (!function_exists('resolve_periode_bulanan')) {
+    // Hitung rentang tanggal EFEKTIF untuk "bulan $bulan/$tahun" cabang ini,
+    // dengan aturan: kalau cabang baru mulai pembukuan pada/setelah tanggal 20,
+    // periode parsial pertamanya digabung ke closing bulan berikutnya —
+    // SEKALI SAJA di awal, bukan siklus berulang tiap bulan.
+    //
+    // Balikan:
+    //   tgl_mulai, tgl_selesai : rentang efektif untuk query laporan_cabang
+    //   digabung               : true kalau tgl_mulai dimundurkan (periode ini
+    //                            berisi gabungan sisa bulan sebelumnya)
+    //   periode_kosong         : true kalau $tahun-$bulan justru adalah bulan
+    //                            mulai cabang itu sendiri (day >= 20) — closing
+    //                            untuk bulan ini tidak ada, sudah digabung maju
+    //                            ke bulan berikutnya, caller sebaiknya tampilkan
+    //                            notice & sembunyikan tabel/export.
+    function resolve_periode_bulanan(mysqli $conn, int $id_cabang, int $tahun, int $bulan): array
+    {
+        $awal_kalender  = sprintf('%04d-%02d-01', $tahun, $bulan);
+        $akhir_kalender = date('Y-m-t', strtotime($awal_kalender));
+        $hasil = ['tgl_mulai' => $awal_kalender, 'tgl_selesai' => $akhir_kalender, 'digabung' => false, 'periode_kosong' => false];
+
+        $mulai_pembukuan = cabang_mulai_pembukuan($conn, $id_cabang);
+        if ($mulai_pembukuan === null) {
+            return $hasil; // belum ada laporan sama sekali — tidak ada yang bisa digeser
+        }
+
+        $hari_mulai = (int) date('j', strtotime($mulai_pembukuan));
+        if ($hari_mulai < 20) {
+            return $hasil; // mulai di awal/pertengahan bulan — tidak perlu digabung
+        }
+
+        $bulan_mulai   = date('Y-m', strtotime($mulai_pembukuan));
+        $bulan_diminta = sprintf('%04d-%02d', $tahun, $bulan);
+        $bulan_sebelum = date('Y-m', strtotime("$awal_kalender -1 month"));
+
+        if ($bulan_mulai === $bulan_diminta) {
+            // Periode yang diminta ADALAH bulan mulai cabang ini sendiri —
+            // closing untuk bulan ini tidak ada, sudah digabung ke bulan depan.
+            $hasil['periode_kosong'] = true;
+            return $hasil;
+        }
+
+        if ($bulan_mulai === $bulan_sebelum) {
+            // Periode yang diminta adalah bulan SETELAH cabang mulai —
+            // mundurkan tgl_mulai supaya sisa hari bulan sebelumnya ikut masuk.
+            $hasil['tgl_mulai'] = $mulai_pembukuan;
+            $hasil['digabung']  = true;
+        }
+
+        return $hasil;
+    }
+}
+
+if (!function_exists('resolve_pengelola_segments')) {
+    // Pecah rentang [$tgl_mulai, $tgl_selesai] jadi beberapa segmen kalau ada
+    // rotasi pengelola di tengah rentang itu (mis. Pengelola A s/d tgl 15,
+    // Pengelola B mulai tgl 16). Kasus normal (1 pengelola sepanjang rentang)
+    // tetap balikin array isi 1 elemen, supaya caller selalu bisa "loop N>=1"
+    // tanpa percabangan khusus utk kasus normal.
+    //
+    // Balikan: array berurutan (tgl_mulai ASC) berisi:
+    //   ['pengelola' => <baris tabel pengelola, atau null kalau tidak ada data>,
+    //    'tgl_mulai' => <dipotong ke dalam rentang>,
+    //    'tgl_selesai' => <dipotong ke dalam rentang>,
+    //    'urutan' => 1, 2, ...]
+    function resolve_pengelola_segments(mysqli $conn, int $id_cabang, string $tgl_mulai, string $tgl_selesai): array
+    {
+        $stmt = $conn->prepare("
+            SELECT * FROM pengelola
+            WHERE id_cabang = ? AND tgl_mulai <= ? AND (tgl_selesai IS NULL OR tgl_selesai >= ?)
+            ORDER BY tgl_mulai ASC
+        ");
+        $stmt->bind_param('iss', $id_cabang, $tgl_selesai, $tgl_mulai);
+        $stmt->execute();
+        $baris = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        if (empty($baris)) {
+            // Tidak ada data pengelola sama sekali utk rentang ini — 1 segmen
+            // tunggal, caller jatuh ke fallback (mis. cabang.nama_pengelola).
+            return [[
+                'pengelola'   => null,
+                'tgl_mulai'   => $tgl_mulai,
+                'tgl_selesai' => $tgl_selesai,
+                'urutan'      => 1,
+            ]];
+        }
+
+        $segmen = [];
+        $urutan = 1;
+        foreach ($baris as $row) {
+            $seg_mulai   = max($row['tgl_mulai'], $tgl_mulai);
+            $seg_selesai = $row['tgl_selesai'] !== null ? min($row['tgl_selesai'], $tgl_selesai) : $tgl_selesai;
+            $segmen[] = [
+                'pengelola'   => $row,
+                'tgl_mulai'   => $seg_mulai,
+                'tgl_selesai' => $seg_selesai,
+                'urutan'      => $urutan++,
+            ];
+        }
+        return $segmen;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 5a-2. Grafik "Trend Performa" — satu logika dipakai bareng oleh admin_pusat
 //       dan investor supaya jendela waktu & pelabelan tiap granularitas SAMA
 //       PERSIS di kedua tempat, tidak ada yang beda sendiri.

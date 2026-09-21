@@ -14,6 +14,9 @@ Nama database: **`db_bumi_bahari`**
 | `laporan_cabang` | Laporan keuangan harian per cabang (unik: `id_cabang` + `tanggal`). `status_laporan` ('menunggu' / 'lengkap') menandai apakah PIC sudah mengisi angka keuangan; `id_user_nota` / `id_user_laporan` mencatat siapa kirim nota vs siapa isi laporan. |
 | `audit_log` | Jejak audit seluruh aktivitas penting (login, edit laporan, CRUD user/cabang/pengelola/investor) |
 | `laporan_cabang_arsip` | Snapshot lengkap (`data_json`) setiap baris `laporan_cabang` yang dihapus dari `admin_pusat/laporan.php` — dibuat WAJIB sebelum hapus, bisa dipulihkan lewat `admin_pusat/arsip_laporan.php`. Data lama tidak pernah hilang permanen. |
+| `revenue_sharing` | Admin fee & service fee bulanan per cabang (menu Revenue Sharing, admin_pusat). `persen_service_fee`/`status_pembayaran` selalu ada; `admin_fee`/`nominal_service_fee` diisi lewat tombol "Simpan Revenue Sharing" di menu Rekapitulasi (NULL kalau belum pernah disimpan dari situ — halaman Revenue Sharing lalu jatuh ke preview live 3%/50-50 sbg fallback). `urutan_pengelola` (default 1) memisahkan data kalau 1 bulan dikelola 2 pengelola berbeda; unik: `id_cabang`+`tahun`+`bulan`+`urutan_pengelola`. |
+| `beban_operasional_keterangan` | "Keterangan Tambahan" per baris Beban Operasional pada menu Rekapitulasi (12 baris tetap: sewa, gaji, listrik, dst — `uraian_key` cocok dengan field di `$uraian_bo`). `urutan_pengelola` sama fungsinya seperti di `revenue_sharing`. |
+| `klaim_bulanan` | Baris klaim manual ("10. Klaim Bulanan" di menu Rekapitulasi) — daftar dinamis (ditambah/dihapus bebas oleh pusat/PIC), bukan daftar tetap. Nominalnya otomatis mengurangi Net Profit SETELAH admin fee 3% dipotong, SEBELUM split 50/50 investor-pengelola. `urutan_pengelola` sama fungsinya seperti di `revenue_sharing`. |
 
 `users` juga punya `totp_secret` / `totp_enabled` / `totp_backup_codes` untuk 2FA (opsional, role `pusat`) — lihat bagian Keamanan di bawah.
 
