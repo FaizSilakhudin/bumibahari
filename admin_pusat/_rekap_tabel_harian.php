@@ -1,14 +1,19 @@
 <?php
 /**
- * Partial: tabel "Rekapitulasi Pendapatan & Pengeluaran Harian" (satu bulan).
- * Dipakai berulang di rekapitulasi.php (bulan berjalan + bulan sebelumnya).
+ * Partial: tabel "Rekapitulasi Pendapatan & Pengeluaran Harian" (satu rentang
+ * tanggal). Dipakai berulang di rekapitulasi.php (periode berjalan + periode
+ * sebelumnya).
  *
  * INPUT  (dari scope pemanggil):
- *   $conn           mysqli
- *   $rk_th          int  tahun
- *   $rk_bl          int  bulan (1-12)
- *   $rk_id_cabang   int
- *   $rk_tabel_id    string  id untuk atribut <table>
+ *   $conn            mysqli
+ *   $rk_tgl_mulai    string  'YYYY-MM-DD' — awal rentang (inklusif)
+ *   $rk_tgl_selesai  string  'YYYY-MM-DD' — akhir rentang (inklusif)
+ *   $rk_id_cabang    int
+ *   $rk_tabel_id     string  id untuk atribut <table>
+ *
+ * Rentang tidak harus persis 1 bulan kalender — bisa lebih lebar (closing
+ * digabung, lihat resolve_periode_bulanan()) atau custom (filter tanggal
+ * manual di rekapitulasi.php).
  *
  * OUTPUT (di-set untuk pemanggil):
  *   $rk_num_rows     int  total baris (termasuk hari libur)
@@ -16,7 +21,7 @@
  *   $rk_t_pasar, $rk_t_beras, $rk_t_sembako, $rk_t_toko  float
  */
 
-if (!isset($conn, $rk_th, $rk_bl, $rk_id_cabang, $rk_tabel_id)) {
+if (!isset($conn, $rk_tgl_mulai, $rk_tgl_selesai, $rk_id_cabang, $rk_tabel_id)) {
     http_response_code(404);
     exit;
 }
@@ -29,10 +34,10 @@ $rk_stmt = $conn->prepare("
            l.gas, l.mingguan_karyawan, l.es_batu, l.bensin, l.lain_lain,
            l.net_profit, l.persentase, l.status_laporan
     FROM laporan_cabang l
-    WHERE YEAR(l.tanggal) = ? AND MONTH(l.tanggal) = ? AND l.id_cabang = ? AND l.status_laporan IN ('lengkap','libur')
+    WHERE l.tanggal BETWEEN ? AND ? AND l.id_cabang = ? AND l.status_laporan IN ('lengkap','libur')
     ORDER BY l.tanggal ASC
 ");
-$rk_stmt->bind_param('iii', $rk_th, $rk_bl, $rk_id_cabang);
+$rk_stmt->bind_param('ssi', $rk_tgl_mulai, $rk_tgl_selesai, $rk_id_cabang);
 $rk_stmt->execute();
 $rk_res        = $rk_stmt->get_result();
 $rk_num_rows   = $rk_res->num_rows;

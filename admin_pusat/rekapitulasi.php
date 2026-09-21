@@ -16,10 +16,48 @@ if ($bulan < 1 || $bulan > 12)      $bulan = (int) date('m');
 $bulan = str_pad((string) $bulan, 2, '0', STR_PAD_LEFT);
 $id_cabang = $_GET['id_cabang'] ?? '';
 
-// Tanggal acuan untuk atribusi pengelola/investor historis — awal periode yang
-// dipilih, BUKAN hari ini. Supaya rekap bulan lama tetap benar walau sudah
-// ada rotasi pengelola/investor sesudahnya.
-$periode_anchor = anchor_periode(date('Y-m-t', strtotime("$tahun-$bulan-01")));
+// Rentang tanggal EFEKTIF untuk periode "bulanan" — default kalender biasa,
+// tapi resolve_periode_bulanan() otomatis menggabungkan closing pertama kalau
+// cabang ini baru mulai pembukuan pada/setelah tanggal 20 (sekali saja di
+// awal, lihat config/koneksi.php). Bisa ditimpa manual lewat 2 input tanggal
+// di form filter (tgl_mulai/tgl_selesai) — override menang atas resolusi
+// otomatis, dan mematikan notice "periode kosong" karena user sudah eksplisit
+// memilih rentangnya sendiri.
+$tgl_mulai_efektif   = date("$tahun-$bulan-01");
+$tgl_selesai_efektif = date('Y-m-t', strtotime($tgl_mulai_efektif));
+$periode_kosong      = false;
+$periode_digabung     = false;
+$override_tanggal    = false;
+$bulan_berikutnya_label = '';
+
+if ($periode === 'bulanan' && $id_cabang !== '') {
+    $resolusi            = resolve_periode_bulanan($conn, (int) $id_cabang, $tahun, (int) $bulan);
+    $tgl_mulai_efektif   = $resolusi['tgl_mulai'];
+    $tgl_selesai_efektif = $resolusi['tgl_selesai'];
+    $periode_kosong      = $resolusi['periode_kosong'];
+    $periode_digabung    = $resolusi['digabung'];
+    if ($periode_kosong) {
+        $bulan_berikutnya_label = date('F Y', strtotime("$tahun-$bulan-01 +1 month"));
+    }
+
+    $get_tgl_mulai   = $_GET['tgl_mulai'] ?? '';
+    $get_tgl_selesai = $_GET['tgl_selesai'] ?? '';
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $get_tgl_mulai) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $get_tgl_selesai)) {
+        if ($get_tgl_selesai < $get_tgl_mulai) { [$get_tgl_mulai, $get_tgl_selesai] = [$get_tgl_selesai, $get_tgl_mulai]; }
+        $tgl_mulai_efektif   = $get_tgl_mulai;
+        $tgl_selesai_efektif = $get_tgl_selesai;
+        $periode_kosong      = false;
+        $periode_digabung    = false;
+        $override_tanggal    = true;
+    }
+}
+
+// Tanggal acuan untuk atribusi pengelola/investor historis — akhir periode
+// yang dipilih (efektif), BUKAN hari ini. Supaya rekap bulan lama tetap benar
+// walau sudah ada rotasi pengelola/investor sesudahnya.
+$periode_anchor = ($periode === 'bulanan')
+    ? anchor_periode($tgl_selesai_efektif)
+    : anchor_periode(date('Y-m-t', strtotime("$tahun-$bulan-01")));
 
 // Ambil nama cabang yang kepilih biar input keisi
 $nama_cabang_terpilih = '';
@@ -49,10 +87,10 @@ if ($periode == 'mingguan') {
     $types .= "i";
     $judul = "Rekap Tahunan - Tahun $tahun";
 } else {
-    $where_sql = "WHERE l.status_laporan = 'lengkap' AND YEAR(l.tanggal)=? AND MONTH(l.tanggal)=?";
-    $params[] = $tahun;
-    $params[] = $bulan;
-    $types .= "ii";
+    $where_sql = "WHERE l.status_laporan = 'lengkap' AND l.tanggal BETWEEN ? AND ?";
+    $params[] = $tgl_mulai_efektif;
+    $params[] = $tgl_selesai_efektif;
+    $types .= "ss";
     $judul = "Rekap Bulanan - " . date('F Y', strtotime("$tahun-$bulan-01"));
 }
 
@@ -226,10 +264,10 @@ if ($id_cabang != '') {
         SELECT GROUP_CONCAT(DISTINCT u.username ORDER BY u.username SEPARATOR ', ') AS pic
         FROM laporan_cabang lc
         JOIN users u ON u.id = lc.id_user_laporan
-        WHERE lc.id_cabang = ? AND YEAR(lc.tanggal) = ? AND MONTH(lc.tanggal) = ?
+        WHERE lc.id_cabang = ? AND lc.tanggal BETWEEN ? AND ?
           AND lc.status_laporan = 'lengkap' AND lc.id_user_laporan IS NOT NULL
     ");
-    $stmt->bind_param("iii", $id_cabang, $tahun, $bulan);
+    $stmt->bind_param("iss", $id_cabang, $tgl_mulai_efektif, $tgl_selesai_efektif);
     $stmt->execute();
     $nama_pic = $stmt->get_result()->fetch_assoc()['pic'] ?? null;
     $nama_pic = $nama_pic ?: '-';
@@ -403,6 +441,29 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
             <div class="col-xl-3 col-md-12 d-grid">
                 <button class="btn btn-primary fw-semibold py-2" style="border-radius: 8px;"><i class="bi bi-funnel-fill me-1"></i> Ambil Data</button>
             </div>
+
+            <?php if ($periode === 'bulanan'): ?>
+            <div class="col-12">
+                <hr class="my-1">
+                <label class="form-label-sm d-block mb-2">
+                    <i class="bi bi-calendar-range me-1"></i> Rentang Tanggal Custom
+                    <span class="text-muted fw-normal">(opsional — menimpa Tahun/Bulan Buku di atas kalau diisi)</span>
+                </label>
+            </div>
+            <div class="col-xl-2 col-md-6">
+                <input type="date" name="tgl_mulai" class="form-control form-control-premium" value="<?= $override_tanggal ? h($tgl_mulai_efektif) : '' ?>">
+            </div>
+            <div class="col-xl-2 col-md-6">
+                <input type="date" name="tgl_selesai" class="form-control form-control-premium" value="<?= $override_tanggal ? h($tgl_selesai_efektif) : '' ?>">
+            </div>
+            <?php if ($override_tanggal): ?>
+            <div class="col-xl-2 col-md-6 d-grid">
+                <a href="?id_cabang=<?= h($id_cabang) ?>&periode=bulanan&tahun=<?= h($tahun) ?>&bulan=<?= h($bulan) ?>" class="btn btn-outline-secondary btn-sm fw-semibold">
+                    <i class="bi bi-x-circle me-1"></i> Hapus Rentang Custom
+                </a>
+            </div>
+            <?php endif; ?>
+            <?php endif; ?>
         </form>
     </div>
 </div>
@@ -412,6 +473,17 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         <div>
             <h6 class="fw-bold text-warning-emphasis mb-1">Pilih Cabang Terlebih Dahulu</h6>
             <span class="text-secondary small">Gunakan form pencarian di atas untuk memuat data transaksi, rincian biaya, dan grafik pembagian hasil.</span>
+        </div>
+    </div>
+    <?php elseif ($periode_kosong): ?>
+    <div class="alert alert-info border-0 p-4 d-flex align-items-center" role="alert" style="border-radius: 12px; background-color: #eff6ff; border: 1px solid #bfdbfe!important;">
+        <i class="bi bi-info-circle-fill fs-4 me-3 text-primary"></i>
+        <div>
+            <h6 class="fw-bold text-primary mb-1">Periode Ini Digabung ke Closing Bulan Berikutnya</h6>
+            <span class="text-secondary small">
+                <?= h($nama_cabang) ?> baru mulai pembukuan pada/setelah tanggal 20 di bulan ini, jadi tidak ada closing tersendiri untuk periode ini —
+                datanya digabung ke closing <strong><?= h($bulan_berikutnya_label) ?></strong>. Pilih bulan tersebut untuk melihat rekapitulasinya.
+            </span>
         </div>
     </div>
     <?php else: ?>
@@ -477,13 +549,21 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         <div class="card border-0 mt-4" style="overflow: hidden;">
             <div class="card-header bg-dark text-white py-3 d-flex align-items-center justify-content-between">
                 <span class="fw-bold"><i class="bi bi-calendar3 me-2"></i>1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date('F Y', strtotime("$tahun-$bulan-01")) ?></span>
-                <span class="badge bg-light text-dark fw-medium px-3 py-1.5 rounded-pill">Detail per tanggal</span>
+                <?php if ($periode_digabung): ?>
+                    <span class="badge bg-info-subtle text-primary fw-medium px-3 py-1.5 rounded-pill" title="Termasuk sisa hari sejak <?= h(date('d/m/Y', strtotime($tgl_mulai_efektif))) ?> (cabang baru mulai pembukuan)">
+                        <i class="bi bi-signpost-split me-1"></i>Gabungan sejak <?= h(date('d/m/Y', strtotime($tgl_mulai_efektif))) ?>
+                    </span>
+                <?php elseif ($override_tanggal): ?>
+                    <span class="badge bg-light text-dark fw-medium px-3 py-1.5 rounded-pill"><?= h(date('d/m/Y', strtotime($tgl_mulai_efektif))) ?> &ndash; <?= h(date('d/m/Y', strtotime($tgl_selesai_efektif))) ?></span>
+                <?php else: ?>
+                    <span class="badge bg-light text-dark fw-medium px-3 py-1.5 rounded-pill">Detail per tanggal</span>
+                <?php endif; ?>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <?php
-                    $rk_th = (int) $tahun;
-                    $rk_bl = (int) $bulan;
+                    $rk_tgl_mulai   = $tgl_mulai_efektif;
+                    $rk_tgl_selesai = $tgl_selesai_efektif;
                     $rk_id_cabang = (int) $id_cabang;
                     $rk_tabel_id = 'tabelRekapHarian';
                     include '_rekap_tabel_harian.php';
@@ -503,16 +583,18 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
             </div>
         </div>
 
-        <!-- (tersembunyi) tabel harian BULAN SEBELUMNYA — sumber Export PDF Harian -->
+        <!-- (tersembunyi) tabel harian BULAN SEBELUMNYA — sumber Export PDF Harian.
+             Dihitung dari bulan kalender sebelum tgl_mulai_efektif (bukan $tahun/$bulan
+             mentah) — supaya tetap konsisten kalau periode ini sedang digabung/di-override. -->
         <?php
-        $rk_prev    = strtotime(sprintf('%04d-%02d-01 -1 month', (int) $tahun, (int) $bulan));
+        $rk_prev    = strtotime(date('Y-m-01', strtotime($tgl_mulai_efektif)) . ' -1 month');
         $bulan_prev = (int) date('n', $rk_prev);
         $tahun_prev = (int) date('Y', $rk_prev);
         ?>
         <div aria-hidden="true" style="position:absolute; left:-99999px; top:0; width:1600px; pointer-events:none;">
             <?php
-            $rk_th = $tahun_prev;
-            $rk_bl = $bulan_prev;
+            $rk_tgl_mulai   = date('Y-m-01', $rk_prev);
+            $rk_tgl_selesai = date('Y-m-t', $rk_prev);
             $rk_id_cabang = (int) $id_cabang;
             $rk_tabel_id = 'tabelRekapHarianPrev';
             include '_rekap_tabel_harian.php';
