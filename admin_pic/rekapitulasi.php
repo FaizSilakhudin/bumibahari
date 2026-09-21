@@ -55,6 +55,35 @@ if ($periode === 'bulanan' && $id_cabang !== '') {
     }
 }
 
+// Kalau periode ini dikelola LEBIH DARI 1 pengelola (rotasi di tengah jalan),
+// tawarkan pemilihan pengelola (tombol di sebelah filter Rentang Tanggal
+// Custom) — pilih salah satu untuk melihat rekapitulasi LENGKAP pengelola itu
+// saja (bukan digabung/ditumpuk). Default: pengelola pertama dalam periode.
+// urutan_pengelola_aktif dipakai sbg diskriminator utk Klaim Bulanan, Keterangan
+// Beban Operasional, dan Revenue Sharing (masing2 pengelola datanya terpisah).
+$segmen_pengelola       = [];
+$urutan_pengelola_aktif = 1;
+$pengelola_terpilih_seg = null;
+if ($periode === 'bulanan' && $id_cabang !== '' && !$periode_kosong) {
+    $segmen_pengelola = resolve_pengelola_segments($conn, (int) $id_cabang, $tgl_mulai_efektif, $tgl_selesai_efektif);
+    if (count($segmen_pengelola) > 1) {
+        $pilih_segmen = (int) ($_GET['pengelola_segmen'] ?? 1);
+        $segmen_valid = null;
+        foreach ($segmen_pengelola as $s) {
+            if ($s['urutan'] === $pilih_segmen) { $segmen_valid = $s; break; }
+        }
+        if ($segmen_valid === null) { $segmen_valid = $segmen_pengelola[0]; }
+
+        $urutan_pengelola_aktif = $segmen_valid['urutan'];
+        $pengelola_terpilih_seg = $segmen_valid['pengelola'];
+        // Persempit rentang efektif ke rentang pengelola yg dipilih SAJA —
+        // seluruh perhitungan di bawah (query utama, tabel harian, BO,
+        // klaim bulanan, revenue sharing) otomatis ikut rentang ini.
+        $tgl_mulai_efektif   = $segmen_valid['tgl_mulai'];
+        $tgl_selesai_efektif = $segmen_valid['tgl_selesai'];
+    }
+}
+
 // Tanggal acuan untuk atribusi pengelola/investor historis — akhir periode
 // yang dipilih (efektif), BUKAN hari ini. Supaya rekap bulan lama tetap benar
 // walau sudah ada rotasi pengelola/investor sesudahnya.
@@ -230,13 +259,13 @@ $persen_admin = 3; // Admin Fee Pusat: 3%
 
 // Klaim Bulanan (baris manual, lihat "10. Klaim Bulanan" & _rekap_klaim_bulanan.php)
 // — nominalnya mengurangi Net Profit SETELAH admin fee 3% dipotong, SEBELUM
-// split 50/50 investor-pengelola. urutan_pengelola=1 (default, belum ada
-// split pengelola di fase ini).
+// split 50/50 investor-pengelola. urutan_pengelola_aktif = segmen pengelola
+// yang sedang dipilih (1 kalau cuma 1 pengelola di periode ini).
 $total_klaim_bulanan = 0.0;
 $daftar_klaim_bulanan = [];
 if ($id_cabang !== '') {
-    $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = 1 ORDER BY urutan ASC, id ASC");
-    $stmt_kb->bind_param('iii', $id_cabang, $tahun, $bulan);
+    $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ? ORDER BY urutan ASC, id ASC");
+    $stmt_kb->bind_param('iiii', $id_cabang, $tahun, $bulan, $urutan_pengelola_aktif);
     $stmt_kb->execute();
     $daftar_klaim_bulanan = $stmt_kb->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt_kb->close();
@@ -494,6 +523,26 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                 </a>
             </div>
             <?php endif; ?>
+
+            <?php if (count($segmen_pengelola) > 1): ?>
+            <div class="col-12">
+                <label class="form-label-sm d-block mb-2 mt-2">
+                    <i class="bi bi-people me-1"></i> Periode ini dikelola <?= count($segmen_pengelola) ?> pengelola berbeda — pilih salah satu
+                </label>
+                <div class="d-flex flex-wrap gap-2">
+                    <?php foreach ($segmen_pengelola as $s):
+                        $s_aktif = $s['urutan'] === $urutan_pengelola_aktif;
+                        $s_nama  = $s['pengelola']['nama_pengelola'] ?? ('Pengelola ' . $s['urutan']);
+                    ?>
+                    <a href="?id_cabang=<?= h($id_cabang) ?>&periode=bulanan&tahun=<?= h($tahun) ?>&bulan=<?= h($bulan) ?>&pengelola_segmen=<?= $s['urutan'] ?>"
+                       class="btn btn-sm fw-semibold <?= $s_aktif ? 'btn-primary' : 'btn-outline-primary' ?>">
+                        <?= $s_aktif ? '<i class="bi bi-check-circle-fill me-1"></i>' : '' ?><?= h($s_nama) ?>
+                        <span class="fw-normal">(<?= h(date('d/m', strtotime($s['tgl_mulai']))) ?>&ndash;<?= h(date('d/m', strtotime($s['tgl_selesai']))) ?>)</span>
+                    </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
             <?php endif; ?>
         </form>
     </div>
@@ -580,7 +629,12 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         <div class="card border-0 mt-4" style="overflow: hidden;">
             <div class="card-header bg-dark text-white py-3 d-flex align-items-center justify-content-between">
                 <span class="fw-bold"><i class="bi bi-calendar3 me-2"></i>1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date('F Y', strtotime("$tahun-$bulan-01")) ?></span>
-                <?php if ($periode_digabung): ?>
+                <?php if (count($segmen_pengelola) > 1): ?>
+                    <span class="badge bg-primary bg-opacity-10 text-primary fw-medium px-3 py-1.5 rounded-pill">
+                        <i class="bi bi-person-badge me-1"></i><?= h($pengelola_terpilih_seg['nama_pengelola'] ?? 'Pengelola ' . $urutan_pengelola_aktif) ?>
+                        (<?= h(date('d/m', strtotime($tgl_mulai_efektif))) ?>&ndash;<?= h(date('d/m/Y', strtotime($tgl_selesai_efektif))) ?>)
+                    </span>
+                <?php elseif ($periode_digabung): ?>
                     <span class="badge bg-info-subtle text-primary fw-medium px-3 py-1.5 rounded-pill" title="Termasuk sisa hari sejak <?= h(date('d/m/Y', strtotime($tgl_mulai_efektif))) ?> (cabang baru mulai pembukuan)">
                         <i class="bi bi-signpost-split me-1"></i>Gabungan sejak <?= h(date('d/m/Y', strtotime($tgl_mulai_efektif))) ?>
                     </span>
@@ -659,11 +713,11 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     // Hitung jumlah hari ada data untuk dapat rata2 harian (hari libur tidak dihitung)
                     $jumlah_hari = (($jumlah_hari_kerja ?? 0) > 0) ? $jumlah_hari_kerja : 1;
 
-                    // Keterangan Tambahan Beban Operasional (persisten) — key: cabang+tahun+bulan.
-                    // urutan_pengelola=1 (default) — belum ada split pengelola di fase ini.
+                    // Keterangan Tambahan Beban Operasional (persisten) — key: cabang+tahun+bulan+
+                    // urutan_pengelola_aktif (segmen pengelola yg sedang dipilih).
                     $ket_bo = [];
-                    $stmt_ket = $conn->prepare("SELECT uraian_key, keterangan FROM beban_operasional_keterangan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = 1");
-                    $stmt_ket->bind_param('iii', $id_cabang, $tahun, $bulan);
+                    $stmt_ket = $conn->prepare("SELECT uraian_key, keterangan FROM beban_operasional_keterangan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ?");
+                    $stmt_ket->bind_param('iiii', $id_cabang, $tahun, $bulan, $urutan_pengelola_aktif);
                     $stmt_ket->execute();
                     $res_ket = $stmt_ket->get_result();
                     while ($rket = $res_ket->fetch_assoc()) {
@@ -742,6 +796,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         fd.append('id_cabang', <?= (int) $id_cabang ?>);
         fd.append('tahun', <?= (int) $tahun ?>);
         fd.append('bulan', <?= (int) $bulan ?>);
+        fd.append('urutan_pengelola', <?= (int) $urutan_pengelola_aktif ?>);
         document.querySelectorAll('input.keterangan[name^="ket_bo"]').forEach(function (inp) {
             const m = inp.name.match(/ket_bo\[(.+)\]/);
             if (m) fd.append('ket_bo[' + m[1] + ']', inp.value);
@@ -971,7 +1026,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
             fd.append('id_cabang', <?= (int) $id_cabang ?>);
             fd.append('tahun', <?= (int) $tahun ?>);
             fd.append('bulan', <?= (int) $bulan ?>);
-            fd.append('urutan_pengelola', 1);
+            fd.append('urutan_pengelola', <?= (int) $urutan_pengelola_aktif ?>);
             fd.append('admin_fee', typeof RK_adminFee === 'number' ? RK_adminFee : 0);
             fd.append('persen_service_fee', persen);
             fd.append('nominal_service_fee', typeof RK_serviceFee === 'number' ? RK_serviceFee : 0);

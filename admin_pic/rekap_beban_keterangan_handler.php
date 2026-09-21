@@ -20,12 +20,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['csrf'] ?? '')) 
     exit;
 }
 
-$id_cabang = (int) ($_POST['id_cabang'] ?? 0);
-$tahun     = (int) ($_POST['tahun'] ?? 0);
-$bulan     = (int) ($_POST['bulan'] ?? 0);
-$ket_bo    = $_POST['ket_bo'] ?? [];
+$id_cabang        = (int) ($_POST['id_cabang'] ?? 0);
+$tahun            = (int) ($_POST['tahun'] ?? 0);
+$bulan            = (int) ($_POST['bulan'] ?? 0);
+$urutan_pengelola = (int) ($_POST['urutan_pengelola'] ?? 1);
+$ket_bo           = $_POST['ket_bo'] ?? [];
 
-if ($id_cabang <= 0 || $tahun < 2000 || $tahun > 2100 || $bulan < 1 || $bulan > 12 || !is_array($ket_bo)) {
+if ($id_cabang <= 0 || $tahun < 2000 || $tahun > 2100 || $bulan < 1 || $bulan > 12 || $urutan_pengelola < 1 || $urutan_pengelola > 9 || !is_array($ket_bo)) {
     echo json_encode(['ok' => false, 'msg' => 'Parameter tidak valid']);
     exit;
 }
@@ -41,7 +42,7 @@ $field_sah = ['sewa', 'gaji', 'listrik', 'air', 'sampah', 'keamanan', 'internet'
 
 $uid = current_user_id();
 $sql = "INSERT INTO beban_operasional_keterangan (id_cabang, tahun, bulan, urutan_pengelola, uraian_key, keterangan, updated_by)
-        VALUES (?, ?, ?, 1, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE keterangan = VALUES(keterangan), updated_by = VALUES(updated_by)";
 $stmt = $conn->prepare($sql);
 
@@ -49,14 +50,14 @@ $disimpan = 0;
 foreach ($field_sah as $key) {
     $nilai = isset($ket_bo[$key]) ? trim((string) $ket_bo[$key]) : '';
     $nilai = $nilai !== '' ? mb_substr($nilai, 0, 255) : null;
-    $stmt->bind_param('iiissi', $id_cabang, $tahun, $bulan, $key, $nilai, $uid);
+    $stmt->bind_param('iiiissi', $id_cabang, $tahun, $bulan, $urutan_pengelola, $key, $nilai, $uid);
     $stmt->execute();
     $disimpan++;
 }
 $stmt->close();
 
 audit($conn, 'rekap_beban_keterangan_simpan', 'beban_operasional_keterangan', $id_cabang, [
-    'id_cabang' => $id_cabang, 'tahun' => $tahun, 'bulan' => $bulan, 'jumlah_field' => $disimpan,
+    'id_cabang' => $id_cabang, 'tahun' => $tahun, 'bulan' => $bulan, 'urutan_pengelola' => $urutan_pengelola, 'jumlah_field' => $disimpan,
 ]);
 
 echo json_encode(['ok' => true, 'jumlah_field' => $disimpan]);

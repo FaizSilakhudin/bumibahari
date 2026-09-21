@@ -23,12 +23,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['csrf'] ?? '')) 
     exit;
 }
 
-$id_cabang = (int) ($_POST['id_cabang'] ?? 0);
-$tahun     = (int) ($_POST['tahun'] ?? 0);
-$bulan     = (int) ($_POST['bulan'] ?? 0);
-$rows_raw  = json_decode($_POST['rows'] ?? '[]', true);
+$id_cabang        = (int) ($_POST['id_cabang'] ?? 0);
+$tahun            = (int) ($_POST['tahun'] ?? 0);
+$bulan            = (int) ($_POST['bulan'] ?? 0);
+$urutan_pengelola = (int) ($_POST['urutan_pengelola'] ?? 1);
+$rows_raw         = json_decode($_POST['rows'] ?? '[]', true);
 
-if ($id_cabang <= 0 || $tahun < 2000 || $tahun > 2100 || $bulan < 1 || $bulan > 12 || !is_array($rows_raw)) {
+if ($id_cabang <= 0 || $tahun < 2000 || $tahun > 2100 || $bulan < 1 || $bulan > 12 || $urutan_pengelola < 1 || $urutan_pengelola > 9 || !is_array($rows_raw)) {
     echo json_encode(['ok' => false, 'msg' => 'Parameter tidak valid']);
     exit;
 }
@@ -46,12 +47,12 @@ $uid = current_user_id();
 
 $conn->begin_transaction();
 try {
-    $del = $conn->prepare('DELETE FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = 1');
-    $del->bind_param('iii', $id_cabang, $tahun, $bulan);
+    $del = $conn->prepare('DELETE FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ?');
+    $del->bind_param('iiii', $id_cabang, $tahun, $bulan, $urutan_pengelola);
     $del->execute();
     $del->close();
 
-    $ins = $conn->prepare('INSERT INTO klaim_bulanan (id_cabang, tahun, bulan, urutan_pengelola, urutan, uraian, nominal, keterangan, created_by) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)');
+    $ins = $conn->prepare('INSERT INTO klaim_bulanan (id_cabang, tahun, bulan, urutan_pengelola, urutan, uraian, nominal, keterangan, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $total = 0.0;
     $jumlah_baris = 0;
     foreach ($rows_raw as $r) {
@@ -64,7 +65,7 @@ try {
         }
         $uraian = mb_substr($uraian, 0, 255);
         $keterangan = $keterangan !== '' ? mb_substr($keterangan, 0, 255) : null;
-        $ins->bind_param('iiiisdsi', $id_cabang, $tahun, $bulan, $urutan, $uraian, $nominal, $keterangan, $uid);
+        $ins->bind_param('iiiiisdsi', $id_cabang, $tahun, $bulan, $urutan_pengelola, $urutan, $uraian, $nominal, $keterangan, $uid);
         $ins->execute();
         $total += $nominal;
         $jumlah_baris++;
@@ -79,7 +80,7 @@ try {
 }
 
 audit($conn, 'rekap_klaim_bulanan_simpan', 'klaim_bulanan', $id_cabang, [
-    'id_cabang' => $id_cabang, 'tahun' => $tahun, 'bulan' => $bulan, 'jumlah_baris' => $jumlah_baris, 'total' => $total,
+    'id_cabang' => $id_cabang, 'tahun' => $tahun, 'bulan' => $bulan, 'urutan_pengelola' => $urutan_pengelola, 'jumlah_baris' => $jumlah_baris, 'total' => $total,
 ]);
 
 echo json_encode(['ok' => true, 'total' => $total, 'jumlah_baris' => $jumlah_baris]);

@@ -159,6 +159,7 @@
         fd.append('id_cabang', <?= (int) $id_cabang ?>);
         fd.append('tahun', <?= (int) $tahun ?>);
         fd.append('bulan', <?= (int) $bulan ?>);
+        fd.append('urutan_pengelola', <?= (int) ($urutan_pengelola_aktif ?? 1) ?>);
         fd.append('rows', JSON.stringify(rows));
 
         const asalHtml = btnSimpan.innerHTML;

@@ -45,6 +45,22 @@
                 }
             }
 
+            // Dipakai saat tabel yang di-html:-capture ke PDF punya sel berisi
+            // <input> (mis. "Keterangan Tambahan" di Beban Operasional, atau
+            // Uraian/Nominal/Keterangan di Klaim Bulanan) — nilai <input> TIDAK
+            // ikut ke .textContent, jadi harus diambil manual dari .value supaya
+            // tidak tampil kosong di PDF.
+            function isiInputKeCellText(data) {
+                if (data.section !== 'body') return;
+                const raw = data.cell.raw;
+                if (!raw || typeof raw.querySelector !== 'function') return;
+                const input = raw.querySelector('input');
+                if (input) {
+                    const nilai = (input.value || '').trim();
+                    data.cell.text = nilai !== '' ? [nilai] : ['-'];
+                }
+            }
+
             // =========================================================
             // EXPORT PDF HARIAN
             //  Hal.1 : 1. Rekapitulasi Pendapatan & Pengeluaran Harian - bulan sebelumnya
@@ -145,7 +161,7 @@
                 const t2 = document.querySelector('.table-clean-input');
                 const el2 = t2 && (t2.tagName === 'TABLE' ? t2 : t2.querySelector('table'));
                 if (el2) {
-                    doc.autoTable({ html: el2, startY: ty, ...baseStyles, styles: { fontSize: 8, cellPadding: 1.5 } });
+                    doc.autoTable({ html: el2, startY: ty, ...baseStyles, styles: { fontSize: 8, cellPadding: 1.5 }, didParseCell: isiInputKeCellText });
                 }
 
                 // Nama file: "Update Laporan Pembukuan Harian <Cabang> <tanggal LAPORAN>" —
@@ -244,7 +260,18 @@
                 doc.addPage(); addWatermark(doc); let y = 15;
                 doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('2. Rincian Beban Operasional', margin, y);
                 let t2 = document.querySelector('.table-clean-input'); let elTabel2 = t2?.tagName === 'TABLE' ? t2 : t2?.querySelector('table');
-                if (elTabel2) { doc.autoTable({ html: elTabel2, startY: y + 5, ...baseTableStyles }); y = doc.lastAutoTable.finalY + 12; } else { y += 15; }
+                if (elTabel2) { doc.autoTable({ html: elTabel2, startY: y + 5, ...baseTableStyles, didParseCell: isiInputKeCellText }); y = doc.lastAutoTable.finalY + 12; } else { y += 15; }
+
+                // "10. Klaim Bulanan" — tabel input dinamis (No/Uraian/Nominal/Keterangan),
+                // ikut di-export persis seperti tampil di layar.
+                const elTabelKlaim = document.getElementById('tabelKlaimBulanan');
+                if (elTabelKlaim) {
+                    if (y > 170) { doc.addPage(); addWatermark(doc); y = 15; }
+                    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('10. Klaim Bulanan', margin, y);
+                    doc.autoTable({ html: elTabelKlaim, startY: y + 5, ...baseTableStyles, didParseCell: isiInputKeCellText });
+                    y = doc.lastAutoTable.finalY + 12;
+                }
+
                 doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('3. Matriks Akumulasi', margin, y);
                 let dataMatriks = [
                     ['Omzet Penjualan', formatRupiahPDF(omzet_akumulasi), 'Pendapatan bruto masuk'],
