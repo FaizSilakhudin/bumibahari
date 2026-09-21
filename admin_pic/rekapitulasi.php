@@ -228,9 +228,26 @@ $persen_investor = 50;
 $persen_pengelola = 50;
 $persen_admin = 3; // Admin Fee Pusat: 3%
 
+// Klaim Bulanan (baris manual, lihat "10. Klaim Bulanan" & _rekap_klaim_bulanan.php)
+// — nominalnya mengurangi Net Profit SETELAH admin fee 3% dipotong, SEBELUM
+// split 50/50 investor-pengelola. urutan_pengelola=1 (default, belum ada
+// split pengelola di fase ini).
+$total_klaim_bulanan = 0.0;
+$daftar_klaim_bulanan = [];
+if ($id_cabang !== '') {
+    $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = 1 ORDER BY urutan ASC, id ASC");
+    $stmt_kb->bind_param('iii', $id_cabang, $tahun, $bulan);
+    $stmt_kb->execute();
+    $daftar_klaim_bulanan = $stmt_kb->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt_kb->close();
+    foreach ($daftar_klaim_bulanan as $kb) {
+        $total_klaim_bulanan += (float) $kb['nominal'];
+    }
+}
+
 // Perhitungan Laba Default (Sebelum pilihan dinamis di UI)
 $share_admin = $laba_bersih_dasar * $persen_admin / 100;
-$laba_setelah_admin = $laba_bersih_dasar - $share_admin;
+$laba_setelah_admin = $laba_bersih_dasar - $share_admin - $total_klaim_bulanan;
 $share_investor = $laba_setelah_admin * $persen_investor / 100;
 $share_pengelola = $laba_setelah_admin * $persen_pengelola / 100;
 
@@ -642,6 +659,18 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     // Hitung jumlah hari ada data untuk dapat rata2 harian (hari libur tidak dihitung)
                     $jumlah_hari = (($jumlah_hari_kerja ?? 0) > 0) ? $jumlah_hari_kerja : 1;
 
+                    // Keterangan Tambahan Beban Operasional (persisten) — key: cabang+tahun+bulan.
+                    // urutan_pengelola=1 (default) — belum ada split pengelola di fase ini.
+                    $ket_bo = [];
+                    $stmt_ket = $conn->prepare("SELECT uraian_key, keterangan FROM beban_operasional_keterangan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = 1");
+                    $stmt_ket->bind_param('iii', $id_cabang, $tahun, $bulan);
+                    $stmt_ket->execute();
+                    $res_ket = $stmt_ket->get_result();
+                    while ($rket = $res_ket->fetch_assoc()) {
+                        $ket_bo[$rket['uraian_key']] = $rket['keterangan'];
+                    }
+                    $stmt_ket->close();
+
                     $uraian_bo = [
                         1 => ['nama' => 'Sewa Ruko', 'field' => 'sewa', 'harian' => true, 'tahunan' => true],
                         2 => ['nama' => 'Gaji Karyawan', 'field' => 'gaji', 'harian' => true, 'tahunan' => false],
@@ -680,6 +709,8 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                             <td class="text-end fw-bold text-dark pe-3"><?= number_format($val_bulanan, 0, ',', '.') ?></td>
                             <td class="ps-4">
                                 <input type="text" class="form-control form-control-sm border-0 bg-transparent keterangan"
+                                    name="ket_bo[<?= h($item['field']) ?>]"
+                                    value="<?= h($ket_bo[$item['field']] ?? '') ?>"
                                     placeholder="Ketik keterangan..."
                                     style="min-width: 180px;">
                             </td>
@@ -693,8 +724,44 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                 </tbody>
             </table>
         </div>
+        <div class="p-3 border-top d-flex justify-content-end" style="background-color: #f8fafc;">
+            <button type="button" id="btnSimpanKeteranganBO" class="btn btn-sm btn-outline-primary fw-semibold">
+                <i class="bi bi-save me-1"></i>Simpan Keterangan
+            </button>
+        </div>
     </div>
 </div>
+<script>
+(function () {
+    const btn = document.getElementById('btnSimpanKeteranganBO');
+    if (!btn) return;
+    const asalHtml = btn.innerHTML;
+    btn.addEventListener('click', function () {
+        const fd = new FormData();
+        fd.append('csrf', <?= json_encode(csrf_token()) ?>);
+        fd.append('id_cabang', <?= (int) $id_cabang ?>);
+        fd.append('tahun', <?= (int) $tahun ?>);
+        fd.append('bulan', <?= (int) $bulan ?>);
+        document.querySelectorAll('input.keterangan[name^="ket_bo"]').forEach(function (inp) {
+            const m = inp.name.match(/ket_bo\[(.+)\]/);
+            if (m) fd.append('ket_bo[' + m[1] + ']', inp.value);
+        });
+        btn.disabled = true;
+        fetch('rekap_beban_keterangan_handler.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                if (!data.ok) { alert('Gagal: ' + (data.msg || 'unknown')); return; }
+                btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersimpan';
+                setTimeout(function () { btn.innerHTML = asalHtml; }, 1500);
+            })
+            .catch(function (err) {
+                btn.disabled = false;
+                alert('Gagal mengirim: ' + err);
+            });
+    });
+})();
+</script>
 
 <!-- ROW MATRIK & REVENUE SHARING -->
 <div class="row g-3 mb-4">
@@ -877,14 +944,58 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                         <i class="bi bi-info-circle me-1 text-primary"></i><strong>Skema Pembagian:</strong>
                     </div>
                     <div class="ms-3">
-                        Net Profit dipotong terlebih dahulu dengan <strong>Admin Fee <?= $persen_admin ?? 3 ?>%</strong>. 
+                        Net Profit dipotong terlebih dahulu dengan <strong>Admin Fee <?= $persen_admin ?? 3 ?>%</strong>.
                         Setelah Admin Fee dipotong, sisa laba dibagi secara <strong>50% untuk Investor</strong> dan <strong>50% untuk Pengelola</strong>.
                     </div>
+                </div>
+                <div class="p-3 border-top d-flex justify-content-end">
+                    <button type="button" id="btnSimpanRevenueSharing" class="btn btn-sm btn-outline-primary fw-semibold">
+                        <i class="bi bi-save me-1"></i>Simpan Revenue Sharing
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+    <script>
+    (function () {
+        const btn = document.getElementById('btnSimpanRevenueSharing');
+        if (!btn) return;
+        const asalHtml = btn.innerHTML;
+        btn.addEventListener('click', function () {
+            const persenEl = document.getElementById('pgl_admin_persen');
+            const persen = persenEl ? parseFloat(persenEl.value) : 3;
+
+            const fd = new FormData();
+            fd.append('csrf', <?= json_encode(csrf_token()) ?>);
+            fd.append('aksi', 'simpan_dari_rekap');
+            fd.append('id_cabang', <?= (int) $id_cabang ?>);
+            fd.append('tahun', <?= (int) $tahun ?>);
+            fd.append('bulan', <?= (int) $bulan ?>);
+            fd.append('urutan_pengelola', 1);
+            fd.append('admin_fee', typeof RK_adminFee === 'number' ? RK_adminFee : 0);
+            fd.append('persen_service_fee', persen);
+            fd.append('nominal_service_fee', typeof RK_serviceFee === 'number' ? RK_serviceFee : 0);
+
+            btn.disabled = true;
+            fetch('revenue_sharing_handler.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    btn.disabled = false;
+                    if (!data.ok) { alert('Gagal: ' + (data.msg || 'unknown')); return; }
+                    btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersimpan';
+                    setTimeout(function () { btn.innerHTML = asalHtml; }, 1500);
+                })
+                .catch(function (err) {
+                    btn.disabled = false;
+                    alert('Gagal mengirim: ' + err);
+                });
+        });
+    })();
+    </script>
 </div>
+
+<?php include '_rekap_klaim_bulanan.php'; ?>
+
 <!-- 5. Profit Investor & Pengelola Manual Panel -->
 <div class="row g-3 mb-4">
     <!-- Investor Form Card -->

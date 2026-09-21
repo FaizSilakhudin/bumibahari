@@ -191,11 +191,12 @@
                 const persen_admin    = <?= (float) ($persen_admin ?? 3) ?>;
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
+                const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan"
                 const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal - talangan_val;   // = Net Profit efektif
                 const admin_fee_val   = laba_akumulasi * persen_admin / 100;
-                const laba_setelah_admin = laba_akumulasi - admin_fee_val;
+                const laba_setelah_admin = laba_akumulasi - admin_fee_val - total_klaim_bulanan;
                 const share_inv_base  = laba_setelah_admin * persen_investor / 100;
                 const share_pgl_base  = laba_setelah_admin * persen_pengelola / 100;
 
@@ -401,11 +402,12 @@
                 const persen_admin    = <?= (float) ($persen_admin ?? 3) ?>;
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
+                const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan"
                 const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal - talangan_val;
                 const admin_fee_val   = laba_akumulasi * persen_admin / 100;
-                const laba_setelah_admin = laba_akumulasi - admin_fee_val;
+                const laba_setelah_admin = laba_akumulasi - admin_fee_val - total_klaim_bulanan;
                 const share_inv_base  = laba_setelah_admin * persen_investor / 100;
                 const share_pgl_base  = laba_setelah_admin * persen_pengelola / 100;
 

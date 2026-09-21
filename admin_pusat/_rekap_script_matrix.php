@@ -87,8 +87,10 @@
             const RK_PERSEN_ADMIN   = <?= (float) ($persen_admin ?? 3) ?>;
             const RK_PERSEN_INV     = <?= (float) ($persen_investor ?? 50) ?>;
             const RK_PERSEN_PGL     = <?= (float) ($persen_pengelola ?? 50) ?>;
+            const RK_TOTAL_KLAIM_BULANAN = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan" — dikurangkan setelah admin fee, sebelum split
 
             let RK_serviceFee       = 0;                    // service fee pengelola (dioper antar fungsi)
+            let RK_adminFee         = 0;                    // admin fee 3% (dioper ke tombol "Simpan Revenue Sharing")
             let RK_netProfitEfektif = RK_NET_PROFIT_100;    // setelah dikurangi Modal Awal + Pengembalian Dana Talangan
 
             function setTxt(id, val) {
@@ -111,7 +113,8 @@
                 RK_netProfitEfektif = getNetProfitEfektif();
 
                 const adminFee       = RK_netProfitEfektif * RK_PERSEN_ADMIN / 100;
-                const labaSetelahAdm = RK_netProfitEfektif - adminFee;
+                RK_adminFee          = adminFee;
+                const labaSetelahAdm = RK_netProfitEfektif - adminFee - RK_TOTAL_KLAIM_BULANAN;
                 const shareInvBase   = labaSetelahAdm * RK_PERSEN_INV / 100;
                 const sharePglBase   = labaSetelahAdm * RK_PERSEN_PGL / 100;
 

@@ -1,21 +1,25 @@
 <?php
 /**
- * Endpoint AJAX untuk REVENUE SHARING (admin_pusat/revenue_sharing.php).
+ * Endpoint AJAX untuk REVENUE SHARING (admin_pusat/revenue_sharing.php DAN
+ * tombol "Simpan Revenue Sharing" di admin_pusat/rekapitulasi.php).
  *
  * Aksi (field POST 'aksi'):
- *   - update_persen : simpan persen_service_fee untuk (id_cabang, tahun, bulan)
- *   - update_status : simpan status_pembayaran untuk (id_cabang, tahun, bulan)
+ *   - simpan_dari_rekap : simpan admin_fee + persen/nominal_service_fee dari
+ *                         Rekapitulasi utk (id_cabang, tahun, bulan, urutan_pengelola)
+ *   - update_status     : simpan status_pembayaran untuk (id_cabang, tahun, bulan)
+ *                         — satu-satunya yang masih editable inline di revenue_sharing.php
+ *
+ * (update_persen DIHAPUS — presentase tidak lagi bisa diedit langsung di
+ * revenue_sharing.php, hanya lewat simpan_dari_rekap.)
  *
  * Response JSON:
- *   sukses  : {ok:true,  nominal_service_fee:<float>, persen_service_fee:<float>,
- *                       status_pembayaran:<string>}
+ *   sukses  : {ok:true, ...}
  *   gagal   : {ok:false, msg:'...'}
  *
  * Keamanan:
  *   - require_role('pusat')                       : hanya user pusat
  *   - csrf_check($_POST['csrf'])                  : token CSRF (FormData)
- *   - Whitelist nilai enum sebelum bind_param    : persen_service_fee ∈ {3,5,7.5},
- *                                                   status_pembayaran ∈ {pending,belum_lunas,lunas}
+ *   - Whitelist nilai enum sebelum bind_param    : status_pembayaran ∈ {pending,belum_lunas,lunas}
  *   - audit()                                     : jejak perubahan
  */
 
@@ -73,10 +77,10 @@ function hitung_service_fee(mysqli $conn, int $id_cabang, int $tahun, int $bulan
 }
 
 // Helper — ambil nilai saat ini sebelum diupdate, untuk audit log "sebelum".
-function ambil_nilai_sebelum(mysqli $conn, int $id_cabang, int $tahun, int $bulan): array {
+function ambil_nilai_sebelum(mysqli $conn, int $id_cabang, int $tahun, int $bulan, int $urutan_pengelola = 1): array {
     $st = $conn->prepare("SELECT persen_service_fee, status_pembayaran
-        FROM revenue_sharing WHERE id_cabang = ? AND tahun = ? AND bulan = ?");
-    $st->bind_param('iii', $id_cabang, $tahun, $bulan);
+        FROM revenue_sharing WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ?");
+    $st->bind_param('iiii', $id_cabang, $tahun, $bulan, $urutan_pengelola);
     $st->execute();
     $r = $st->get_result()->fetch_assoc();
     $st->close();
@@ -86,49 +90,57 @@ function ambil_nilai_sebelum(mysqli $conn, int $id_cabang, int $tahun, int $bula
     ];
 }
 
-// ---- Aksi: ubah presentase service fee ----
-if ($aksi === 'update_persen') {
-    $persen_mentah = (float) ($_POST['persen_service_fee'] ?? 0);
-    // Whitelist — sama persis dengan nilai tombol di UI (3%, 5%, 7.5%)
+// ---- Aksi: simpan admin_fee + persen/nominal_service_fee dari Rekapitulasi ----
+if ($aksi === 'simpan_dari_rekap') {
+    $urutan_pengelola   = (int) ($_POST['urutan_pengelola'] ?? 1);
+    $admin_fee          = (float) ($_POST['admin_fee'] ?? 0);
+    $persen_mentah      = (float) ($_POST['persen_service_fee'] ?? 0);
+    $nominal_service_fee = (float) ($_POST['nominal_service_fee'] ?? 0);
+
+    if ($urutan_pengelola < 1 || $urutan_pengelola > 9) {
+        echo json_encode(['ok' => false, 'msg' => 'Segmen pengelola tidak valid']);
+        exit;
+    }
     if (!in_array($persen_mentah, [3.0, 5.0, 7.5], true)) {
         echo json_encode(['ok' => false, 'msg' => 'Presentase tidak valid (3/5/7,5 saja)']);
         exit;
     }
 
-    $sebelum = ambil_nilai_sebelum($conn, $id_cabang, $tahun, $bulan);
+    $sebelum = ambil_nilai_sebelum($conn, $id_cabang, $tahun, $bulan, $urutan_pengelola);
     $uid = current_user_id();
 
-    // INSERT … ON DUPLICATE KEY UPDATE — kalau baris (cabang,tahun,bulan) belum ada,
-    // dibuat; kalau sudah ada, kolom persen + updated_by di-update. Status TIDAK
-    // disentuh di sini — hanya presentase.
-    $sql = "INSERT INTO revenue_sharing (id_cabang, tahun, bulan, persen_service_fee, status_pembayaran, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?)
+    // INSERT … ON DUPLICATE KEY UPDATE pada unique key (id_cabang,tahun,bulan,
+    // urutan_pengelola) — simpan admin_fee + persen + nominal_service_fee
+    // sekaligus (nilai sudah dihitung KLIEN, termasuk Modal Awal/Talangan/
+    // Klaim Bulanan — dipercaya apa adanya, tidak di-re-derive server-side).
+    // Status TIDAK disentuh di sini.
+    $sql = "INSERT INTO revenue_sharing (id_cabang, tahun, bulan, urutan_pengelola, admin_fee, persen_service_fee, nominal_service_fee, status_pembayaran, updated_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
+              admin_fee = VALUES(admin_fee),
               persen_service_fee = VALUES(persen_service_fee),
+              nominal_service_fee = VALUES(nominal_service_fee),
               updated_by = VALUES(updated_by)";
     $st = $conn->prepare($sql);
-    // Pakai nilai status saat ini dari sebelum (kalau baris baru, default 'pending')
-    $st->bind_param('iiidsi', $id_cabang, $tahun, $bulan, $persen_mentah, $sebelum['status_pembayaran'], $uid);
+    $st->bind_param('iiiidddsi', $id_cabang, $tahun, $bulan, $urutan_pengelola, $admin_fee, $persen_mentah, $nominal_service_fee, $sebelum['status_pembayaran'], $uid);
     $st->execute();
     $st->close();
 
-    // Hitung ulang nominal dengan persen BARU
-    $recalc = hitung_service_fee($conn, $id_cabang, $tahun, $bulan, $persen_mentah);
-
-    audit($conn, 'revenue_sharing_update_persen', 'revenue_sharing', $id_cabang, [
-        'id_cabang'   => $id_cabang,
-        'tahun'       => $tahun,
-        'bulan'       => $bulan,
-        'sebelum'     => $sebelum['persen_service_fee'],
-        'sesudah'     => $persen_mentah,
-        'nominal_baru'=> round($recalc['service_fee'], 2),
+    audit($conn, 'revenue_sharing_simpan_dari_rekap', 'revenue_sharing', $id_cabang, [
+        'id_cabang'           => $id_cabang,
+        'tahun'               => $tahun,
+        'bulan'               => $bulan,
+        'urutan_pengelola'    => $urutan_pengelola,
+        'admin_fee'           => $admin_fee,
+        'persen_service_fee'  => $persen_mentah,
+        'nominal_service_fee' => $nominal_service_fee,
     ]);
 
     echo json_encode([
-        'ok'                 => true,
-        'persen_service_fee' => $persen_mentah,
-        'status_pembayaran'  => $sebelum['status_pembayaran'],
-        'nominal_service_fee'=> round($recalc['service_fee'], 2),
+        'ok'                  => true,
+        'admin_fee'           => $admin_fee,
+        'persen_service_fee'  => $persen_mentah,
+        'nominal_service_fee' => $nominal_service_fee,
     ]);
     exit;
 }

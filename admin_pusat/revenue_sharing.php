@@ -32,42 +32,70 @@ $nama_periode_en = date('F Y', strtotime("$sel_tahun-$sel_bulan-01"));
 $akhir_periode  = date('Y-m-t', strtotime("$sel_tahun-$sel_bulan-01"));
 $periode_anchor = anchor_periode($akhir_periode);
 
-// ----- Query: 1 baris per cabang, agregat net_profit + status/presentase -----
+// ----- Query: 1 baris per cabang, agregat net_profit + admin_fee/service fee TERSIMPAN -----
+// admin_fee/nominal_service_fee TIDAK dihitung live lagi — nilainya berasal dari
+// tombol "Simpan Revenue Sharing" di menu Rekapitulasi (bisa >1 baris per cabang+
+// periode kalau ada split pengelola, makanya di-SUM lewat subquery rs_sum).
+// persen_service_fee/status_pembayaran tetap diambil dari segmen 1 (urutan_pengelola=1)
+// sebagai representatif — status itu satu-satunya yang masih bisa diedit di halaman ini.
 $sql = "
     SELECT
         c.id_cabang,
         c.nama_cabang,
         COALESCE(SUM(l.net_profit), 0) AS net_profit,
-        COALESCE(rs.persen_service_fee, 5.00) AS persen_service_fee,
-        COALESCE(rs.status_pembayaran, 'pending') AS status_pembayaran
+        rs_sum.admin_fee_sum,
+        rs_sum.nominal_service_fee_sum,
+        COALESCE(rs_sum.jml_tersimpan, 0) AS jml_tersimpan,
+        COALESCE(rs1.persen_service_fee, 5.00) AS persen_service_fee,
+        COALESCE(rs1.status_pembayaran, 'pending') AS status_pembayaran
     FROM cabang c
     LEFT JOIN laporan_cabang l
         ON l.id_cabang = c.id_cabang
         AND YEAR(l.tanggal) = ? AND MONTH(l.tanggal) = ?
         AND l.status_laporan = 'lengkap'
-    LEFT JOIN revenue_sharing rs
-        ON rs.id_cabang = c.id_cabang AND rs.tahun = ? AND rs.bulan = ?
-    GROUP BY c.id_cabang, c.nama_cabang, rs.persen_service_fee, rs.status_pembayaran
+    LEFT JOIN (
+        SELECT id_cabang,
+               SUM(admin_fee) AS admin_fee_sum,
+               SUM(nominal_service_fee) AS nominal_service_fee_sum,
+               COUNT(admin_fee) AS jml_tersimpan
+        FROM revenue_sharing
+        WHERE tahun = ? AND bulan = ?
+        GROUP BY id_cabang
+    ) rs_sum ON rs_sum.id_cabang = c.id_cabang
+    LEFT JOIN revenue_sharing rs1
+        ON rs1.id_cabang = c.id_cabang AND rs1.tahun = ? AND rs1.bulan = ? AND rs1.urutan_pengelola = 1
+    GROUP BY c.id_cabang, c.nama_cabang, rs_sum.admin_fee_sum, rs_sum.nominal_service_fee_sum, rs_sum.jml_tersimpan, rs1.persen_service_fee, rs1.status_pembayaran
     ORDER BY c.nama_cabang ASC
 ";
 $st = $conn->prepare($sql);
-$st->bind_param('iiii', $sel_tahun, $sel_bulan, $sel_tahun, $sel_bulan);
+$st->bind_param('iiiiii', $sel_tahun, $sel_bulan, $sel_tahun, $sel_bulan, $sel_tahun, $sel_bulan);
 $st->execute();
 $rs_rows = $st->get_result()->fetch_all(MYSQLI_ASSOC);
 $st->close();
 
-// ----- Hitung nominal & kumpulkan baris -----
+// ----- Kumpulkan baris — pakai nilai TERSIMPAN kalau sudah pernah di-Simpan
+// dari Rekapitulasi; kalau belum, fallback ke preview live (formula lama:
+// admin fee 3% + service fee dari 50% sisi pengelola) supaya halaman ini tetap
+// berguna utk periode yang belum disentuh dari Rekapitulasi (termasuk semua
+// histori sebelum fitur Simpan ini ada). -----
 $total_admin_fee_all   = 0.0;
 $total_service_fee_all = 0.0;
 $baris = [];
 $jml_lunas = 0;
 foreach ($rs_rows as $r) {
-    $net_profit   = (float) $r['net_profit'];
-    $admin_fee    = $net_profit > 0 ? $net_profit * 3 / 100 : 0;
-    $laba_setelah = $net_profit - $admin_fee;
-    $share_pgl    = $laba_setelah * 50 / 100;
-    $persen       = (float) $r['persen_service_fee'];
-    $service_fee  = $share_pgl * $persen / 100;
+    $net_profit = (float) $r['net_profit'];
+    $persen     = (float) $r['persen_service_fee'];
+    $tersimpan  = ((int) $r['jml_tersimpan']) > 0;
+
+    if ($tersimpan) {
+        $admin_fee   = (float) $r['admin_fee_sum'];
+        $service_fee = (float) $r['nominal_service_fee_sum'];
+    } else {
+        $admin_fee    = $net_profit > 0 ? $net_profit * 3 / 100 : 0;
+        $laba_setelah = $net_profit - $admin_fee;
+        $share_pgl    = $laba_setelah * 50 / 100;
+        $service_fee  = $share_pgl * $persen / 100;
+    }
 
     $total_admin_fee_all   += $admin_fee;
     $total_service_fee_all += $service_fee;
@@ -82,6 +110,7 @@ foreach ($rs_rows as $r) {
         'persen_service_fee'  => $persen,
         'nominal_service_fee' => $service_fee,
         'status_pembayaran'   => $r['status_pembayaran'],
+        'tersimpan'           => $tersimpan,
     ];
 }
 $total_keseluruhan = $total_admin_fee_all + $total_service_fee_all;
@@ -276,7 +305,7 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
                 <div class="title">Admin Fee &amp; Service Fee Bulanan</div>
                 <div class="desc">
                     <i class="bi bi-info-circle me-1"></i>
-                    Admin Fee <strong>3%</strong> otomatis dari net profit keseluruhan. Service Fee dihitung dari <strong>50% sisi pengelola</strong> dengan presentase yang bisa dipilih per cabang.
+                    Admin Fee &amp; Service Fee diatur dari menu <strong>Rekapitulasi</strong> (tombol "Simpan Revenue Sharing"). Halaman ini menampilkan nilai yang sudah disimpan — hanya <strong>Status Pembayaran</strong> yang bisa diedit di sini.
                 </div>
             </div>
             <form method="GET" class="d-flex flex-wrap gap-2" style="min-width: 280px;">
@@ -351,18 +380,10 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
                         <td class="rs-col-np text-muted" data-label="Net Profit">Rp <?= number_format($b['net_profit'], 0, ',', '.') ?></td>
                         <td class="rs-col-af" data-label="Admin Fee" style="color:#0f172a;">Rp <?= number_format($b['admin_fee'], 0, ',', '.') ?></td>
                         <td class="rs-col-prs" data-label="Presentase">
-                            <div class="rs-btn-group" data-field="persen" role="group">
-                                <?php foreach ([3.0, 5.0, 7.5] as $p):
-                                    $active = abs($b['persen_service_fee'] - $p) < 0.01;
-                                ?>
-                                <button type="button"
-                                    class="rs-btn <?= $active ? 'is-active' : '' ?>"
-                                    data-value="<?= $p ?>"
-                                    title="Service Fee <?= rtrim(rtrim(number_format($p, 2, ',', '.'), '0'), ',') ?>%">
-                                    <?= rtrim(rtrim(number_format($p, 2, ',', '.'), '0'), ',') ?>%
-                                </button>
-                                <?php endforeach; ?>
-                            </div>
+                            <span class="fw-bold" style="color:#0f172a;"><?= rtrim(rtrim(number_format($b['persen_service_fee'], 2, ',', '.'), '0'), ',') ?>%</span>
+                            <?php if (!$b['tersimpan']): ?>
+                                <div><span class="badge bg-warning bg-opacity-10 text-warning-emphasis fw-medium" style="font-size: 9px;">Belum disimpan</span></div>
+                            <?php endif; ?>
                         </td>
                         <td class="rs-col-sf" id="<?= $nom_id ?>" data-label="Service Fee">Rp <?= number_format($b['nominal_service_fee'], 0, ',', '.') ?></td>
                         <td class="rs-col-stt" data-label="Status">
@@ -445,33 +466,32 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
 
 <script>
 (function () {
-    // ===== Inline edit presentase/status (delegation; tidak butuh global) =====
+    // ===== Inline edit status (delegation; tidak butuh global) =====
+    // Presentase/Admin Fee/Service Fee TIDAK bisa diedit di sini lagi — nilainya
+    // datang dari tombol "Simpan Revenue Sharing" di Rekapitulasi. Satu-satunya
+    // yang masih editable inline di halaman ini adalah Status Pembayaran.
     const csrfToken  = <?= json_encode($csrf_token) ?>;
     const handlerUrl = 'revenue_sharing_handler.php';
-    const fmtRp      = (n) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
-    document.querySelectorAll('.rs-btn-group').forEach((grp) => {
+    document.querySelectorAll('.rs-btn-group[data-field="status"]').forEach((grp) => {
         grp.addEventListener('click', (ev) => {
             const btn = ev.target.closest('.rs-btn');
             if (!btn || btn.disabled) return;
             const tr     = btn.closest('tr');
-            const field  = grp.dataset.field;
             const value  = btn.dataset.value;
             const idCab  = tr.dataset.idCabang;
             const tahun  = tr.dataset.tahun;
             const bulan  = tr.dataset.bulan;
-            const aksi   = (field === 'persen') ? 'update_persen' : 'update_status';
 
             grp.querySelectorAll('.rs-btn').forEach((b) => b.disabled = true);
 
             const fd = new FormData();
             fd.append('csrf', csrfToken);
-            fd.append('aksi', aksi);
+            fd.append('aksi', 'update_status');
             fd.append('id_cabang', idCab);
             fd.append('tahun', tahun);
             fd.append('bulan', bulan);
-            if (field === 'persen') fd.append('persen_service_fee', value);
-            else                    fd.append('status_pembayaran', value);
+            fd.append('status_pembayaran', value);
 
             fetch(handlerUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
                 .then((r) => r.json())
@@ -481,10 +501,6 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
                     grp.querySelectorAll('.rs-btn').forEach((b) => {
                         b.classList.toggle('is-active', b.dataset.value === value);
                     });
-                    const nomCell = document.getElementById('rs-nom-' + idCab);
-                    if (nomCell && typeof data.nominal_service_fee === 'number') {
-                        nomCell.textContent = fmtRp(data.nominal_service_fee);
-                    }
                     tr.classList.remove('rs-flash');
                     void tr.offsetWidth;
                     tr.classList.add('rs-flash');
@@ -514,15 +530,14 @@ window.sharePdfToWA = async function (doc, filename) {
 };
 
 // Pewarnaan sel khusus saat di-export ke PDF.
-// Untuk kolom Presentase (idx 5) dan Status Pembayaran (idx 7), sel HTML berisi
-// 3 tombol (rs-btn) di mana hanya 1 yang aktif (.is-active). Untuk PDF, kita:
-//   1. Hanya render TEKS tombol aktif saja (override data.cell.text) — bukan semua
-//      "3% 5% 7,5%" atau "Pending Belum Lunas Lunas" yang akan menyulitkan pembaca.
-//   2. Warnai background sel sesuai warna sistem di UI agar visualnya konsisten:
-//        - Presentase aktif  → bold, biru, teks hitam
-//        - Status pending   → bold, oranye (amber-700), teks putih
-//        - Status belum lunas → bold, merah (red-700), teks putih
-//        - Status lunas     → bold, hijau (green-700), teks putih
+// Kolom Presentase (idx 5) sekarang teks biasa (bisa 2 baris kalau ada badge
+// "Belum disimpan") — tidak perlu ekstraksi tombol lagi. Status Pembayaran
+// (idx 7) masih berupa tombol (rs-btn), hanya 1 yang aktif (.is-active):
+//   1. Hanya render TEKS tombol aktif saja (override data.cell.text).
+//   2. Warnai background sel sesuai warna status di UI:
+//        - pending      → bold, oranye (amber-700), teks putih
+//        - belum lunas  → bold, merah (red-700), teks putih
+//        - lunas        → bold, hijau (green-700), teks putih
 window.rsDidParseCell = function (data) {
     if (data.section === 'head') {
         data.cell.styles.fillColor = [15, 23, 42];
@@ -545,29 +560,24 @@ window.rsDidParseCell = function (data) {
         data.cell.styles.textColor = teks.indexOf('-') !== -1 ? [220, 53, 69] : [14, 165, 233];
     }
 
-    // Kolom Presentase (idx 5) & Status (idx 7): render hanya tombol aktif dengan style tombol.
-    if ((idx === 5 || idx === 7) && raw && typeof raw.querySelector === 'function') {
+    // Kolom Status (idx 7): render hanya tombol aktif dengan style tombol.
+    if (idx === 7 && raw && typeof raw.querySelector === 'function') {
         const active = raw.querySelector('.rs-btn.is-active');
         if (active) {
             data.cell.text = [active.textContent.trim()];
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.halign = 'center';
 
-            // Presentase aktif: TANPA background warna (sesuai permintaan),
-            // cuma teks tebal menampilkan nilai yang dipilih (3% / 5% / 7,5%).
-            // Warna blok HANYA dipakai di kolom Status Pembayaran di bawah.
-            if (idx === 7) {
-                const status = active.dataset.value;
-                if (status === 'pending') {
-                    data.cell.styles.fillColor = [180, 83, 9];    // amber-700
-                    data.cell.styles.textColor = [255, 255, 255]; // putih
-                } else if (status === 'belum_lunas') {
-                    data.cell.styles.fillColor = [185, 28, 28];   // red-700
-                    data.cell.styles.textColor = [255, 255, 255]; // putih
-                } else if (status === 'lunas') {
-                    data.cell.styles.fillColor = [21, 128, 61];   // green-700
-                    data.cell.styles.textColor = [255, 255, 255]; // putih
-                }
+            const status = active.dataset.value;
+            if (status === 'pending') {
+                data.cell.styles.fillColor = [180, 83, 9];    // amber-700
+                data.cell.styles.textColor = [255, 255, 255]; // putih
+            } else if (status === 'belum_lunas') {
+                data.cell.styles.fillColor = [185, 28, 28];   // red-700
+                data.cell.styles.textColor = [255, 255, 255]; // putih
+            } else if (status === 'lunas') {
+                data.cell.styles.fillColor = [21, 128, 61];   // green-700
+                data.cell.styles.textColor = [255, 255, 255]; // putih
             }
         }
     }
@@ -652,8 +662,7 @@ window.exportExcel = function () {
             if (cells.length < 8) return;
             const statusBtn = tr.querySelector('.rs-btn-group[data-field="status"] .rs-btn.is-active');
             const status = statusBtn ? statusBtn.textContent.trim() : '-';
-            const persenBtn = tr.querySelector('.rs-btn-group[data-field="persen"] .rs-btn.is-active');
-            const persen = persenBtn ? persenBtn.textContent.trim() : '-';
+            const persen = cells[5].querySelector('span')?.textContent.trim() || cells[5].textContent.trim();
             rows.push([
                 cells[0].textContent.trim(),
                 cells[1].textContent.replace(/\s+/g, ' ').trim(),

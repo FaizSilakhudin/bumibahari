@@ -32,7 +32,7 @@ $rk_stmt = $conn->prepare("
            l.belanja_pasar, l.belanja_beras, l.belanja_sembako, l.belanja_toko,
            l.sewa, l.gaji, l.listrik, l.air, l.sampah, l.keamanan, l.internet,
            l.gas, l.mingguan_karyawan, l.es_batu, l.bensin, l.lain_lain,
-           l.net_profit, l.persentase, l.status_laporan
+           l.net_profit, l.persentase, l.status_laporan, l.keterangan
     FROM laporan_cabang l
     WHERE l.tanggal BETWEEN ? AND ? AND l.id_cabang = ? AND l.status_laporan IN ('lengkap','libur')
     ORDER BY l.tanggal ASC
@@ -63,6 +63,7 @@ $rk_no = 1;
             <th class="text-end" width="8%">Sisa Tunai</th>
             <th class="text-end" width="8%">Net Profit</th>
             <th class="text-center" width="4%">Margin (%)</th>
+            <th width="10%">Keterangan</th>
         </tr>
         <tr class="table-secondary" style="font-size: 0.8rem;">
             <th></th>
@@ -83,6 +84,7 @@ $rk_no = 1;
             <th></th>
             <th></th>
             <th></th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -92,7 +94,7 @@ $rk_no = 1;
                 <tr class="table-secondary">
                     <td class="text-center text-muted"><?= $rk_no++ ?></td>
                     <td class="fw-medium"><?= date('d/m/Y', strtotime($rk_h['tanggal'])) ?></td>
-                    <td colspan="16" class="text-center text-muted fst-italic">
+                    <td colspan="17" class="text-center text-muted fst-italic">
                         <i class="bi bi-moon-stars-fill me-1"></i> LIBUR / TUTUP
                     </td>
                 </tr>
@@ -159,11 +161,12 @@ $rk_no = 1;
                     <td class="text-end fw-semibold <?= $rk_sisa_hari < 0 ? 'text-danger' : '' ?>"><?= number_format($rk_sisa_hari, 0, ',', '.') ?></td>
                     <td class="text-end fw-bold <?= $rk_laba < 0 ? 'text-danger' : 'text-success' ?>"><?= number_format($rk_laba, 0, ',', '.') ?></td>
                     <td class="text-center fw-semibold <?= $rk_persen < 0 ? 'text-danger' : 'text-primary' ?>"><?= number_format($rk_persen, 2) ?>%</td>
+                    <td class="small text-muted" style="white-space: normal;"><?= h($rk_h['keterangan'] ?? '') ?></td>
                 </tr>
             <?php endwhile; ?>
         <?php else: ?>
             <tr>
-                <td colspan="18" class="text-center text-muted py-5">
+                <td colspan="19" class="text-center text-muted py-5">
                     <i class="bi bi-inbox fs-3 d-block mb-2"></i>
                     Belum ada data laporan untuk periode ini
                 </td>
@@ -190,6 +193,7 @@ $rk_no = 1;
                 <td class="text-end <?= $rk_t_sisa < 0 ? 'text-danger' : '' ?>"><?= number_format($rk_t_sisa, 0, ',', '.') ?></td>
                 <td class="text-end <?= $rk_t_laba < 0 ? 'text-danger' : 'text-success' ?>"><?= number_format($rk_t_laba, 0, ',', '.') ?></td>
                 <td class="text-center <?= $rk_margin < 0 ? 'text-danger' : 'text-primary' ?>"><?= number_format($rk_margin, 2) ?>%</td>
+                <td></td>
             </tr>
         </tfoot>
     <?php endif; ?>

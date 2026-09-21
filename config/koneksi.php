@@ -693,6 +693,12 @@ require_once __DIR__ . '/keuangan.php';
 // ---------------------------------------------------------------------------
 require_once __DIR__ . '/totp.php';
 
+// ---------------------------------------------------------------------------
+// 10. Komputasi per-segmen Rekapitulasi (closing digabung, split pengelola) —
+//     lihat tests/rekap_hitung_test.php.
+// ---------------------------------------------------------------------------
+require_once __DIR__ . '/rekap_hitung.php';
+
 if (!function_exists('role_home')) {
     // Tujuan halaman awal per role, dipakai login.php & verify_2fa.php.
     function role_home(?string $role): string
