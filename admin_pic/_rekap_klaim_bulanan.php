@@ -8,13 +8,16 @@
  *   $conn                        mysqli
  *   $id_cabang, $tahun, $bulan
  *   $daftar_klaim_bulanan        array  hasil query klaim_bulanan (lihat rekapitulasi.php)
- *   $total_klaim_bulanan         float  SEMUA baris (investor + warung)
+ *   $total_klaim_bulanan         float  SEMUA baris (investor + warung + pusat)
  *   $total_klaim_dana_investor   float  baris ber-sumber_dana='investor' SAJA
+ *   $total_klaim_dana_pusat      float  baris ber-sumber_dana='pusat' SAJA
  *
  * Kolom: No, Iuran Beban, Jumlah Akhir, Sumber Dana, Keterangan Tambahan.
- * Sumber Dana ('investor'/'warung') per baris:
+ * Sumber Dana ('investor'/'warung'/'pusat') per baris:
  *   - investor : nominal masuk Pengembalian Dana Talangan (menambah Total
  *                Bersih Investor) SELAIN memotong Net Profit.
+ *   - pusat    : nominal masuk Admin Management Pusat (6. Rekapan Hasil
+ *                Akhir Keuntungan) SELAIN memotong Net Profit.
  *   - warung   : nominal HANYA memotong Net Profit.
  * Semua baris (apapun sumber dananya) memotong Net Profit SEBELUM admin fee
  * 3% dipotong (lihat rekapitulasi.php & _rekap_script_matrix.php).
@@ -63,6 +66,7 @@
                                 <select class="form-select form-select-sm border-0 bg-transparent klaim-sumber">
                                     <option value="warung" <?= $kb_sumber === 'warung' ? 'selected' : '' ?>>Dana Warung</option>
                                     <option value="investor" <?= $kb_sumber === 'investor' ? 'selected' : '' ?>>Dana Investor</option>
+                                    <option value="pusat" <?= $kb_sumber === 'pusat' ? 'selected' : '' ?>>Dana Pusat</option>
                                 </select>
                             </td>
                             <td class="ps-4"><input type="text" class="form-control form-control-sm border-0 bg-transparent klaim-keterangan" value="<?= h($kb['keterangan'] ?? '') ?>" placeholder="Ketik keterangan..."></td>
@@ -83,7 +87,7 @@
         </div>
         <div class="px-3 pb-2 pt-1" style="font-size: 0.78rem; color: #64748b;">
             <i class="bi bi-info-circle me-1"></i>
-            Semua baris memotong Net Profit sebelum Admin Fee 3%. Baris "Dana Investor" tambahan otomatis masuk Pengembalian Dana Talangan (Koreksi Dividen: Sisi Investor).
+            Semua baris memotong Net Profit sebelum Admin Fee 3%. Baris "Dana Investor" tambahan otomatis masuk Pengembalian Dana Talangan (Koreksi Dividen: Sisi Investor); baris "Dana Pusat" tambahan otomatis masuk Admin Management Pusat (6. Rekapan Hasil Akhir Keuntungan).
         </div>
         <div class="p-3 border-top d-flex justify-content-between align-items-center" style="background-color: #f8fafc;">
             <button type="button" id="btnTambahKlaimBulanan" class="btn btn-sm btn-outline-secondary fw-semibold">
@@ -108,23 +112,28 @@
     function hitungUlangNoDanTotal() {
         let total = 0;
         let totalInvestor = 0;
+        let totalPusat = 0;
         let no = 1;
         tbody.querySelectorAll('tr.klaim-row').forEach(function (tr) {
             tr.querySelector('.klaim-no').textContent = no++;
             const nominal = parseFloat(tr.querySelector('.klaim-nominal').value) || 0;
+            const sumber = tr.querySelector('.klaim-sumber').value;
             total += nominal;
-            if (tr.querySelector('.klaim-sumber').value === 'investor') totalInvestor += nominal;
+            if (sumber === 'investor') totalInvestor += nominal;
+            if (sumber === 'pusat') totalPusat += nominal;
         });
         totalCell.textContent = fmtRp(total);
 
-        // Update Net Profit / Revenue Sharing / Koreksi Dividen secara LIVE
-        // (sebelum diklik Simpan) — RK_TOTAL_KLAIM_BULANAN, RK_TOTAL_KLAIM_DANA_INVESTOR,
-        // & hitungCascade() datang dari _rekap_script_matrix.php. Semuanya sudah
-        // pasti ada di scope global saat fungsi ini benar-benar terpanggil (event
-        // user, bukan saat parse awal), walau file itu di-include belakangan.
+        // Update Net Profit / Revenue Sharing / Koreksi Dividen / Rekapan Hasil
+        // Akhir secara LIVE (sebelum diklik Simpan) — RK_TOTAL_KLAIM_BULANAN,
+        // RK_TOTAL_KLAIM_DANA_INVESTOR, RK_TOTAL_KLAIM_DANA_PUSAT, & hitungCascade()
+        // datang dari _rekap_script_matrix.php. Semuanya sudah pasti ada di scope
+        // global saat fungsi ini benar-benar terpanggil (event user, bukan saat
+        // parse awal), walau file itu di-include belakangan.
         if (typeof hitungCascade === 'function') {
             RK_TOTAL_KLAIM_BULANAN = total;
             RK_TOTAL_KLAIM_DANA_INVESTOR = totalInvestor;
+            RK_TOTAL_KLAIM_DANA_PUSAT = totalPusat;
             hitungCascade();
         }
     }
@@ -136,7 +145,7 @@
             '<td class="text-center text-muted fw-medium klaim-no"></td>' +
             '<td><input type="text" class="form-control form-control-sm border-0 bg-transparent klaim-uraian" placeholder="Uraian klaim..."></td>' +
             '<td class="text-end"><input type="number" class="form-control form-control-sm border-0 bg-transparent text-end fw-bold klaim-nominal" value="0" min="0" step="1000"></td>' +
-            '<td class="text-center"><select class="form-select form-select-sm border-0 bg-transparent klaim-sumber"><option value="warung" selected>Dana Warung</option><option value="investor">Dana Investor</option></select></td>' +
+            '<td class="text-center"><select class="form-select form-select-sm border-0 bg-transparent klaim-sumber"><option value="warung" selected>Dana Warung</option><option value="investor">Dana Investor</option><option value="pusat">Dana Pusat</option></select></td>' +
             '<td class="ps-4"><input type="text" class="form-control form-control-sm border-0 bg-transparent klaim-keterangan" placeholder="Ketik keterangan..."></td>' +
             '<td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger p-0 klaim-hapus" title="Hapus baris"><i class="bi bi-trash"></i></button></td>';
         return tr;

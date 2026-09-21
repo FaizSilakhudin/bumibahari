@@ -261,11 +261,13 @@ $persen_admin = 3; // Admin Fee Pusat: 3%
 // — nominalnya (SEMUA baris, apapun sumber dananya) mengurangi Net Profit
 // SEBELUM admin fee 3% dipotong. Baris ber-sumber_dana='investor' JUGA
 // otomatis masuk ke "Pengembalian Dana Talangan" (Koreksi Dividen: Sisi
-// Investor) — menambah Total Bersih Investor, di luar potongan Net Profit
-// di atas. urutan_pengelola_aktif = segmen pengelola yang sedang dipilih
-// (1 kalau cuma 1 pengelola di periode ini).
+// Investor); baris ber-sumber_dana='pusat' JUGA otomatis masuk ke "Admin
+// Management Pusat" (6. Rekapan Hasil Akhir Keuntungan) — keduanya di luar
+// potongan Net Profit di atas. urutan_pengelola_aktif = segmen pengelola
+// yang sedang dipilih (1 kalau cuma 1 pengelola di periode ini).
 $total_klaim_bulanan = 0.0;
 $total_klaim_dana_investor = 0.0;
+$total_klaim_dana_pusat = 0.0;
 $daftar_klaim_bulanan = [];
 if ($id_cabang !== '') {
     $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, sumber_dana, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ? ORDER BY urutan ASC, id ASC");
@@ -277,6 +279,9 @@ if ($id_cabang !== '') {
         $total_klaim_bulanan += (float) $kb['nominal'];
         if (($kb['sumber_dana'] ?? 'warung') === 'investor') {
             $total_klaim_dana_investor += (float) $kb['nominal'];
+        }
+        if (($kb['sumber_dana'] ?? 'warung') === 'pusat') {
+            $total_klaim_dana_pusat += (float) $kb['nominal'];
         }
     }
 }
@@ -1124,7 +1129,13 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
 
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Kasbon Pengelola</label>
-                        <input type="number" id="inv_kasbon" class="form-control border-2" style="border-radius: 8px;" value="0" min="0" oninput="hitungCascade()">
+                        <div class="input-group">
+                            <input type="number" id="inv_kasbon" class="form-control border-2" style="border-radius: 8px 0 0 8px;" value="0" min="0" oninput="hitungCascade()">
+                            <select id="inv_kasbon_sumber" class="form-select border-2" style="max-width: 120px; border-radius: 0 8px 8px 0;" title="Sumber Kasbon — siapa yang menalangi kasbon ini" onchange="hitungCascade()">
+                                <option value="investor" selected>Dana Investor</option>
+                                <option value="pusat">Dana Pusat</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -1191,7 +1202,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
 <!-- 6. Rekapan Hasil Keseluruhan Keuntungan Final -->
 <div class="card border-0 mb-5" style="overflow: hidden;">
     <div class="card-header bg-danger text-white py-3 d-flex align-items-center justify-content-between" style="background-color: #dc3545 !important;">
-        <span class="fw-bold"><i class="bi bi-wallet2 me-2"></i>6. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)</span>
+        <span class="fw-bold"><i class="bi bi-wallet2 me-2"></i>7. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)</span>
         <span class="badge bg-white text-danger fw-bold px-3 py-1.5 rounded-pill shadow-sm" style="font-size: 0.75rem;"><i class="bi bi-check2-circle me-1"></i>Validasi Siap Transfer</span>
     </div>
     <div class="card-body p-0">
@@ -1231,7 +1242,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                         <td class="fw-medium text-dark">WARDOYO</td>
                         <td><span class="badge bg-light text-dark border px-2.5 py-1 fw-medium">BCA</span></td>
                         <td class="text-end px-4 fw-bold text-danger">
-                            <span id="final_admin" class="fs-6">Rp <?= number_format($share_admin ?? 0, 0, ',', '.') ?></span>
+                            <span id="final_admin" class="fs-6">Rp <?= number_format(($share_admin ?? 0) + ($total_klaim_dana_pusat ?? 0), 0, ',', '.') ?></span>
                         </td>
                     </tr>
                 </tbody>

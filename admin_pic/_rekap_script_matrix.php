@@ -97,6 +97,12 @@
             // tanpa perlu reload.
             let RK_TOTAL_KLAIM_BULANAN = <?= (float) ($total_klaim_bulanan ?? 0) ?>;
             let RK_TOTAL_KLAIM_DANA_INVESTOR = <?= (float) ($total_klaim_dana_investor ?? 0) ?>;
+            // Baris Klaim Bulanan ber-sumber_dana='pusat' — otomatis masuk Admin
+            // Management Pusat (6. Rekapan Hasil Akhir), lihat updateFinalRekap().
+            let RK_TOTAL_KLAIM_DANA_PUSAT = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>;
+            // Kasbon Pengelola kalau sumbernya "Dana Pusat" (bukan "Dana Investor")
+            // — diisi ulang tiap hitungInvestor() dipanggil, dipakai updateFinalRekap().
+            let RK_KASBON_DANA_PUSAT = 0;
 
             let RK_serviceFee       = 0;                    // service fee pengelola (dioper antar fungsi)
             let RK_adminFee         = 0;                    // admin fee 3% (dioper ke tombol "Simpan Revenue Sharing")
@@ -171,12 +177,25 @@
                 const profit       = parseFloat(document.getElementById('inv_profit')?.value) || 0;
                 const sewa         = parseFloat(document.getElementById('inv_sewa')?.value) || 0;
                 const kasbon       = parseFloat(document.getElementById('inv_kasbon')?.value) || 0;
+                const kasbonSumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const talangan     = parseFloat(document.getElementById('inv_modal')?.value) || 0;
                 const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
 
                 let total = profit;
                 total += (operatorSewa === 'plus') ? sewa : -sewa;
-                total += kasbon;
+
+                // Kasbon Pengelola TETAP dipotong dari sisi Pengelola apapun
+                // sumbernya (lihat hitungPengelola()) — tapi PENGGANTIANNYA cuma
+                // masuk ke Investor kalau sumbernya "Dana Investor". Kalau
+                // "Dana Pusat", penggantian itu masuk ke Admin Management Pusat
+                // (RK_KASBON_DANA_PUSAT, dipakai updateFinalRekap()) — BUKAN ke
+                // Investor.
+                if (kasbonSumber === 'investor') {
+                    total += kasbon;
+                    RK_KASBON_DANA_PUSAT = 0;
+                } else {
+                    RK_KASBON_DANA_PUSAT = kasbon;
+                }
 
                 // Pengembalian Dana Talangan SELALU ditambahkan — sumbernya
                 // sudah pasti "Dana Investor" (nilai ini hanya berisi total
@@ -216,8 +235,11 @@
                 // RK_adminFee sudah dihitung benar di hitungCascade() (dari Net
                 // Profit SETELAH Klaim Bulanan) — jangan hitung ulang dari
                 // RK_netProfitEfektif mentah di sini, akan salah (tidak ikut
-                // potongan Klaim Bulanan).
-                const adminTot = RK_adminFee + RK_serviceFee;
+                // potongan Klaim Bulanan). RK_TOTAL_KLAIM_DANA_PUSAT (dari Klaim
+                // Bulanan "Dana Pusat") dan RK_KASBON_DANA_PUSAT (dari Kasbon
+                // Pengelola bersumber "Dana Pusat") keduanya masuk ke Admin
+                // Management Pusat juga.
+                const adminTot = RK_adminFee + RK_serviceFee + RK_TOTAL_KLAIM_DANA_PUSAT + RK_KASBON_DANA_PUSAT;
 
                 setTxt('final_inv',   formatRupiah(finalInv));
                 setTxt('final_pgl',   formatRupiah(finalPgl));

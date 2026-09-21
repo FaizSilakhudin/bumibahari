@@ -77,10 +77,14 @@ if (!function_exists('hitung_rekap_segmen')) {
         $stmt_kb->close();
         $total_klaim_bulanan = 0.0;
         $total_klaim_dana_investor = 0.0;
+        $total_klaim_dana_pusat = 0.0;
         foreach ($daftar_klaim_bulanan as $kb) {
             $total_klaim_bulanan += (float) $kb['nominal'];
             if (($kb['sumber_dana'] ?? 'warung') === 'investor') {
                 $total_klaim_dana_investor += (float) $kb['nominal'];
+            }
+            if (($kb['sumber_dana'] ?? 'warung') === 'pusat') {
+                $total_klaim_dana_pusat += (float) $kb['nominal'];
             }
         }
 
@@ -131,6 +135,7 @@ if (!function_exists('hitung_rekap_segmen')) {
             'daftar_klaim_bulanan' => $daftar_klaim_bulanan,
             'total_klaim_bulanan'  => $total_klaim_bulanan,
             'total_klaim_dana_investor' => $total_klaim_dana_investor,
+            'total_klaim_dana_pusat' => $total_klaim_dana_pusat,
             'persen_admin'         => $persen_admin,
             'persen_investor'      => $persen_investor,
             'persen_pengelola'     => $persen_pengelola,

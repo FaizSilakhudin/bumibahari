@@ -220,6 +220,7 @@
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
                 const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan"
+                const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
                 const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal;   // = Net Profit efektif (sebelum klaim)
@@ -309,11 +310,20 @@
                 const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($bo_db['sewa'] ?? 0) ?>);
                 const inv_modal = talangan_val;
                 const inv_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
+                const inv_kasbon_sumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
+
+                // Kasbon SELALU dipotong dari sisi Pengelola (di bawah), tapi
+                // penggantiannya cuma masuk Total Bersih Investor kalau sumbernya
+                // "Dana Investor" — kalau "Dana Pusat", penggantiannya masuk
+                // Admin Management Pusat lewat kasbon_dana_pusat (dipakai di
+                // totalAdminGabungan).
+                const kasbon_ke_investor = inv_kasbon_sumber === 'investor' ? inv_kasbon : 0;
+                const kasbon_dana_pusat = inv_kasbon_sumber === 'pusat' ? inv_kasbon : 0;
 
                 let inv_total_val = inv_profit;
                 if (operatorSewa === 'plus') inv_total_val += inv_sewa; else inv_total_val -= inv_sewa;
-                inv_total_val += inv_kasbon;
+                inv_total_val += kasbon_ke_investor;
                 inv_total_val += inv_modal;   // Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor") — selalu ditambahkan
                 inv_total_val = Math.max(0, inv_total_val);
 
@@ -321,7 +331,7 @@
                     ['Profit Investor (50%)', formatRupiahPDF(inv_profit)],
                     ['Potongan Sewa Ruko ' + (operatorSewa === 'plus' ? '(+)' : '(-)'), formatRupiahPDF(inv_sewa)],
                     ['Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor")', formatRupiahPDF(inv_modal)],
-                    ['Penambahan/Pengembalian Kasbon Pengelola', formatRupiahPDF(inv_kasbon)],
+                    ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + (inv_kasbon_sumber === 'investor' ? 'Dana Investor' : 'Dana Pusat') + ')', formatRupiahPDF(kasbon_ke_investor)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahPDF(inv_total_val)],
                 ];
                 doc.autoTable({ head: [['Keterangan Komponen', 'Nilai']], body: dataInvestor, startY: y + 5, ...baseTableStyles });
@@ -353,10 +363,10 @@
                 if (document.getElementById('final_inv')) document.getElementById('final_inv').innerText = formatRupiahPDF(inv_total_val);
                 if (document.getElementById('final_pgl')) document.getElementById('final_pgl').innerText = formatRupiahPDF(pgl_total_val);
                 const admin3Persen = admin_fee_val; // 3% dari Net Profit efektif
-                const totalAdminGabungan = admin3Persen + pgl_service_fee;
+                const totalAdminGabungan = admin3Persen + pgl_service_fee + total_klaim_dana_pusat + kasbon_dana_pusat;
                 if (document.getElementById('final_admin')) document.getElementById('final_admin').innerText = formatRupiahPDF(totalAdminGabungan);
 
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('6. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)', margin, y);
+                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('7. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)', margin, y);
                 let wrapperPayroll = document.querySelector('.card.border-0.mb-5'); 
                 let elTabel6 = wrapperPayroll?.querySelector('table');
                 if (elTabel6) {
@@ -446,6 +456,7 @@
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
                 const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan"
+                const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
                 const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal;
@@ -512,11 +523,15 @@
                 const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($bo_db['sewa'] ?? 0) ?>);
                 const inv_modal = talangan_val;
                 const inv_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
+                const inv_kasbon_sumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
+
+                const kasbon_ke_investor = inv_kasbon_sumber === 'investor' ? inv_kasbon : 0;
+                const kasbon_dana_pusat = inv_kasbon_sumber === 'pusat' ? inv_kasbon : 0;
 
                 let inv_total_val = inv_profit;
                 if (operatorSewa === 'plus') inv_total_val += inv_sewa; else inv_total_val -= inv_sewa;
-                inv_total_val += inv_kasbon;
+                inv_total_val += kasbon_ke_investor;
                 inv_total_val += inv_modal; // Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor") — selalu ditambahkan
                 inv_total_val = Math.max(0, inv_total_val);
 
@@ -525,7 +540,7 @@
                     ['Profit Investor (50%)', formatRupiahXLS(inv_profit)],
                     ['Potongan Sewa Ruko ' + (operatorSewa === 'plus' ? '(+)' : '(-)'), formatRupiahXLS(inv_sewa)],
                     ['Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor")', formatRupiahXLS(inv_modal)],
-                    ['Penambahan/Pengembalian Kasbon Pengelola', formatRupiahXLS(inv_kasbon)],
+                    ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + (inv_kasbon_sumber === 'investor' ? 'Dana Investor' : 'Dana Pusat') + ')', formatRupiahXLS(kasbon_ke_investor)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahXLS(inv_total_val)],
                 ];
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['4. Koreksi Dividen: Sisi Investor'], [], ...dataInvestorX]), 'Koreksi Investor');
@@ -554,12 +569,12 @@
                 // di halaman (persis seperti exportPDF()) sebelum tabelnya dibaca.
                 if (document.getElementById('final_inv')) document.getElementById('final_inv').innerText = formatRupiahXLS(inv_total_val);
                 if (document.getElementById('final_pgl')) document.getElementById('final_pgl').innerText = formatRupiahXLS(pgl_total_val);
-                const totalAdminGabunganX = admin_fee_val + pgl_service_fee;
+                const totalAdminGabunganX = admin_fee_val + pgl_service_fee + total_klaim_dana_pusat + kasbon_dana_pusat;
                 if (document.getElementById('final_admin')) document.getElementById('final_admin').innerText = formatRupiahXLS(totalAdminGabunganX);
 
                 const wrapperPayroll = document.querySelector('.card.border-0.mb-5');
                 const elTabel6 = wrapperPayroll?.querySelector('table');
-                const ws6 = XLSX.utils.aoa_to_sheet([['6. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)'], []]);
+                const ws6 = XLSX.utils.aoa_to_sheet([['7. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)'], []]);
                 if (elTabel6) XLSX.utils.sheet_add_dom(ws6, elTabel6, { origin: -1, raw: true });
                 XLSX.utils.book_append_sheet(wb, ws6, 'Distribusi Payroll');
 
