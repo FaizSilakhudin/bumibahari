@@ -105,6 +105,16 @@
             total += parseFloat(tr.querySelector('.klaim-nominal').value) || 0;
         });
         totalCell.textContent = fmtRp(total);
+
+        // Update Net Profit / Revenue Sharing / Koreksi Dividen secara LIVE
+        // (sebelum diklik Simpan) — RK_TOTAL_KLAIM_BULANAN & hitungCascade()
+        // datang dari _rekap_script_matrix.php. Keduanya sudah pasti ada di
+        // scope global saat fungsi ini benar-benar terpanggil (event user,
+        // bukan saat parse awal), walau file itu di-include belakangan.
+        if (typeof hitungCascade === 'function') {
+            RK_TOTAL_KLAIM_BULANAN = total;
+            hitungCascade();
+        }
     }
 
     function baruBaris() {

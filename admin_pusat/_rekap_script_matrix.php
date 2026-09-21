@@ -87,7 +87,11 @@
             const RK_PERSEN_ADMIN   = <?= (float) ($persen_admin ?? 3) ?>;
             const RK_PERSEN_INV     = <?= (float) ($persen_investor ?? 50) ?>;
             const RK_PERSEN_PGL     = <?= (float) ($persen_pengelola ?? 50) ?>;
-            const RK_TOTAL_KLAIM_BULANAN = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan" — dikurangkan setelah admin fee, sebelum split
+            // "10. Klaim Bulanan" — dikurangkan setelah admin fee, sebelum split investor-pengelola.
+            // let (bukan const): di-update LIVE oleh _rekap_klaim_bulanan.php tiap nominal
+            // diketik / baris ditambah / baris dihapus — SEBELUM disimpan, supaya Net Profit
+            // & Revenue Sharing di layar langsung menyesuaikan tanpa perlu reload.
+            let RK_TOTAL_KLAIM_BULANAN = <?= (float) ($total_klaim_bulanan ?? 0) ?>;
 
             let RK_serviceFee       = 0;                    // service fee pengelola (dioper antar fungsi)
             let RK_adminFee         = 0;                    // admin fee 3% (dioper ke tombol "Simpan Revenue Sharing")

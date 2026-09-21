@@ -1012,39 +1012,44 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         </div>
     </div>
     <script>
+    // Dipakai bareng oleh tombol "Simpan Revenue Sharing" (kartu Kontrak
+    // Pembagian Hasil) DAN "Simpan Service Fee" (kartu Koreksi Dividen: Sisi
+    // Pengelola) — dua titik masuk, satu aksi: simpan admin_fee + persen/
+    // nominal_service_fee (sesuai pgl_admin_persen SAAT ini) ke revenue_sharing.
+    function simpanRevenueSharing(btn) {
+        const persenEl = document.getElementById('pgl_admin_persen');
+        const persen = persenEl ? parseFloat(persenEl.value) : 3;
+        const asalHtml = btn.innerHTML;
+
+        const fd = new FormData();
+        fd.append('csrf', <?= json_encode(csrf_token()) ?>);
+        fd.append('aksi', 'simpan_dari_rekap');
+        fd.append('id_cabang', <?= (int) $id_cabang ?>);
+        fd.append('tahun', <?= (int) $tahun ?>);
+        fd.append('bulan', <?= (int) $bulan ?>);
+        fd.append('urutan_pengelola', <?= (int) $urutan_pengelola_aktif ?>);
+        fd.append('admin_fee', typeof RK_adminFee === 'number' ? RK_adminFee : 0);
+        fd.append('persen_service_fee', persen);
+        fd.append('nominal_service_fee', typeof RK_serviceFee === 'number' ? RK_serviceFee : 0);
+
+        btn.disabled = true;
+        fetch('revenue_sharing_handler.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                if (!data.ok) { alert('Gagal: ' + (data.msg || 'unknown')); return; }
+                btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersimpan';
+                setTimeout(function () { btn.innerHTML = asalHtml; }, 1500);
+            })
+            .catch(function (err) {
+                btn.disabled = false;
+                alert('Gagal mengirim: ' + err);
+            });
+    }
+
     (function () {
         const btn = document.getElementById('btnSimpanRevenueSharing');
-        if (!btn) return;
-        const asalHtml = btn.innerHTML;
-        btn.addEventListener('click', function () {
-            const persenEl = document.getElementById('pgl_admin_persen');
-            const persen = persenEl ? parseFloat(persenEl.value) : 3;
-
-            const fd = new FormData();
-            fd.append('csrf', <?= json_encode(csrf_token()) ?>);
-            fd.append('aksi', 'simpan_dari_rekap');
-            fd.append('id_cabang', <?= (int) $id_cabang ?>);
-            fd.append('tahun', <?= (int) $tahun ?>);
-            fd.append('bulan', <?= (int) $bulan ?>);
-            fd.append('urutan_pengelola', <?= (int) $urutan_pengelola_aktif ?>);
-            fd.append('admin_fee', typeof RK_adminFee === 'number' ? RK_adminFee : 0);
-            fd.append('persen_service_fee', persen);
-            fd.append('nominal_service_fee', typeof RK_serviceFee === 'number' ? RK_serviceFee : 0);
-
-            btn.disabled = true;
-            fetch('revenue_sharing_handler.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    btn.disabled = false;
-                    if (!data.ok) { alert('Gagal: ' + (data.msg || 'unknown')); return; }
-                    btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersimpan';
-                    setTimeout(function () { btn.innerHTML = asalHtml; }, 1500);
-                })
-                .catch(function (err) {
-                    btn.disabled = false;
-                    alert('Gagal mengirim: ' + err);
-                });
-        });
+        if (btn) btn.addEventListener('click', function () { simpanRevenueSharing(btn); });
     })();
     </script>
 </div>
@@ -1157,6 +1162,11 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+                <button type="button" id="btnSimpanServiceFee" class="btn btn-sm btn-outline-success fw-semibold" onclick="simpanRevenueSharing(this)">
+                    <i class="bi bi-save me-1"></i>Simpan Service Fee
+                </button>
             </div>
         </div>
     </div>
