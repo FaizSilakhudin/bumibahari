@@ -34,6 +34,11 @@ if (!$id_cabang && $list_cabang) {
     $id_cabang = (int) $list_cabang[0]['id_cabang'];
 }
 
+$nama_cabang_terpilih = '';
+foreach ($list_cabang as $c) {
+    if ((int) $c['id_cabang'] === $id_cabang) { $nama_cabang_terpilih = $c['nama_cabang']; break; }
+}
+
 // -----------------------------------------------------------------------------
 // INFO CABANG + PENGELOLA AKTIF + INVESTOR AKTIF + REKENING
 // -----------------------------------------------------------------------------
@@ -303,17 +308,17 @@ function lm_rp($n): string
     </div>
 
     <!-- Filter -->
-    <form method="GET" action="" class="lm-filter mb-4">
+    <form method="GET" action="" class="lm-filter mb-4" id="filterFormLM">
         <div class="row g-3 align-items-end">
             <div class="col-lg-3 col-sm-6">
                 <label class="form-label">Cabang</label>
-                <select name="id_cabang" class="form-select">
+                <input list="listCabangLM" id="inputCabangLM" class="form-control" placeholder="Ketik nama cabang..." value="<?= h($nama_cabang_terpilih) ?>" autocomplete="off">
+                <input type="hidden" name="id_cabang" id="idCabangLM" value="<?= (int) $id_cabang ?>">
+                <datalist id="listCabangLM">
                     <?php foreach ($list_cabang as $c): ?>
-                        <option value="<?= (int) $c['id_cabang'] ?>" <?= ($c['id_cabang'] == $id_cabang) ? 'selected' : '' ?>>
-                            <?= h($c['nama_cabang']) ?>
-                        </option>
+                        <option value="<?= h($c['nama_cabang']) ?>" data-id="<?= (int) $c['id_cabang'] ?>"></option>
                     <?php endforeach; ?>
-                </select>
+                </datalist>
             </div>
             <div class="col-lg-3 col-sm-6">
                 <label class="form-label">Tanggal Mulai</label>
@@ -423,6 +428,35 @@ function lm_rp($n): string
   </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Dropdown cabang bisa diketik/dicari (datalist), sinkron ke hidden id_cabang.
+    const form = document.getElementById('filterFormLM');
+    const inputCabang = document.getElementById('inputCabangLM');
+    const idCabang = document.getElementById('idCabangLM');
+    const listCabang = document.getElementById('listCabangLM');
+    if (!form || !inputCabang || !idCabang || !listCabang) return;
+
+    inputCabang.addEventListener('input', function () {
+        const val = this.value;
+        let found = false;
+        listCabang.querySelectorAll('option').forEach(opt => {
+            if (opt.value === val) {
+                idCabang.value = opt.getAttribute('data-id');
+                found = true;
+            }
+        });
+        if (!found) idCabang.value = '';
+    });
+    form.addEventListener('submit', function (e) {
+        if (idCabang.value === '') {
+            e.preventDefault();
+            alert('Pilih cabang dari daftar, jangan ketik manual!');
+            inputCabang.focus();
+        }
+    });
+});
+</script>
 <script>
 const LM_PDF_FILENAME = <?= json_encode($nama_file_pdf) ?>;
 

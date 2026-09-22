@@ -378,6 +378,14 @@ $stmt->execute();
 $net_profit = $stmt->get_result()->fetch_assoc()['total']?? 0;
 
 $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
+
+$nama_cabang_terpilih = 'Semua Cabang';
+if ($cabang && $id_cabang !== '') {
+    $cabang->data_seek(0);
+    while ($c = $cabang->fetch_assoc()) {
+        if ((string) $c['id_cabang'] === (string) $id_cabang) { $nama_cabang_terpilih = $c['nama_cabang']; break; }
+    }
+}
 ?>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -433,16 +441,19 @@ $cabang = $conn->query("SELECT * FROM cabang ORDER BY nama_cabang");
 
                 <div class="col-lg-4 col-md-8">
                     <label class="form-label fw-semibold text-secondary small">Pilih Cabang</label>
-                    <select name="id_cabang" class="form-select form-select-md border-2 bg-light">
-                        <option value="">Semua Cabang</option>
-                        <?php if (isset($cabang) && $cabang->num_rows > 0): 
-                            $cabang->data_seek(0); 
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-2 border-end-0"><i class="bi bi-shop"></i></span>
+                        <input list="listCabangFilter" id="inputCabangFilter" class="form-control form-select-md border-2 bg-light border-start-0" placeholder="Ketik nama cabang..." value="<?= h($nama_cabang_terpilih) ?>" autocomplete="off">
+                    </div>
+                    <input type="hidden" name="id_cabang" id="idCabangFilter" value="<?= h($id_cabang) ?>">
+                    <datalist id="listCabangFilter">
+                        <option value="Semua Cabang" data-id=""></option>
+                        <?php if (isset($cabang) && $cabang->num_rows > 0):
+                            $cabang->data_seek(0);
                             while($c = $cabang->fetch_assoc()): ?>
-                                <option value="<?= $c['id_cabang'] ?>" <?= ($id_cabang ?? '') == $c['id_cabang'] ? 'selected' : '' ?>>
-                                    <?= h($c['nama_cabang']) ?>
-                                </option>
+                                <option value="<?= h($c['nama_cabang']) ?>" data-id="<?= $c['id_cabang'] ?>"></option>
                         <?php endwhile; endif; ?>
-                    </select>
+                    </datalist>
                 </div>
                 <div class="col-lg-2 col-md-4 d-grid">
                     <button type="submit" class="btn btn-primary btn-md fw-bold">
@@ -762,6 +773,36 @@ document.addEventListener('DOMContentLoaded', function(){
         document.getElementById('tgl_awal').value = awal;
         document.getElementById('tgl_akhir').value = akhir;
     });
+
+    // Dropdown cabang bisa diketik/dicari (datalist), sinkron ke hidden id_cabang.
+    const inputCabang = document.getElementById('inputCabangFilter');
+    const idCabang = document.getElementById('idCabangFilter');
+    const listCabang = document.getElementById('listCabangFilter');
+    if (inputCabang && idCabang && listCabang) {
+        inputCabang.addEventListener('input', function () {
+            const val = this.value;
+            let found = false;
+            listCabang.querySelectorAll('option').forEach(opt => {
+                if (opt.value === val) {
+                    idCabang.value = opt.getAttribute('data-id');
+                    found = true;
+                }
+            });
+            if (!found) idCabang.value = '';
+        });
+        form.addEventListener('submit', function (e) {
+            const val = inputCabang.value.trim();
+            if (val === '' || val === 'Semua Cabang') {
+                idCabang.value = '';
+                return;
+            }
+            if (idCabang.value === '') {
+                e.preventDefault();
+                alert('Pilih cabang dari daftar, jangan ketik manual!');
+                inputCabang.focus();
+            }
+        });
+    }
 });
 </script>
 <script>
