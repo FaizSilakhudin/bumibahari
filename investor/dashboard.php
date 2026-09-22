@@ -130,17 +130,17 @@ if (!empty($cabang_ids)) {
                            LEFT JOIN laporan_cabang l ON l.id_cabang = c.id_cabang
                                   AND DATE_FORMAT(l.tanggal,'%Y-%m') = ? AND l.status_laporan = 'lengkap'
                            WHERE c.id_cabang IN ($ph)
-                           GROUP BY c.id_cabang ORDER BY total_omset DESC");
+                           GROUP BY c.id_cabang");
     $st->bind_param('s' . str_repeat('i', count($cabang_ids)), $periode_ini, ...$cabang_ids);
     $st->execute();
     $res_rank = $st->get_result();
-    $no = 1;
     while ($row = $res_rank->fetch_assoc()) {
-        $row['no'] = $no++;
         // Pengelola PADA PERIODE terpilih, bukan kolom statis cabang.nama_pengelola.
         $row['nama_pengelola'] = pengelola_pada_tanggal($conn, (int) $row['id_cabang'], anchor_periode($tgl_akhir));
         $ranking_cabang[] = $row;
     }
+    // Poin performa = %share omzet + %share net profit thd total seluruh cabang.
+    $ranking_cabang = hitung_poin_ranking_cabang($ranking_cabang);
 
     // 6. Daftar laporan yang sudah diinput PIC (pengganti "peringatan dini") — dipaginasi
     $limit_laporan  = 10;
@@ -388,7 +388,7 @@ if (!empty($cabang_ids)) {
                     <div class="kpi-icon"><i class="bi bi-trophy-fill"></i></div>
                     <div>
                         <div class="kpi-label">Ranking Cabang</div>
-                        <div style="font-size: 12px; color: #8b7aa0;">Urut Omzet Tertinggi &mdash; <?= h($nama_periode) ?></div>
+                        <div style="font-size: 12px; color: #8b7aa0;">Urut Poin Performa (Omzet + Net Profit) &mdash; <?= h($nama_periode) ?></div>
                     </div>
                 </div>
                 <div style="max-height: 290px; overflow-y: auto; margin-top: 15px; padding-right: 5px;">
@@ -399,11 +399,12 @@ if (!empty($cabang_ids)) {
                                 <th style="color: #8b7aa0; font-weight: 700;">Cabang</th>
                                 <th class="text-end" style="color: #8b7aa0; font-weight: 700;">Omzet</th>
                                 <th class="text-end" style="color: #8b7aa0; font-weight: 700;">Net Profit</th>
+                                <th class="text-end" style="color: #8b7aa0; font-weight: 700;">Poin</th>
                             </tr>
                         </thead>
                         <tbody>
                         <?php if (empty($ranking_cabang)): ?>
-                            <tr><td colspan="4" class="text-center text-muted py-3">Belum ada data</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-3">Belum ada data</td></tr>
                         <?php else: foreach ($ranking_cabang as $rank): ?>
                             <tr style="border-bottom: 1px solid #faf5ff;">
                                 <td>
@@ -424,6 +425,7 @@ if (!empty($cabang_ids)) {
                                 </td>
                                 <td class="text-end" style="font-weight: 700; color: var(--inv-primary);">Rp <?= number_format($rank['total_omset'], 0, ',', '.') ?></td>
                                 <td class="text-end" style="font-weight: 700; color: <?= $rank['total_net_profit'] >= 0 ? '#16a34a' : '#dc2626' ?>;">Rp <?= number_format($rank['total_net_profit'], 0, ',', '.') ?></td>
+                                <td class="text-end" style="font-weight: 700; color: #7c3aed;"><?= number_format($rank['poin'], 1, ',', '.') ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
                         </tbody>

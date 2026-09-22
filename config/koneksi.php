@@ -343,6 +343,49 @@ if (!function_exists('pengelola_pada_tanggal')) {
     }
 }
 
+if (!function_exists('hitung_poin_ranking_cabang')) {
+    // Rangking cabang berdasarkan POIN PERFORMA, bukan omzet tertinggi.
+    // Poin = %share omzet + %share net profit thd total SELURUH cabang yg
+    // masuk filter (omzet:total_omzet x100% + net_profit:total_net_profit x100%).
+    // Dengan begini cabang beromzet kecil tapi net profit bagus bisa mengungguli
+    // cabang beromzet besar tapi net profit-nya tipis/rugi.
+    // $rows: array asosiatif dari hasil query, tiap elemen wajib punya
+    // 'total_omset' dan 'total_net_profit'. Kembalian: array yg sama, sudah
+    // diurutkan (poin tertinggi dulu) + field tambahan 'pct_omzet',
+    // 'pct_net_profit', 'poin', dan 'no'.
+    function hitung_poin_ranking_cabang(array $rows): array
+    {
+        $total_omzet_semua = 0.0;
+        $total_laba_semua = 0.0;
+        foreach ($rows as $row) {
+            $total_omzet_semua += (float) $row['total_omset'];
+            $total_laba_semua  += (float) $row['total_net_profit'];
+        }
+
+        foreach ($rows as &$row) {
+            // Jika total net profit seluruh cabang <=0 (rugi/impas), share net
+            // profit tidak dihitung (dianggap 0 utk semua) supaya rangking tidak
+            // terbalik-balik akibat pembagian dgn angka negatif.
+            $pct_omzet = $total_omzet_semua > 0 ? ((float) $row['total_omset'] / $total_omzet_semua) * 100 : 0.0;
+            $pct_laba  = $total_laba_semua > 0 ? ((float) $row['total_net_profit'] / $total_laba_semua) * 100 : 0.0;
+            $row['pct_omzet'] = $pct_omzet;
+            $row['pct_net_profit'] = $pct_laba;
+            $row['poin'] = $pct_omzet + $pct_laba;
+        }
+        unset($row);
+
+        usort($rows, fn($a, $b) => $b['poin'] <=> $a['poin']);
+
+        $no = 1;
+        foreach ($rows as &$row) {
+            $row['no'] = $no++;
+        }
+        unset($row);
+
+        return $rows;
+    }
+}
+
 if (!function_exists('investor_pada_tanggal')) {
     // Nama investor yang berinvestasi PADA tanggal tertentu — bukan investor
     // aktif sekarang. Sama alasannya dengan pengelola_pada_tanggal().

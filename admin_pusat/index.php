@@ -238,19 +238,18 @@ $st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang, c.nama_pengelola,
     LEFT JOIN laporan_cabang l ON l.id_cabang = c.id_cabang
         AND YEAR(l.tanggal) = $sel_tahun AND MONTH(l.tanggal) = $sel_bulan AND l.status_laporan = 'lengkap'
     WHERE 1=1 $filter_cabang_admin
-    GROUP BY c.id_cabang
-    ORDER BY total_omset DESC");
+    GROUP BY c.id_cabang");
 if ($admin_bind_types !== '') $st->bind_param($admin_bind_types, ...$admin_params);
 $st->execute();
 $res_rank = $st->get_result();
-$no = 1;
 while ($row = $res_rank->fetch_assoc()) {
-    $row['no'] = $no++;
     // Pengelola PADA PERIODE terpilih, bukan kolom statis cabang.nama_pengelola
     // (yang tidak pernah ikut ter-update walau ada rotasi pengelola).
     $row['nama_pengelola'] = pengelola_pada_tanggal($conn, (int) $row['id_cabang'], $periode_anchor_sql);
     $ranking_cabang[] = $row;
 }
+// Poin performa = %share omzet + %share net profit thd total seluruh cabang.
+$ranking_cabang = hitung_poin_ranking_cabang($ranking_cabang);
 ?>
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -650,10 +649,10 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                     </div>
                     <div>
                         <div class="kpi-label">Ranking Cabang</div>
-                        <div style="font-size: 12px; color: #64748b;">Urut Omzet Tertinggi</div>
+                        <div style="font-size: 12px; color: #64748b;">Urut Poin Performa (Omzet + Net Profit)</div>
                     </div>
                 </div>
-                
+
                 <div style="max-height: 290px; overflow-y: auto; margin-top: 15px; padding-right: 5px;">
                     <table class="table table-sm align-middle" style="font-size: 13px; margin-bottom: 0;">
                         <thead style="position: sticky; top: 0; background: #fff; z-index: 1;">
@@ -662,12 +661,13 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                                 <th style="color: #64748b; font-weight: 700;">Cabang</th>
                                 <th class="text-end" style="color: #64748b; font-weight: 700;">Omzet</th>
                                 <th class="text-end" style="color: #64748b; font-weight: 700;">Net Profit</th>
+                                <th class="text-end" style="color: #64748b; font-weight: 700;">Poin</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if(empty($ranking_cabang)): ?>
                             <tr>
-                                <td colspan="4" class="text-center text-muted py-3">Belum ada data</td>
+                                <td colspan="5" class="text-center text-muted py-3">Belum ada data</td>
                             </tr>
                             <?php else: ?>
                             <?php foreach($ranking_cabang as $rank): ?>
@@ -692,6 +692,9 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                                 </td>
                                 <td class="text-end" style="font-weight: 700; color: <?= $rank['total_net_profit'] >= 0 ? '#10b981' : '#ef4444' ?>;">
                                     Rp <?= number_format($rank['total_net_profit'],0,',','.')?>
+                                </td>
+                                <td class="text-end" style="font-weight: 700; color: #7c3aed;">
+                                    <?= number_format($rank['poin'],1,',','.')?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
