@@ -349,7 +349,10 @@ if (!empty($cabang_ids)) {
                                 </td>
                                 <td class="text-end" style="font-weight: 700; color: var(--pic-primary);">Rp <?= number_format($rank['total_omset'], 0, ',', '.') ?></td>
                                 <td class="text-end" style="font-weight: 700; color: <?= $rank['total_net_profit'] >= 0 ? '#16a34a' : '#dc2626' ?>;">Rp <?= number_format($rank['total_net_profit'], 0, ',', '.') ?></td>
-                                <td class="text-end" style="font-weight: 700; color: #7c3aed;"><?= number_format($rank['poin'], 1, ',', '.') ?></td>
+                                <td class="text-end">
+                                    <div style="font-weight: 700; color: #7c3aed;"><?= number_format($rank['poin'], 1, ',', '.') ?></div>
+                                    <div style="font-size: 10px; color: #94a3b8; white-space: nowrap;">O:<?= number_format($rank['pct_omzet'], 1, ',', '.') ?> + NP:<?= number_format($rank['pct_net_profit'], 1, ',', '.') ?></div>
+                                </td>
                             </tr>
                         <?php endforeach; endif; ?>
                         </tbody>

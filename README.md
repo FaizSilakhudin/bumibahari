@@ -33,12 +33,13 @@ Sistem manajemen operasional & keuangan harian untuk jaringan warteg Bumi Bahari
 - Foto nota baru otomatis dikompresi saat upload; foto lama tidak pernah disentuh
 - Atribusi historis (pengelola/investor per periode) supaya laporan lama tetap benar walau sudah ada rotasi
 
-## Status deployment saat ini (per 2026-09-01)
+## Status deployment saat ini (per 2026-09-22)
 
-- **Production**: `wartegbumibahari.co.id` (aaPanel, nginx, PHP 8.1, MariaDB), sudah di-deploy sampai commit terbaru dari `main`.
-- **Database production**: `db_bumi_bahari` (user MySQL least-privilege dengan nama sama). Skema lengkap (8 tabel: `cabang`, `cabang_investor`, `investor`, `laporan_cabang`, `users`, `pengelola`, `audit_log`, `laporan_cabang_arsip`).
+- **Production**: `wartegbumibahari.co.id` (aaPanel, nginx, PHP 8.1, MariaDB), auto-deploy dari `main` (lihat bawah).
+- **Database production**: `db_bumi_bahari` (user MySQL least-privilege dengan nama sama). Skema lengkap (8 tabel: `cabang`, `cabang_investor`, `investor`, `laporan_cabang`, `users`, `pengelola`, `audit_log`, `laporan_cabang_arsip`). **Tidak** ikut ter-sync oleh deploy pipeline — deploy hanya menyentuh kode (`git pull`), migrasi database tetap manual (lihat `database/README.md`).
 - **Database lokal**: disinkronkan penuh dari production (`database/backups/LOCAL_before_sync_from_prod_*.sql` adalah cadangan isi lokal sebelum sinkronisasi ini, kalau perlu dibandingkan).
 - CI (`.github/workflows/tests.yml`) menjalankan `tests/run.php` otomatis di tiap push/PR.
+- **Auto-deploy** (`.github/workflows/deploy.yml`): tiap push ke `main`, GitHub Actions SSH ke server pakai key khusus deploy (bukan key root pribadi) yang di server dikunci lewat `command=` di `authorized_keys` — key itu **hanya bisa** menjalankan `/root/wbb_deploy.sh`, tidak bisa buka shell bebas walau secret-nya bocor. Script itu `git fetch` + `git merge --ff-only` (menolak jalan kalau ada perubahan lokal di server yang bentrok, supaya tidak ada data/kode ke-overwrite paksa), lalu `chown -R www:www` biar permission tetap konsisten untuk php-fpm/nginx. Log ada di `/root/wbb_deploy.log` di server. Secret GitHub yang dipakai: `WBB_DEPLOY_SSH_KEY` (private key khusus deploy, disimpan di Settings → Secrets and variables → Actions repo ini).
 - Backup database + `uploads/` terjadwal otomatis harian (Windows Task Scheduler di mesin dev; lihat `database/README.md` untuk status backup production).
 
 ## Menjalankan lokal

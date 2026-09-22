@@ -9,6 +9,7 @@
 /config/db_credentials.php
 .env
 .env.*
+/deploy.txt
 
 # Cadangan database & artefak sementara
 /database/backups/

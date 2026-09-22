@@ -693,8 +693,9 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                                 <td class="text-end" style="font-weight: 700; color: <?= $rank['total_net_profit'] >= 0 ? '#10b981' : '#ef4444' ?>;">
                                     Rp <?= number_format($rank['total_net_profit'],0,',','.')?>
                                 </td>
-                                <td class="text-end" style="font-weight: 700; color: #7c3aed;">
-                                    <?= number_format($rank['poin'],1,',','.')?>
+                                <td class="text-end">
+                                    <div style="font-weight: 700; color: #7c3aed;"><?= number_format($rank['poin'],1,',','.')?></div>
+                                    <div style="font-size: 10px; color: #94a3b8; white-space: nowrap;">O:<?= number_format($rank['pct_omzet'],1,',','.')?> + NP:<?= number_format($rank['pct_net_profit'],1,',','.')?></div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
