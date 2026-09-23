@@ -1,6 +1,6 @@
 <?php
 /**
- * Partial: "10. Klaim Bulanan" — daftar baris klaim manual pada Rekapitulasi.
+ * Partial: "5. Klaim Bulanan" — daftar baris klaim manual pada Rekapitulasi.
  * Ditulis sekali, dicopy verbatim ke admin_pusat/ dan admin_pic/ (konvensi
  * proyek ini — lihat _rekap_tabel_harian.php, _rekap_script_export.php, dst).
  *
@@ -16,7 +16,7 @@
  * Sumber Dana ('investor'/'warung'/'pusat') per baris:
  *   - investor : nominal masuk Pengembalian Dana Talangan (menambah Total
  *                Bersih Investor) SELAIN memotong Net Profit.
- *   - pusat    : nominal masuk Admin Management Pusat (6. Rekapan Hasil
+ *   - pusat    : nominal masuk Admin Management Pusat (8. Rekapan Hasil
  *                Akhir Keuntungan) SELAIN memotong Net Profit.
  *   - warung   : nominal HANYA memotong Net Profit.
  * Semua baris (apapun sumber dananya) memotong Net Profit SEBELUM admin fee
@@ -29,7 +29,7 @@
 ?>
 <div class="card border-0 mb-4" style="overflow: hidden;">
     <div class="card-header bg-light border-bottom py-3 d-flex align-items-center justify-content-between">
-        <span class="fw-bold text-dark"><i class="bi bi-receipt-cutoff me-2 text-muted"></i>10. Klaim Bulanan</span>
+        <span class="fw-bold text-dark"><i class="bi bi-receipt-cutoff me-2 text-muted"></i>5. Klaim Bulanan</span>
         <span class="badge bg-warning bg-opacity-10 text-warning-emphasis px-3 py-1.5 rounded-pill fw-medium" style="font-size: 0.75rem;">Memotong Net Profit Sebelum Admin Fee</span>
     </div>
     <div class="card-body p-0">
@@ -87,7 +87,7 @@
         </div>
         <div class="px-3 pb-2 pt-1" style="font-size: 0.78rem; color: #64748b;">
             <i class="bi bi-info-circle me-1"></i>
-            Semua baris memotong Net Profit sebelum Admin Fee 3%. Baris "Dana Investor" tambahan otomatis masuk Pengembalian Dana Talangan (Koreksi Dividen: Sisi Investor); baris "Dana Pusat" tambahan otomatis masuk Admin Management Pusat (6. Rekapan Hasil Akhir Keuntungan).
+            Semua baris memotong Net Profit sebelum Admin Fee 3%. Baris "Dana Investor" tambahan otomatis masuk Pengembalian Dana Talangan (Koreksi Dividen: Sisi Investor); baris "Dana Pusat" tambahan otomatis masuk Admin Management Pusat (8. Rekapan Hasil Akhir Keuntungan).
         </div>
         <div class="p-3 border-top d-flex justify-content-between align-items-center" style="background-color: #f8fafc;">
             <button type="button" id="btnTambahKlaimBulanan" class="btn btn-sm btn-outline-secondary fw-semibold">

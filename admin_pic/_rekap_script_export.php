@@ -219,7 +219,7 @@
                 const persen_admin    = <?= (float) ($persen_admin ?? 3) ?>;
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
-                const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan"
+                const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "5. Klaim Bulanan"
                 const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
                 const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
@@ -286,25 +286,25 @@
                     ['Total Pengeluaran', formatRupiahPDF(pengeluaran_akumulasi), 'Belanja + BO'],
                     ['Modal Awal', formatRupiahPDF(modal_awal), 'Diisi manual, mengurangi Net Profit awal'],
                     ['Laba Bersih (Net Profit efektif)', formatRupiahPDF(laba_akumulasi), 'Net Profit 100% - Modal Awal'],
-                    ['Klaim Bulanan', formatRupiahPDF(total_klaim_bulanan), 'Lihat rincian "10. Klaim Bulanan" di bawah'],
+                    ['Klaim Bulanan', formatRupiahPDF(total_klaim_bulanan), 'Lihat rincian "5. Klaim Bulanan" di bawah'],
                 ];
                 doc.autoTable({ head: [['Komponen Pokok', 'Jumlah', 'Catatan Ringkas']], body: dataMatriks, startY: y + 5, ...baseTableStyles });
                 y = doc.lastAutoTable.finalY + 12;
 
-                // "10. Klaim Bulanan" — tabel input dinamis (No/Iuran Beban/Jumlah
+                // "5. Klaim Bulanan" — tabel input dinamis (No/Iuran Beban/Jumlah
                 // Akhir/Sumber Dana/Keterangan), ikut di-export persis seperti tampil
                 // di layar. Kalau tidak muat di halaman ini, lanjut ke halaman baru
                 // (jarang terjadi, cuma jaga-jaga kalau barisnya banyak).
                 const elTabelKlaim = document.getElementById('tabelKlaimBulanan');
                 if (elTabelKlaim) {
                     if (y > 170) { doc.addPage(); addWatermark(doc); y = 15; }
-                    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('10. Klaim Bulanan', margin, y);
+                    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('5. Klaim Bulanan', margin, y);
                     doc.autoTable({ html: elTabelKlaim, startY: y + 5, ...baseTableStyles, didParseCell: isiInputKeCellText });
                 }
 
                 // HALAMAN 4 — Koreksi Dividen Investor + Pengelola + Rekapan Hasil Akhir
                 doc.addPage(); addWatermark(doc); y = 15;
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('4. Koreksi Dividen: Sisi Investor', margin, y);
+                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('6. Koreksi Dividen: Sisi Investor', margin, y);
 
                 const inv_profit = share_inv_base;
                 const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($bo_db['sewa'] ?? 0) ?>);
@@ -337,7 +337,7 @@
                 doc.autoTable({ head: [['Keterangan Komponen', 'Nilai']], body: dataInvestor, startY: y + 5, ...baseTableStyles });
                 y = doc.lastAutoTable.finalY + 12;
 
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('5. Koreksi Dividen: Sisi Pengelola', margin, y);
+                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('7. Koreksi Dividen: Sisi Pengelola', margin, y);
 
                 const pgl_profit = share_pgl_base;
                 const elSelectFee = document.getElementById('pgl_admin_persen');
@@ -366,7 +366,7 @@
                 const totalAdminGabungan = admin3Persen + pgl_service_fee + total_klaim_dana_pusat + kasbon_dana_pusat;
                 if (document.getElementById('final_admin')) document.getElementById('final_admin').innerText = formatRupiahPDF(totalAdminGabungan);
 
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('7. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)', margin, y);
+                doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('8. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)', margin, y);
                 let wrapperPayroll = document.querySelector('.card.border-0.mb-5'); 
                 let elTabel6 = wrapperPayroll?.querySelector('table');
                 if (elTabel6) {
@@ -455,7 +455,7 @@
                 const persen_admin    = <?= (float) ($persen_admin ?? 3) ?>;
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
-                const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "10. Klaim Bulanan"
+                const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "5. Klaim Bulanan"
                 const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
                 const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
@@ -497,10 +497,10 @@
                 if (elBO) XLSX.utils.sheet_add_dom(ws2, elBO, { origin: -1, raw: true });
                 XLSX.utils.book_append_sheet(wb, ws2, 'Rincian BO');
 
-                // Sheet: 10. Klaim Bulanan
+                // Sheet: 5. Klaim Bulanan
                 const elKlaimX = document.getElementById('tabelKlaimBulanan');
                 if (elKlaimX) {
-                    const wsKlaim = XLSX.utils.aoa_to_sheet([['10. Klaim Bulanan'], []]);
+                    const wsKlaim = XLSX.utils.aoa_to_sheet([['5. Klaim Bulanan'], []]);
                     XLSX.utils.sheet_add_dom(wsKlaim, elKlaimX, { origin: -1, raw: true });
                     XLSX.utils.book_append_sheet(wb, wsKlaim, 'Klaim Bulanan');
                 }
@@ -514,7 +514,7 @@
                     ['Total Pengeluaran', formatRupiahXLS(pengeluaran_akumulasi), 'Belanja + BO'],
                     ['Modal Awal', formatRupiahXLS(modal_awal), 'Diisi manual, mengurangi Net Profit awal'],
                     ['Laba Bersih (Net Profit efektif)', formatRupiahXLS(laba_akumulasi), 'Net Profit 100% - Modal Awal'],
-                    ['Klaim Bulanan', formatRupiahXLS(total_klaim_bulanan), 'Lihat rincian "10. Klaim Bulanan" di sheet lain'],
+                    ['Klaim Bulanan', formatRupiahXLS(total_klaim_bulanan), 'Lihat rincian "5. Klaim Bulanan" di sheet lain'],
                 ];
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['3. Matriks Akumulasi'], [], ...dataMatriksX]), 'Matriks Akumulasi');
 
@@ -543,7 +543,7 @@
                     ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + (inv_kasbon_sumber === 'investor' ? 'Dana Investor' : 'Dana Pusat') + ')', formatRupiahXLS(kasbon_ke_investor)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahXLS(inv_total_val)],
                 ];
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['4. Koreksi Dividen: Sisi Investor'], [], ...dataInvestorX]), 'Koreksi Investor');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['6. Koreksi Dividen: Sisi Investor'], [], ...dataInvestorX]), 'Koreksi Investor');
 
                 // Sheet 5: Koreksi Dividen — Pengelola
                 const pgl_profit = share_pgl_base;
@@ -563,7 +563,7 @@
                     ['Potongan Kasbon', formatRupiahXLS(pgl_kasbon)],
                     ['TOTAL BERSIH PENGELOLA (' + str_pct_bersih + '%)', formatRupiahXLS(pgl_total_val)],
                 ];
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['5. Koreksi Dividen: Sisi Pengelola'], [], ...dataPengelolaX]), 'Koreksi Pengelola');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['7. Koreksi Dividen: Sisi Pengelola'], [], ...dataPengelolaX]), 'Koreksi Pengelola');
 
                 // Sheet 6: Distribusi Payroll — samakan dulu angka final_inv/final_pgl/final_admin
                 // di halaman (persis seperti exportPDF()) sebelum tabelnya dibaca.
@@ -574,7 +574,7 @@
 
                 const wrapperPayroll = document.querySelector('.card.border-0.mb-5');
                 const elTabel6 = wrapperPayroll?.querySelector('table');
-                const ws6 = XLSX.utils.aoa_to_sheet([['7. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)'], []]);
+                const ws6 = XLSX.utils.aoa_to_sheet([['8. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)'], []]);
                 if (elTabel6) XLSX.utils.sheet_add_dom(ws6, elTabel6, { origin: -1, raw: true });
                 XLSX.utils.book_append_sheet(wb, ws6, 'Distribusi Payroll');
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Endpoint AJAX: simpan baris "10. Klaim Bulanan" (Rekapitulasi, admin_pic).
+ * Endpoint AJAX: simpan baris "5. Klaim Bulanan" (Rekapitulasi, admin_pic).
  * Sama persis dengan versi admin_pusat, TAPI cabang dibatasi hanya yang
  * dipegang PIC ini (pic_cabang_ids()).
  *

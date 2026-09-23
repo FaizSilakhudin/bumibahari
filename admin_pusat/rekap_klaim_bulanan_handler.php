@@ -1,6 +1,6 @@
 <?php
 /**
- * Endpoint AJAX: simpan baris "10. Klaim Bulanan" (Rekapitulasi, admin_pusat).
+ * Endpoint AJAX: simpan baris "5. Klaim Bulanan" (Rekapitulasi, admin_pusat).
  *
  * Strategi paling sederhana utk "baris ditambah/dihapus bebas oleh user":
  * hapus SEMUA baris lama utk (id_cabang,tahun,bulan,urutan_pengelola) lalu

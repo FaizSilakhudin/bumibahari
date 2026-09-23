@@ -87,7 +87,7 @@
             const RK_PERSEN_ADMIN   = <?= (float) ($persen_admin ?? 3) ?>;
             const RK_PERSEN_INV     = <?= (float) ($persen_investor ?? 50) ?>;
             const RK_PERSEN_PGL     = <?= (float) ($persen_pengelola ?? 50) ?>;
-            // "10. Klaim Bulanan" — SEMUA baris (investor+warung) mengurangi Net
+            // "5. Klaim Bulanan" — SEMUA baris (investor+warung) mengurangi Net
             // Profit SEBELUM admin fee dihitung. RK_TOTAL_KLAIM_DANA_INVESTOR =
             // subset baris ber-sumber_dana='investor' SAJA, otomatis jadi
             // Pengembalian Dana Talangan (Koreksi Dividen: Sisi Investor).
@@ -98,7 +98,7 @@
             let RK_TOTAL_KLAIM_BULANAN = <?= (float) ($total_klaim_bulanan ?? 0) ?>;
             let RK_TOTAL_KLAIM_DANA_INVESTOR = <?= (float) ($total_klaim_dana_investor ?? 0) ?>;
             // Baris Klaim Bulanan ber-sumber_dana='pusat' — otomatis masuk Admin
-            // Management Pusat (6. Rekapan Hasil Akhir), lihat updateFinalRekap().
+            // Management Pusat (8. Rekapan Hasil Akhir), lihat updateFinalRekap().
             let RK_TOTAL_KLAIM_DANA_PUSAT = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>;
             // Kasbon Pengelola kalau sumbernya "Dana Pusat" (bukan "Dana Investor")
             // — diisi ulang tiap hitungInvestor() dipanggil, dipakai updateFinalRekap().
@@ -137,10 +137,10 @@
                 const shareInvBase   = labaSetelahAdm * RK_PERSEN_INV / 100;
                 const sharePglBase   = labaSetelahAdm * RK_PERSEN_PGL / 100;
 
-                // 4. Matrik Akumulasi — Laba Bersih
+                // 3. Matrik Akumulasi — Laba Bersih
                 setTxt('matrik_laba_bersih', formatRupiah(RK_netProfitEfektif));
 
-                // 5. Kontrak Pembagian Hasil (Revenue Sharing)
+                // 4. Kontrak Pembagian Hasil (Revenue Sharing)
                 setTxt('rev_net_profit',         formatRupiah(RK_netProfitEfektif));
                 setTxt('rev_klaim_bulanan',      formatRupiah(RK_TOTAL_KLAIM_BULANAN));
                 setTxt('rev_admin_fee',          formatRupiah(adminFee));

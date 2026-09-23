@@ -246,12 +246,12 @@ $persen_investor = 50;
 $persen_pengelola = 50;
 $persen_admin = 3; // Admin Fee Pusat: 3%
 
-// Klaim Bulanan (baris manual, lihat "10. Klaim Bulanan" & _rekap_klaim_bulanan.php)
+// Klaim Bulanan (baris manual, lihat "5. Klaim Bulanan" & _rekap_klaim_bulanan.php)
 // — nominalnya (SEMUA baris, apapun sumber dananya) mengurangi Net Profit
 // SEBELUM admin fee 3% dipotong. Baris ber-sumber_dana='investor' JUGA
 // otomatis masuk ke "Pengembalian Dana Talangan" (Koreksi Dividen: Sisi
 // Investor); baris ber-sumber_dana='pusat' JUGA otomatis masuk ke "Admin
-// Management Pusat" (6. Rekapan Hasil Akhir Keuntungan) — keduanya di luar
+// Management Pusat" (8. Rekapan Hasil Akhir Keuntungan) — keduanya di luar
 // potongan Net Profit di atas. urutan_pengelola_aktif = segmen pengelola
 // yang sedang dipilih (1 kalau cuma 1 pengelola di periode ini).
 $total_klaim_bulanan = 0.0;
@@ -822,11 +822,11 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
 <!-- ROW MATRIK & REVENUE SHARING -->
 <div class="row g-3 mb-4">
 
-    <!-- 4. Matrik Akumulasi -->
+    <!-- 3. Matrik Akumulasi -->
     <div class="col-lg-6">
         <div class="card border-0 h-100" style="overflow: hidden;">
             <div class="card-header bg-light border-bottom py-3">
-                <span class="fw-bold text-dark"><i class="bi bi-calculator me-2 text-muted"></i>4. Matrik Akumulasi <?= date('F Y', strtotime("$tahun-$bulan-01")) ?></span>
+                <span class="fw-bold text-dark"><i class="bi bi-calculator me-2 text-muted"></i>3. Matrik Akumulasi <?= date('F Y', strtotime("$tahun-$bulan-01")) ?></span>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover align-middle mb-0">
@@ -895,7 +895,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
             <div class="card-header bg-light border-bottom py-3">
                 <span class="fw-bold text-dark">
                     <i class="bi bi-share me-2 text-muted"></i>
-                    5. Kontrak Pembagian Hasil (Revenue Sharing)
+                    4. Kontrak Pembagian Hasil (Revenue Sharing)
                 </span>
             </div>
             <div class="card-body p-0">
@@ -1077,7 +1077,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         <div class="card border-0 border-top border-4 border-primary h-100">
             <div class="card-header bg-white border-bottom py-3">
                 <span class="fw-bold text-primary">
-                    <i class="bi bi-pencil-square me-2"></i>Koreksi Dividen: Sisi Investor
+                    <i class="bi bi-pencil-square me-2"></i>6. Koreksi Dividen: Sisi Investor
                 </span>
             </div>
             <div class="card-body p-4 d-flex flex-column justify-content-between">
@@ -1138,7 +1138,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
     <div class="card border-0 border-top border-4 border-success h-100">
         <div class="card-header bg-white border-bottom py-3">
             <span class="fw-bold text-success">
-                <i class="bi bi-pencil-square me-2"></i>Koreksi Dividen: Sisi Pengelola
+                <i class="bi bi-pencil-square me-2"></i>7. Koreksi Dividen: Sisi Pengelola
             </span>
         </div>
         <div class="card-body p-4 d-flex flex-column justify-content-between">
@@ -1185,10 +1185,10 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
     </div>
 </div>
 </div>
-<!-- 6. Rekapan Hasil Keseluruhan Keuntungan Final -->
+<!-- 8. Rekapan Hasil Keseluruhan Keuntungan Final -->
 <div class="card border-0 mb-5" style="overflow: hidden;">
     <div class="card-header bg-danger text-white py-3 d-flex align-items-center justify-content-between" style="background-color: #dc3545 !important;">
-        <span class="fw-bold"><i class="bi bi-wallet2 me-2"></i>7. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)</span>
+        <span class="fw-bold"><i class="bi bi-wallet2 me-2"></i>8. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)</span>
         <span class="badge bg-white text-danger fw-bold px-3 py-1.5 rounded-pill shadow-sm" style="font-size: 0.75rem;"><i class="bi bi-check2-circle me-1"></i>Validasi Siap Transfer</span>
     </div>
     <div class="card-body p-0">
