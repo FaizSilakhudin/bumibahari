@@ -267,8 +267,20 @@ if (isset($_POST['login'])) {
             to   { transform: scale(1.1); }
         }
 
+        .auth-left-gallery::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(15, 61, 36, 0) 60%, rgba(15, 61, 36, 0.55) 100%);
+            pointer-events: none;
+        }
+
         .auth-left-gallery-dots {
-            margin-top: 12px;
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 12px;
+            z-index: 2;
             display: flex;
             justify-content: center;
             gap: 7px;
@@ -494,12 +506,11 @@ if (isset($_POST['login'])) {
             <img data-src="assets/img/hero/wbb-kegiatan-07.jpg" alt="Kegiatan Warteg Bumi Bahari">
             <img data-src="assets/img/hero/wbb-kegiatan-08.jpg" alt="Kegiatan Warteg Bumi Bahari">
             <img data-src="assets/img/hero/wbb-kegiatan-09.jpg" alt="Kegiatan Warteg Bumi Bahari">
-        </div>
-
-        <div class="auth-left-gallery-dots" id="authGalleryDots">
-            <span class="active"></span><span></span><span></span>
-            <span></span><span></span><span></span>
-            <span></span><span></span><span></span>
+            <div class="auth-left-gallery-dots" id="authGalleryDots">
+                <span class="active"></span><span></span><span></span>
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+            </div>
         </div>
 
         <div class="auth-left-footer">
