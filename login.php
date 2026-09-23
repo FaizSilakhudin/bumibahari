@@ -234,6 +234,64 @@ if (isset($_POST['login'])) {
             margin: 0;
         }
 
+        /* Galeri foto kegiatan -- auto-geser, cross-fade */
+        .auth-left-gallery {
+            position: relative;
+            z-index: 2;
+            margin-top: 28px;
+            aspect-ratio: 16 / 10;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+        }
+
+        .auth-left-gallery img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1.2s ease;
+        }
+
+        .auth-left-gallery img.active {
+            opacity: 1;
+        }
+
+        .auth-left-gallery::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(15, 61, 36, 0) 55%, rgba(15, 61, 36, 0.55) 100%);
+            pointer-events: none;
+        }
+
+        .auth-left-gallery-dots {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 12px;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .auth-left-gallery-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .auth-left-gallery-dots span.active {
+            width: 18px;
+            border-radius: 3px;
+            background: #ffffff;
+        }
+
         .auth-left-footer {
             position: relative;
             z-index: 2;
@@ -432,6 +490,23 @@ if (isset($_POST['login'])) {
             <p>Pusat Sistem Informasi Manajemen Cabang Warteg Bumi Bahari.</p>
         </div>
 
+        <div class="auth-left-gallery" id="authGallery">
+            <img data-src="assets/img/hero/wbb-kegiatan-01.jpg" class="active" alt="Kegiatan Warteg Bumi Bahari">
+            <img data-src="assets/img/hero/wbb-kegiatan-02.jpg" alt="Kegiatan Warteg Bumi Bahari">
+            <img data-src="assets/img/hero/wbb-kegiatan-03.jpg" alt="Kegiatan Warteg Bumi Bahari">
+            <img data-src="assets/img/hero/wbb-kegiatan-04.jpg" alt="Kegiatan Warteg Bumi Bahari">
+            <img data-src="assets/img/hero/wbb-kegiatan-05.jpg" alt="Kegiatan Warteg Bumi Bahari">
+            <img data-src="assets/img/hero/wbb-kegiatan-06.jpg" alt="Kegiatan Warteg Bumi Bahari">
+            <img data-src="assets/img/hero/wbb-kegiatan-07.jpg" alt="Kegiatan Warteg Bumi Bahari">
+            <img data-src="assets/img/hero/wbb-kegiatan-08.jpg" alt="Kegiatan Warteg Bumi Bahari">
+            <img data-src="assets/img/hero/wbb-kegiatan-09.jpg" alt="Kegiatan Warteg Bumi Bahari">
+            <div class="auth-left-gallery-dots" id="authGalleryDots">
+                <span class="active"></span><span></span><span></span>
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+
         <div class="auth-left-footer">
             &copy; 2026 Warteg Bumi Bahari Official.
         </div>
@@ -511,6 +586,34 @@ function togglePassword() {
         icon.classList.add('bi-eye');
     }
 }
+
+// Galeri foto kegiatan -- auto-geser cross-fade tiap 4 detik.
+// Panel kiri disembunyikan total di layar <992px (lihat @media di atas),
+// jadi foto SENGAJA tidak diberi src langsung di HTML -- baru di-load
+// (data-src -> src) kalau layarnya cukup lebar, supaya HP tidak boros
+// kuota mendownload 9 foto yang toh tidak pernah terlihat.
+(function () {
+    if (!window.matchMedia('(min-width: 992px)').matches) return;
+
+    const gallery = document.getElementById('authGallery');
+    if (!gallery) return;
+
+    const imgs = gallery.querySelectorAll('img[data-src]');
+    const dots = document.querySelectorAll('#authGalleryDots span');
+    imgs.forEach(function (img) {
+        img.src = img.dataset.src;
+    });
+    if (imgs.length < 2) return;
+
+    let idx = 0;
+    setInterval(function () {
+        imgs[idx].classList.remove('active');
+        dots[idx].classList.remove('active');
+        idx = (idx + 1) % imgs.length;
+        imgs[idx].classList.add('active');
+        dots[idx].classList.add('active');
+    }, 4000);
+})();
 </script>
 </body>
 </html>
