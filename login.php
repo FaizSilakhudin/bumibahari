@@ -238,10 +238,9 @@ if (isset($_POST['login'])) {
         .auth-left-gallery {
             position: relative;
             z-index: 2;
-            margin: 28px auto 0;
-            width: 92%;
-            max-width: 480px;
-            aspect-ratio: 16 / 10;
+            margin-top: 24px;
+            width: 100%;
+            aspect-ratio: 16 / 9.3;
             border-radius: 16px;
             overflow: hidden;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
@@ -268,36 +267,22 @@ if (isset($_POST['login'])) {
             to   { transform: scale(1.1); }
         }
 
-        .auth-left-gallery::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(180deg, rgba(15, 61, 36, 0) 55%, rgba(15, 61, 36, 0.55) 100%);
-            pointer-events: none;
-        }
-
         .auth-left-gallery-dots {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 12px;
-            z-index: 2;
+            margin-top: 12px;
             display: flex;
             justify-content: center;
-            gap: 6px;
+            gap: 7px;
         }
 
         .auth-left-gallery-dots span {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.4);
-            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.35);
+            transition: background 0.3s ease;
         }
 
         .auth-left-gallery-dots span.active {
-            width: 18px;
-            border-radius: 3px;
             background: #ffffff;
         }
 
@@ -509,11 +494,12 @@ if (isset($_POST['login'])) {
             <img data-src="assets/img/hero/wbb-kegiatan-07.jpg" alt="Kegiatan Warteg Bumi Bahari">
             <img data-src="assets/img/hero/wbb-kegiatan-08.jpg" alt="Kegiatan Warteg Bumi Bahari">
             <img data-src="assets/img/hero/wbb-kegiatan-09.jpg" alt="Kegiatan Warteg Bumi Bahari">
-            <div class="auth-left-gallery-dots" id="authGalleryDots">
-                <span class="active"></span><span></span><span></span>
-                <span></span><span></span><span></span>
-                <span></span><span></span><span></span>
-            </div>
+        </div>
+
+        <div class="auth-left-gallery-dots" id="authGalleryDots">
+            <span class="active"></span><span></span><span></span>
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
         </div>
 
         <div class="auth-left-footer">
