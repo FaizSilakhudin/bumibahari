@@ -188,11 +188,8 @@ if (isset($_POST['login'])) {
         .auth-left-top img {
             width: 58px;
             height: 58px;
-            padding: 7px;
-            border-radius: 50%;
             object-fit: contain;
-            background: #ffffff;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+            filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.28));
             flex-shrink: 0;
         }
 
@@ -279,24 +276,17 @@ if (isset($_POST['login'])) {
         }
 
         .logo-wrapper {
-            width: 76px;
-            height: 76px;
-            background: #f8fafc;
-            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 16px auto;
-            padding: 10px;
-            border: 2px solid #e2e8f0;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-            overflow: hidden;
         }
 
         .logo-wrapper img {
-            width: 100%;
-            height: 100%;
+            width: 84px;
+            height: 84px;
             object-fit: contain;
+            filter: drop-shadow(0 8px 14px rgba(15, 61, 36, 0.22));
         }
 
         .brand-title {
