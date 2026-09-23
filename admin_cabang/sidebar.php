@@ -95,25 +95,13 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
             border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
         
-        .logo-wbb-container {
-            width: 45px;
-            height: 45px;
-            background: #ffffff;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            padding: 5px;
-            border: 2px solid rgba(255, 193, 7, 0.4);
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-
         .logo-wbb-img {
-            width: 100%;
-            height: 100%;
+            height: 45px;
+            width: auto;
+            max-width: 45px;
             object-fit: contain;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+            flex-shrink: 0;
         }
 
         .sidebar-brand {
@@ -201,9 +189,7 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
 <!-- Topbar Ponsel -->
 <div class="navbar-mobile-toggle justify-content-between align-items-center d-flex d-lg-none">
     <div class="d-flex align-items-center gap-2">
-        <div class="logo-wbb-container" style="width: 36px; height: 36px;">
-            <img src="../assets/img/wbb.png?v=2" alt="Logo" class="logo-wbb-img" onerror="this.style.display='none'; this.parentNode.insertAdjacentHTML('beforeend', '<i class=\'bi bi-shop text-success fs-6\'></i>')">
-        </div>
+        <img src="../assets/img/wbb.png?v=2" alt="Logo" class="logo-wbb-img" style="height: 36px; max-width: 36px;" onerror="this.style.display='none'; this.parentNode.insertAdjacentHTML('beforeend', '<i class=\'bi bi-shop text-success fs-6\'></i>')">
         <span class="text-white fw-bold" style="font-size: 0.95rem; letter-spacing: 0.5px;">Warteg Bumi Bahari</span>
     </div>
     <button class="btn btn-success border-0 p-2" type="button" onclick="toggleSidebar()" style="background: rgba(255,255,255,0.12); border-radius: 10px;">
@@ -218,9 +204,7 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
 <div class="sidebar-container" id="sidebarContainer">
     <div class="sidebar-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <div class="logo-wbb-container">
-                <img src="../assets/img/wbb.png?v=2" alt="Logo WBB" class="logo-wbb-img" onerror="this.style.display='none'; this.parentNode.insertAdjacentHTML('beforeend', '<i class=\'bi bi-shop text-dark fs-5\'></i>')">
-            </div>
+            <img id="logoWWB" src="../assets/img/wbb.png?v=2" alt="Logo WBB" class="logo-wbb-img" onerror="this.style.display='none'; this.parentNode.insertAdjacentHTML('beforeend', '<i class=\'bi bi-shop text-dark fs-5\'></i>')">
             <h5 class="sidebar-brand">
                 Bumi Bahari
                 <span style="color: #ffca2c; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; margin-top: 2px; letter-spacing: 1px; display: block;">Admin Cabang</span>

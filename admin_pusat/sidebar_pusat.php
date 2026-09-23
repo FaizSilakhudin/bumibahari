@@ -153,7 +153,7 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
 
 <div class="sidebar d-flex flex-column">
     <div class="sidebar-brand text-center">
-        <img id="logoWWB" src="../assets/img/wbb.png?v=2" alt="Logo WBB" class="img-fluid mb-2" style="max-height: 65px; object-fit: contain;">
+        <img id="logoWWB" src="../assets/img/wbb.png?v=2" alt="Logo WBB" class="img-fluid mb-2" style="max-height: 65px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35));">
         <h5 class="text-white mb-1">Warteg Bumi Bahari</h5>
         <small class="d-block">Sistem Informasi Manajemen Cabang</small>
     </div>
