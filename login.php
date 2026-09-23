@@ -239,12 +239,12 @@ if (isset($_POST['login'])) {
             position: relative;
             z-index: 2;
             margin: 28px auto 0;
-            width: 78%;
-            max-width: 380px;
+            width: 92%;
+            max-width: 480px;
             aspect-ratio: 16 / 10;
-            border-radius: 14px;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
         }
 
         .auth-left-gallery img {
