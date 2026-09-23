@@ -254,11 +254,18 @@ if (isset($_POST['login'])) {
             height: 100%;
             object-fit: cover;
             opacity: 0;
-            transition: opacity 1.2s ease;
+            transform: scale(1);
+            transition: opacity 1.8s ease-in-out;
         }
 
         .auth-left-gallery img.active {
             opacity: 1;
+            animation: authGalleryKenBurns 5.5s ease-out forwards;
+        }
+
+        @keyframes authGalleryKenBurns {
+            from { transform: scale(1); }
+            to   { transform: scale(1.1); }
         }
 
         .auth-left-gallery::after {
@@ -612,9 +619,11 @@ function togglePassword() {
         imgs[idx].classList.remove('active');
         dots[idx].classList.remove('active');
         idx = (idx + 1) % imgs.length;
+        imgs[idx].classList.remove('active');
+        void imgs[idx].offsetWidth; // reset animasi Ken Burns setiap ganti foto
         imgs[idx].classList.add('active');
         dots[idx].classList.add('active');
-    }, 4000);
+    }, 5000);
 })();
 </script>
 </body>
