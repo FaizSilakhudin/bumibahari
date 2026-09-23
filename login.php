@@ -428,12 +428,12 @@ if (isset($_POST['login'])) {
         </div>
 
         <div class="auth-left-hero">
-            <h1>Selamat Datang<br>Kembali</h1>
-            <p>Kelola laporan, cabang, dan performa Warteg Bumi Bahari dalam satu sistem yang cepat dan rapi.</p>
+            <h1>Selamat Datang</h1>
+            <p>Pusat Sistem Informasi Manajemen Cabang Warteg Bumi Bahari.</p>
         </div>
 
         <div class="auth-left-footer">
-            &copy; 2026 Warteg Bumi Bahari. Sistem informasi internal.
+            &copy; 2026 Warteg Bumi Bahari Official.
         </div>
     </div>
 
