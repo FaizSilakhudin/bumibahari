@@ -403,35 +403,13 @@ if (isset($_POST['login'])) {
         }
 
         /* ===================== RESPONSIVE ===================== */
-        /* Di layar sempit, panel kiri tidak hilang total -- diciutkan jadi
-           strip brand di atas (logo + nama + badge), hero besar & footer
-           disembunyikan supaya form login tetap jadi fokus utama. */
+        /* Di layar sempit, panel kiri (brand/hero) disembunyikan total --
+           logo & nama brand sudah ada juga di dalam kartu form, jadi kalau
+           panel kiri diciutkan jadi strip di atas malah dobel. Cukup box
+           login saja yang tampil di HP. */
         @media (max-width: 991.98px) {
-            .auth-shell { flex-direction: column; min-height: auto; }
-
-            .auth-left {
-                flex: 0 0 auto;
-                max-width: 100%;
-                padding: 22px 24px;
-            }
-            .auth-left::before, .auth-left::after, .auth-left-blob { display: none; }
-            .auth-left-top { justify-content: center; }
-            .auth-left-hero, .auth-left-footer { display: none; }
-
-            /* Top-align (bukan center) -- kalau di-center dalam sisa tinggi
-               100vh, kartu login "mengambang" dengan jarak kosong besar di
-               atas & bawahnya pada layar HP yang tinggi. */
-            .auth-right {
-                flex: 1 1 auto;
-                align-items: flex-start;
-                padding: 32px 20px 40px;
-            }
-        }
-
-        @media (max-width: 420px) {
-            .auth-left-top { gap: 12px; }
-            .auth-left-top img { width: 48px; height: 48px; }
-            .auth-brand-name { font-size: 1rem; }
+            .auth-left { display: none; }
+            .auth-right { flex: 1 1 100%; padding: 32px 20px; }
         }
     </style>
 </head>
