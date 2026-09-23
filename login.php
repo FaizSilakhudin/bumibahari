@@ -120,28 +120,159 @@ if (isset($_POST['login'])) {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     
     <style>
+        :root {
+            --wbb-green-dark: #0f3d24;
+            --wbb-green: #1b6b3d;
+            --wbb-green-light: #2f9e5c;
+            --wbb-gold: #f4b93c;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+            margin: 0;
+            background: #ffffff;
+        }
+
+        .auth-shell {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ===================== PANEL KIRI (brand / hero) ===================== */
+        .auth-left {
+            position: relative;
+            flex: 0 0 44%;
+            max-width: 44%;
+            background: linear-gradient(160deg, var(--wbb-green-light) 0%, var(--wbb-green) 45%, var(--wbb-green-dark) 100%);
+            color: #ffffff;
+            padding: 48px 56px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+
+        .auth-left::before,
+        .auth-left::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.07);
+            pointer-events: none;
+        }
+        .auth-left::before { width: 420px; height: 420px; top: -160px; right: -140px; }
+        .auth-left::after   { width: 320px; height: 320px; bottom: -120px; left: -100px; background: rgba(255, 255, 255, 0.06); }
+
+        .auth-left-blob {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            pointer-events: none;
+        }
+
+        .auth-left-top {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .auth-left-top img {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #ffffff;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+        }
+
+        .auth-brand-name {
+            font-weight: 700;
+            font-size: 1.05rem;
+            letter-spacing: -0.2px;
+        }
+
+        .auth-badge {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            padding: 3px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.16);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+        }
+
+        .auth-left-hero {
+            position: relative;
+            z-index: 2;
+            margin-top: 40px;
+        }
+
+        .auth-left-hero h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            line-height: 1.15;
+            letter-spacing: -1px;
+            margin-bottom: 16px;
+        }
+
+        .auth-left-hero p {
+            font-size: 0.98rem;
+            color: rgba(255, 255, 255, 0.82);
+            max-width: 380px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .auth-left-footer {
+            position: relative;
+            z-index: 2;
+            font-size: 0.78rem;
+            color: rgba(255, 255, 255, 0.65);
+        }
+
+        /* ===================== PANEL KANAN (form login) ===================== */
+        .auth-right {
+            flex: 1;
+            min-width: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
+            padding: 40px 20px;
+            background: #f8faf9;
         }
 
         .login-container {
             width: 100%;
             max-width: 420px;
+            min-width: 0;
         }
 
         .login-card {
+            position: relative;
             background: #ffffff;
             border: 1px solid rgba(226, 232, 240, 0.8);
             border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(52, 58, 64, 0.08);
-            transition: transform 0.3s ease;
+            box-shadow: 0 20px 45px rgba(15, 61, 36, 0.10);
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, var(--wbb-gold), #f97316, var(--wbb-gold));
         }
 
         .logo-wrapper {
@@ -203,8 +334,8 @@ if (isset($_POST['login'])) {
 
         .input-group-custom .form-control:focus {
             background-color: #ffffff;
-            border-color: #343a40;
-            box-shadow: 0 0 0 4px rgba(52, 58, 64, 0.1);
+            border-color: var(--wbb-green);
+            box-shadow: 0 0 0 4px rgba(27, 107, 61, 0.12);
         }
 
         .input-group-custom .input-icon {
@@ -230,13 +361,13 @@ if (isset($_POST['login'])) {
             transition: color 0.2s ease;
         }
         .input-group-custom .toggle-password:hover {
-            color: #343a40;
+            color: var(--wbb-green);
         }
 
         .btn-login {
             height: 48px;
-            background-color: #343a40;
-            border-color: #343a40;
+            background-color: var(--wbb-green);
+            border-color: var(--wbb-green);
             color: #ffffff;
             font-weight: 600;
             font-size: 0.95rem;
@@ -245,10 +376,10 @@ if (isset($_POST['login'])) {
         }
 
         .btn-login:hover {
-            background-color: #212529;
-            border-color: #212529;
+            background-color: var(--wbb-green-dark);
+            border-color: var(--wbb-green-dark);
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(33, 37, 41, 0.15);
+            box-shadow: 0 4px 14px rgba(15, 61, 36, 0.22);
         }
 
         .btn-login:active {
@@ -264,68 +395,105 @@ if (isset($_POST['login'])) {
             background-color: #fee2e2;
             color: #991b1b;
         }
-        
+
+        .login-divider {
+            border-top: 1px solid #eef2f0;
+            margin: 24px 0 16px;
+        }
+
         .footer-text {
             font-size: 0.775rem;
             color: #94a3b8;
             text-align: center;
-            margin-top: 20px;
+            margin-top: 4px;
+        }
+
+        /* ===================== RESPONSIVE ===================== */
+        @media (max-width: 991.98px) {
+            .auth-left { display: none; }
+            .auth-right { flex: 1 1 100%; }
         }
     </style>
 </head>
 <body>
 
-<div class="login-container">
-    <div class="card login-card border-0">
-        <div class="card-body p-4 p-sm-5">
-            
-            <div class="text-center mb-4">
-                <div class="logo-wrapper">
-                    <img id="logoWWB" src="assets/img/wbb.png" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
-                </div>
-                <h3 class="brand-title mb-1">WARTEG BUMI BAHARI</h3>
-                <p class="brand-subtitle mb-0">Budaya Kuliner Indonesia</p>
+<div class="auth-shell">
+    <div class="auth-left">
+        <div class="auth-left-blob" style="width:180px;height:180px;top:38%;right:8%;"></div>
+
+        <div class="auth-left-top">
+            <img src="assets/img/wbb.png" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
+            <div>
+                <div class="auth-brand-name">Warteg Bumi Bahari</div>
+                <span class="auth-badge">Sistem Manajemen Cabang</span>
             </div>
-            
-            <?php if($error):?>
-                <div class="alert alert-custom d-flex align-items-center mb-4" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <div><?= h($error)?></div>
-                </div>
-            <?php endif;?>
-            
-            <form method="POST" autocomplete="off">
-                <input type="hidden" name="csrf" value="<?=csrf_token()?>">
-                <div class="mb-3">
-                    <label class="form-label">Username</label>
-                    <div class="input-group-custom">
-                        <span class="input-icon"><i class="bi bi-person"></i></span>
-                        <input type="text" name="username" class="form-control" placeholder="Masukkan username admin" required autofocus>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="form-label">Password</label>
-                    <div class="input-group-custom">
-                        <span class="input-icon"><i class="bi bi-lock"></i></span>
-                        <input type="password" name="password" id="password" class="form-control" placeholder="••••" required>
-                        <span class="toggle-password" onclick="togglePassword()">
-                            <i class="bi bi-eye" id="toggleIcon"></i>
-                        </span>
-                    </div>
-                </div>
-                
-                <button type="submit" name="login" class="btn btn-login w-100 d-flex align-items-center justify-content-center gap-2">
-                    <span>Masuk ke Sistem</span>
-                    <i class="bi bi-arrow-right-short fs-5"></i>
-                </button>
-            </form>
-            
+        </div>
+
+        <div class="auth-left-hero">
+            <h1>Selamat Datang<br>Kembali</h1>
+            <p>Kelola laporan, cabang, dan performa Warteg Bumi Bahari dalam satu sistem yang cepat dan rapi.</p>
+        </div>
+
+        <div class="auth-left-footer">
+            &copy; 2026 Warteg Bumi Bahari. Sistem informasi internal.
         </div>
     </div>
-    
-    <div class="footer-text">
-        &copy; 2026 Warteg Bumi Bahari. All Rights Reserved.
+
+    <div class="auth-right">
+        <div class="login-container">
+            <div class="card login-card border-0">
+                <div class="card-body p-4 p-sm-5">
+
+                    <div class="text-center mb-4">
+                        <div class="logo-wrapper">
+                            <img id="logoWWB" src="assets/img/wbb.png" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
+                        </div>
+                        <h3 class="brand-title mb-1">Masuk untuk Melanjutkan</h3>
+                        <p class="brand-subtitle mb-0">Masukkan username dan password Anda</p>
+                    </div>
+
+                    <?php if($error):?>
+                        <div class="alert alert-custom d-flex align-items-center mb-4" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <div><?= h($error)?></div>
+                        </div>
+                    <?php endif;?>
+
+                    <form method="POST" autocomplete="off">
+                        <input type="hidden" name="csrf" value="<?=csrf_token()?>">
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <div class="input-group-custom">
+                                <span class="input-icon"><i class="bi bi-person"></i></span>
+                                <input type="text" name="username" class="form-control" placeholder="Masukkan username" required autofocus>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Password</label>
+                            <div class="input-group-custom">
+                                <span class="input-icon"><i class="bi bi-lock"></i></span>
+                                <input type="password" name="password" id="password" class="form-control" placeholder="Masukkan password" required>
+                                <span class="toggle-password" onclick="togglePassword()">
+                                    <i class="bi bi-eye" id="toggleIcon"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                        <button type="submit" name="login" class="btn btn-login w-100 d-flex align-items-center justify-content-center gap-2">
+                            <span>Masuk</span>
+                            <i class="bi bi-arrow-right-short fs-5"></i>
+                        </button>
+                    </form>
+
+                    <div class="login-divider"></div>
+                    <div class="footer-text">
+                        Sistem informasi internal &middot; Warteg Bumi Bahari
+                    </div>
+
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
