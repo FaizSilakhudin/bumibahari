@@ -20,6 +20,19 @@ $nama_periode = date('F Y', strtotime("$periode_ini-01"));
 $periode_anchor_sql = anchor_periode(date('Y-m-t', strtotime("$periode_ini-01")));
 $kemarin = date('Y-m-d', strtotime('-1 day'));
 
+// Grafik tren — granularitas bisa dipilih (harian/mingguan/bulanan/tahunan),
+// sama seperti admin_pusat & investor. Default harian.
+$granularitas_tren = $_GET['tren'] ?? 'harian';
+if (!in_array($granularitas_tren, ['harian', 'mingguan', 'bulanan', 'tahunan'], true)) {
+    $granularitas_tren = 'harian';
+}
+$label_periode_tren = [
+    'harian'   => '30 Hari Terakhir',
+    'mingguan' => '12 Minggu Terakhir',
+    'bulanan'  => '6 Bulan Terakhir',
+    'tahunan'  => '5 Tahun Terakhir',
+][$granularitas_tren];
+
 $kpi = ['omzet' => 0, 'laba' => 0, 'margin' => 0];
 $kpi_hari_ini = ['omzet' => 0, 'laba' => 0];
 $kpi_lalu = ['omzet' => 0];
@@ -80,23 +93,12 @@ if (!empty($cabang_ids)) {
     $cabang_aktif = (int) $row_aktif['total'];
     $laporan_selesai = (int) $row_aktif['jml_laporan'];
 
-    // 4. Grafik tren 6 bulan
-    $g_start = date('Y-m-01', strtotime("$periode_ini-01 -5 month"));
-    $g_end   = date('Y-m-t', strtotime("$periode_ini-01"));
-    $st = $conn->prepare("SELECT DATE_FORMAT(l.tanggal,'%b %Y') bulan,
-                                  COALESCE(SUM(l.total_omset),0) omzet,
-                                  COALESCE(SUM(l.net_profit),0) laba
-                           FROM laporan_cabang l
-                           WHERE l.status_laporan='lengkap' AND l.tanggal BETWEEN ? AND ? AND l.id_cabang IN ($ph)
-                           GROUP BY DATE_FORMAT(l.tanggal,'%Y-%m') ORDER BY l.tanggal ASC");
-    $st->bind_param('ss' . $types_ids, $g_start, $g_end, ...$cabang_ids);
-    $st->execute();
-    $grafik = $st->get_result();
-    while ($g = $grafik->fetch_assoc()) {
-        $label_grafik[] = $g['bulan'];
-        $data_omzet[]   = (float) $g['omzet'];
-        $data_laba[]    = (float) $g['laba'];
-    }
+    // 4. Grafik tren — granularitas bisa dipilih (harian/mingguan/bulanan/tahunan)
+    $where_filter_tren = "AND l.status_laporan = 'lengkap' AND l.id_cabang IN ($ph)";
+    $tren = ambil_tren_performa($conn, $granularitas_tren, $periode_anchor_sql, $where_filter_tren, $cabang_ids, $types_ids);
+    $label_grafik = $tren['label'];
+    $data_omzet   = $tren['omzet'];
+    $data_laba    = $tren['laba'];
 
     // 5. Ranking cabang (di antara cabang yang Anda pegang)
     $st = $conn->prepare("SELECT c.id_cabang, c.nama_cabang,
@@ -299,11 +301,17 @@ if (!empty($cabang_ids)) {
     <div class="row g-3 mb-4">
         <div class="col-lg-8 col-12">
             <div class="saas-card h-100">
-                <div class="d-flex align-items-center justify-content-between mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
                     <div>
-                        <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">Trend Performa 6 Bulan Terakhir</h6>
+                        <h6 class="fw-bold mb-0" style="color: #0f172a; font-size: 16px;">Trend Performa <?= h($label_periode_tren) ?></h6>
                         <span class="text-muted small">Omzet vs Laba &mdash; cabang yang Anda pegang</span>
                     </div>
+                    <select class="form-select form-select-sm" style="width:auto;" onchange="gantiTren(this.value)">
+                        <option value="harian" <?= $granularitas_tren === 'harian' ? 'selected' : '' ?>>Harian</option>
+                        <option value="mingguan" <?= $granularitas_tren === 'mingguan' ? 'selected' : '' ?>>Mingguan</option>
+                        <option value="bulanan" <?= $granularitas_tren === 'bulanan' ? 'selected' : '' ?>>Bulanan</option>
+                        <option value="tahunan" <?= $granularitas_tren === 'tahunan' ? 'selected' : '' ?>>Tahunan</option>
+                    </select>
                 </div>
                 <div style="position: relative; height: 300px; width: 100%;">
                     <canvas id="grafikTrend"></canvas>
@@ -403,6 +411,14 @@ if (!empty($cabang_ids)) {
     </div>
     <?php endif; ?>
 </div>
+
+<script>
+function gantiTren(val) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tren', val);
+    window.location.href = url.toString();
+}
+</script>
 
 <?php if (!empty($label_grafik)): ?>
 <script>
