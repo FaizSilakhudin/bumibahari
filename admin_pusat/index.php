@@ -163,9 +163,9 @@ if ($sel_cabang) {
 // 5. Grafik tren — granularitas bisa dipilih (harian/mingguan/bulanan/tahunan),
 //    berakhir di periode terpilih.
 // =====================================================================
-$granularitas_tren = $_GET['tren'] ?? 'bulanan';
+$granularitas_tren = $_GET['tren'] ?? 'harian';
 if (!in_array($granularitas_tren, ['harian', 'mingguan', 'bulanan', 'tahunan'], true)) {
-    $granularitas_tren = 'bulanan';
+    $granularitas_tren = 'harian';
 }
 $g_end = anchor_periode(date('Y-m-t', strtotime("$periode_ini-01")));
 $tren  = ambil_tren_performa($conn, $granularitas_tren, $g_end, $where_filter, $params, $types);

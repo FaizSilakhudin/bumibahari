@@ -57,9 +57,9 @@ $tgl_awal     = date("$sel_tahun-$sel_bulan-01");
 $tgl_akhir    = date('Y-m-t', strtotime($tgl_awal));
 $kemarin      = date('Y-m-d', strtotime('-1 day'));
 
-$granularitas_tren = $_GET['tren'] ?? 'bulanan';
+$granularitas_tren = $_GET['tren'] ?? 'harian';
 if (!in_array($granularitas_tren, ['harian', 'mingguan', 'bulanan', 'tahunan'], true)) {
-    $granularitas_tren = 'bulanan';
+    $granularitas_tren = 'harian';
 }
 $label_periode_tren = [
     'harian'   => '30 Hari Terakhir',
