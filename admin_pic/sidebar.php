@@ -58,10 +58,10 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
         .logo-wbb-container {
             width: 45px; height: 45px; background: #ffffff; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); padding: 2px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); padding: 5px;
             border: 2px solid rgba(59, 130, 246, 0.4); overflow: hidden; flex-shrink: 0;
         }
-        .logo-wbb-img { width: 100%; height: 100%; object-fit: cover; }
+        .logo-wbb-img { width: 100%; height: 100%; object-fit: contain; }
         .sidebar-brand { color: #ffffff; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.3px; line-height: 1.2; margin: 0; }
 
         .sidebar-menu { padding: 25px 16px; }

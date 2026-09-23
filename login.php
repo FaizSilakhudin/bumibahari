@@ -182,27 +182,30 @@ if (isset($_POST['login'])) {
             z-index: 2;
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 16px;
         }
 
         .auth-left-top img {
-            width: 52px;
-            height: 52px;
+            width: 58px;
+            height: 58px;
+            padding: 7px;
             border-radius: 50%;
-            object-fit: cover;
+            object-fit: contain;
             background: #ffffff;
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+            flex-shrink: 0;
         }
 
         .auth-brand-name {
             font-weight: 700;
-            font-size: 1.05rem;
+            font-size: 1.1rem;
             letter-spacing: -0.2px;
+            line-height: 1.3;
         }
 
         .auth-badge {
             display: inline-block;
-            margin-top: 4px;
+            margin-top: 6px;
             font-size: 0.72rem;
             font-weight: 600;
             letter-spacing: 0.3px;
@@ -276,14 +279,15 @@ if (isset($_POST['login'])) {
         }
 
         .logo-wrapper {
-            width: 72px;
-            height: 72px;
+            width: 76px;
+            height: 76px;
             background: #f8fafc;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 16px auto;
+            padding: 10px;
             border: 2px solid #e2e8f0;
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
             overflow: hidden;
@@ -292,7 +296,7 @@ if (isset($_POST['login'])) {
         .logo-wrapper img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
         }
 
         .brand-title {
@@ -409,9 +413,28 @@ if (isset($_POST['login'])) {
         }
 
         /* ===================== RESPONSIVE ===================== */
+        /* Di layar sempit, panel kiri tidak hilang total -- diciutkan jadi
+           strip brand di atas (logo + nama + badge), hero besar & footer
+           disembunyikan supaya form login tetap jadi fokus utama. */
         @media (max-width: 991.98px) {
-            .auth-left { display: none; }
-            .auth-right { flex: 1 1 100%; }
+            .auth-shell { flex-direction: column; }
+
+            .auth-left {
+                flex: 0 0 auto;
+                max-width: 100%;
+                padding: 26px 24px;
+            }
+            .auth-left::before, .auth-left::after, .auth-left-blob { display: none; }
+            .auth-left-top { justify-content: center; }
+            .auth-left-hero, .auth-left-footer { display: none; }
+
+            .auth-right { flex: 1 1 auto; padding: 32px 20px; }
+        }
+
+        @media (max-width: 420px) {
+            .auth-left-top { gap: 12px; }
+            .auth-left-top img { width: 48px; height: 48px; }
+            .auth-brand-name { font-size: 1rem; }
         }
     </style>
 </head>

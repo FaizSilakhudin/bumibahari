@@ -104,16 +104,16 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
             align-items: center;
             justify-content: center;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            padding: 2px;
+            padding: 5px;
             border: 2px solid rgba(255, 193, 7, 0.4);
             overflow: hidden;
             flex-shrink: 0;
         }
-        
+
         .logo-wbb-img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
         }
 
         .sidebar-brand {
