@@ -721,10 +721,10 @@ document.addEventListener('click', () => notifSound.play().then(()=>notifSound.p
                 // Panggil partial tabel harian — variabel input sesuai dokumentasi di _rekap_tabel_harian.php.
                 // Partial akan meng-set $rk_num_rows, $rk_num_lengkap, dan variabel total_* yang dipakai
                 // di tempat lain (tidak dipakai di sini, tapi partial mengharapnya ada).
-                $rk_th = (int) $sel_tahun;
-                $rk_bl = (int) $sel_bulan;
-                $rk_id_cabang = (int) $sel_cabang;
-                $rk_tabel_id = 'tabelRekapHarianCabangDashboard';
+                $rk_tgl_mulai   = sprintf('%04d-%02d-01', $sel_tahun, $sel_bulan);
+                $rk_tgl_selesai = date('Y-m-t', strtotime($rk_tgl_mulai));
+                $rk_id_cabang   = (int) $sel_cabang;
+                $rk_tabel_id    = 'tabelRekapHarianCabangDashboard';
                 include '_rekap_tabel_harian.php';
                 ?>
             </div>
