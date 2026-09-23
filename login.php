@@ -486,7 +486,7 @@ if (isset($_POST['login'])) {
 
                     <div class="login-divider"></div>
                     <div class="footer-text">
-                        Sistem Informasi Manajemen Cabang &middot; Warteg Bumi Bahari
+                        SIMC &middot; Warteg Bumi Bahari
                     </div>
 
                 </div>
