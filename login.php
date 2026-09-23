@@ -446,8 +446,8 @@ if (isset($_POST['login'])) {
                         <div class="logo-wrapper">
                             <img id="logoWWB" src="assets/img/wbb.png?v=2" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
                         </div>
-                        <h3 class="brand-title mb-1">Masuk untuk Melanjutkan</h3>
-                        <p class="brand-subtitle mb-0">Masukkan username dan password Anda</p>
+                        <h3 class="brand-title mb-1">WARTEG BUMI BAHARI</h3>
+                        <p class="brand-subtitle mb-0">Budaya Kuliner Indonesia</p>
                     </div>
 
                     <?php if($error):?>
