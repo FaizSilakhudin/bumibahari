@@ -350,10 +350,10 @@ function lm_rp($n): string
 
     <!-- Kertas laporan -->
     <div class="lm-paper" id="area-laporan">
-        <img src="../assets/img/wbb.png" class="lm-watermark" alt="">
+        <img src="../assets/img/wbb.png?v=2" class="lm-watermark" alt="">
 
         <div class="lm-kop">
-            <img src="../assets/img/wbb.png" alt="Logo Warteg Bumi Bahari">
+            <img src="../assets/img/wbb.png?v=2" alt="Logo Warteg Bumi Bahari">
             <div>
                 <p class="lm-kop-name">WARTEG BUMI BAHARI</p>
                 <p class="lm-kop-addr">

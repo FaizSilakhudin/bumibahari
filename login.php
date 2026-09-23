@@ -417,18 +417,25 @@ if (isset($_POST['login'])) {
            strip brand di atas (logo + nama + badge), hero besar & footer
            disembunyikan supaya form login tetap jadi fokus utama. */
         @media (max-width: 991.98px) {
-            .auth-shell { flex-direction: column; }
+            .auth-shell { flex-direction: column; min-height: auto; }
 
             .auth-left {
                 flex: 0 0 auto;
                 max-width: 100%;
-                padding: 26px 24px;
+                padding: 22px 24px;
             }
             .auth-left::before, .auth-left::after, .auth-left-blob { display: none; }
             .auth-left-top { justify-content: center; }
             .auth-left-hero, .auth-left-footer { display: none; }
 
-            .auth-right { flex: 1 1 auto; padding: 32px 20px; }
+            /* Top-align (bukan center) -- kalau di-center dalam sisa tinggi
+               100vh, kartu login "mengambang" dengan jarak kosong besar di
+               atas & bawahnya pada layar HP yang tinggi. */
+            .auth-right {
+                flex: 1 1 auto;
+                align-items: flex-start;
+                padding: 32px 20px 40px;
+            }
         }
 
         @media (max-width: 420px) {
@@ -445,7 +452,7 @@ if (isset($_POST['login'])) {
         <div class="auth-left-blob" style="width:180px;height:180px;top:38%;right:8%;"></div>
 
         <div class="auth-left-top">
-            <img src="assets/img/wbb.png" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
+            <img src="assets/img/wbb.png?v=2" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
             <div>
                 <div class="auth-brand-name">Warteg Bumi Bahari</div>
                 <span class="auth-badge">Sistem Manajemen Cabang</span>
@@ -469,7 +476,7 @@ if (isset($_POST['login'])) {
 
                     <div class="text-center mb-4">
                         <div class="logo-wrapper">
-                            <img id="logoWWB" src="assets/img/wbb.png" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
+                            <img id="logoWWB" src="assets/img/wbb.png?v=2" alt="Logo WBB" onerror="this.src='https://placehold.co/100x100?text=WBB'">
                         </div>
                         <h3 class="brand-title mb-1">Masuk untuk Melanjutkan</h3>
                         <p class="brand-subtitle mb-0">Masukkan username dan password Anda</p>

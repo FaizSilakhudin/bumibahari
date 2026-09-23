@@ -93,7 +93,7 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
 <div class="navbar-mobile-toggle justify-content-between align-items-center d-flex d-lg-none">
     <div class="d-flex align-items-center gap-2">
         <div class="logo-wbb-container" style="width: 36px; height: 36px;">
-            <img src="../assets/img/wbb.png" alt="Logo" class="logo-wbb-img" onerror="this.style.display='none'; this.parentNode.insertAdjacentHTML('beforeend', '<i class=\'bi bi-person-badge text-primary fs-6\'></i>')">
+            <img src="../assets/img/wbb.png?v=2" alt="Logo" class="logo-wbb-img" onerror="this.style.display='none'; this.parentNode.insertAdjacentHTML('beforeend', '<i class=\'bi bi-person-badge text-primary fs-6\'></i>')">
         </div>
         <span class="text-white fw-bold" style="font-size: 0.95rem; letter-spacing: 0.5px;">Warteg Bumi Bahari</span>
     </div>
@@ -108,7 +108,7 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
     <div class="sidebar-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
             <div class="logo-wbb-container">
-                <img src="../assets/img/wbb.png" alt="Logo WBB" class="logo-wbb-img" onerror="this.style.display='none'; this.parentNode.insertAdjacentHTML('beforeend', '<i class=\'bi bi-person-badge text-dark fs-5\'></i>')">
+                <img src="../assets/img/wbb.png?v=2" alt="Logo WBB" class="logo-wbb-img" onerror="this.style.display='none'; this.parentNode.insertAdjacentHTML('beforeend', '<i class=\'bi bi-person-badge text-dark fs-5\'></i>')">
             </div>
             <h5 class="sidebar-brand">
                 Bumi Bahari
