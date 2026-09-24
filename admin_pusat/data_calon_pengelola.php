@@ -332,10 +332,19 @@ function esc(s) {
     return d.innerHTML;
 }
 
+function yt(v) { return v === 'ya' ? 'Ya' : (v === 'tidak' ? 'Tidak' : '-'); }
+const UPLOAD_DIR = '../uploads/calon_pengelola/';
+const UPLOAD_LABEL = { foto_ktp: 'KTP', foto_kk: 'Kartu Keluarga', foto_buku_nikah: 'Buku Nikah', foto_masakan1: 'Foto Masakan 1', foto_masakan2: 'Foto Masakan 2', foto_masakan3: 'Foto Masakan 3' };
+
 function lihatDetail(d) {
-    document.getElementById('detailNama').innerText = d.nama_calon || '';
+    document.getElementById('detailNama').innerText = (d.no_urut ? 'No. ' + d.no_urut + ' — ' : '') + (d.nama_calon || '');
     document.getElementById('detailMeta').innerText =
         (d.tanggal_interview || '-') + ' · Interviewer: ' + (d.interviewer || '-') + ' · Diinput oleh: ' + (d.nama_input || '-');
+
+    let dokumenHtml = '';
+    Object.keys(UPLOAD_LABEL).forEach(function (f) {
+        if (d[f]) dokumenHtml += '<div class="col-4 text-center"><img src="' + UPLOAD_DIR + d[f] + '" style="width:100%;height:90px;object-fit:cover;border-radius:8px;border:1px solid #eef2f9;"><div class="small text-muted mt-1">' + UPLOAD_LABEL[f] + '</div></div>';
+    });
 
     document.getElementById('detailBody').innerHTML = `
         <div class="form-section-title" style="margin-top:0;border-top:none;">Identitas</div>
@@ -343,19 +352,30 @@ function lihatDetail(d) {
         <p class="mb-3"><strong>Alamat:</strong> ${esc(d.alamat)}</p>
 
         <div class="form-section-title">A. Identitas &amp; Pengalaman Kerja</div>
-        <p style="white-space:pre-wrap;">${esc(d.catatan_identitas)}</p>
+        <p class="mb-1"><strong>1. Perkenalan &amp; pengalaman kerja:</strong> ${esc(d.a_perkenalan)}</p>
+        <p class="mb-1"><strong>2. Tempat kerja sebelumnya:</strong> ${esc(d.a_nama_tempat_usaha)} &mdash; ${esc(d.a_posisi_jabatan)} &mdash; ${esc(d.a_lama_bekerja)}</p>
+        <p class="mb-1"><strong>3. Pernah kelola warteg:</strong> ${yt(d.a_pernah_kelola_warteg)} &mdash; Lama: ${esc(d.a_lama_kelola_warteg)}, Omzet rata-rata: ${esc(d.a_omzet_rata_rata)}, Omzet tertinggi: ${esc(d.a_omzet_tertinggi)}</p>
+        <p class="mb-1"><strong>4. Alasan berhenti:</strong> ${esc(d.a_alasan_berhenti)}</p>
+        <p class="mb-1"><strong>Video hasil masakan:</strong> ${yt(d.a_video_masakan)} &middot; <strong>Menu dikuasai:</strong> ${esc(d.a_menu_dikuasai)}</p>
+        <p class="mb-3"><strong>Catatan interviewer:</strong> ${esc(d.a_catatan_interviewer)}</p>
 
         <div class="form-section-title">B. Pengetahuan tentang WBB</div>
-        <p style="white-space:pre-wrap;">${esc(d.catatan_pengetahuan_wbb)}</p>
+        <p class="mb-1"><strong>1. Tahu dari mana:</strong> ${esc(d.b_tahu_dari_mana)}</p>
+        <p class="mb-1"><strong>2. Alasan tertarik:</strong> ${esc(d.b_alasan_tertarik)}</p>
+        <p class="mb-1"><strong>3. Pernah kunjungi outlet:</strong> ${yt(d.b_pernah_kunjungi_outlet)} &mdash; Outlet: ${esc(d.b_outlet_mana)}, Yang diperhatikan: ${esc(d.b_yang_diperhatikan)}</p>
+        <p class="mb-1"><strong>4. Pendapat penjualan baik:</strong> ${esc(d.b_pendapat_penjualan_baik)}</p>
+        <p class="mb-3"><strong>Catatan interviewer:</strong> ${esc(d.b_catatan_interviewer)}</p>
 
         <div class="form-section-title">C. Kesiapan Ikuti Sistem</div>
-        <p style="white-space:pre-wrap;">${esc(d.catatan_kesiapan_sistem)}</p>
-
-        <div class="form-section-title">D. Komitmen &amp; Jenjang Karier</div>
-        <p style="white-space:pre-wrap;">${esc(d.catatan_komitmen_karier)}</p>
+        <p class="mb-3">${esc(d.c_jawaban_kesiapan)}</p>
 
         <div class="form-section-title">F. Pertanyaan Komitmen Akhir</div>
-        <p style="white-space:pre-wrap;">${esc(d.catatan_komitmen_akhir)}</p>
+        <p class="mb-1"><strong>1. Siap ikuti SOP:</strong> ${yt(d.f_siap_sop)} &middot; <strong>2. Siap dievaluasi:</strong> ${yt(d.f_siap_evaluasi)}</p>
+        <p class="mb-1"><strong>3. Siap dipindah:</strong> ${yt(d.f_siap_dipindah)} &middot; <strong>4. Siap jaga kualitas:</strong> ${yt(d.f_siap_jaga_kualitas)}</p>
+        <p class="mb-1"><strong>5. Rencana tingkatkan penjualan:</strong> ${esc(d.f_rencana_tingkatkan_penjualan)}</p>
+        <p class="mb-3"><strong>6. Target bergabung:</strong> ${esc(d.f_target_bergabung)}</p>
+
+        ${dokumenHtml ? '<div class="form-section-title">Dokumen &amp; Foto</div><div class="row g-2 mb-3">' + dokumenHtml + '</div>' : ''}
 
         <div class="form-section-title">Kesimpulan</div>
         <p class="mb-1"><strong>Interviewer:</strong> ${KESIMPULAN_LABEL[d.kesimpulan_interviewer] || '-'}</p>
