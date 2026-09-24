@@ -747,10 +747,11 @@ if (!function_exists('role_home')) {
     function role_home(?string $role): string
     {
         switch ($role) {
-            case 'pusat':    return 'admin_pusat/index';
-            case 'pic':      return 'admin_pic/index';
-            case 'investor': return 'investor/dashboard';
-            default:         return 'admin_cabang/input_data';
+            case 'pusat':     return 'admin_pusat/index';
+            case 'pic':       return 'admin_pic/index';
+            case 'investor':  return 'investor/dashboard';
+            case 'rekrutmen': return 'admin_rekrutmen/index';
+            default:          return 'admin_cabang/input_data';
         }
     }
 }

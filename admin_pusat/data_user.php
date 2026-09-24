@@ -24,18 +24,20 @@ if (!function_exists('csrf_check')) {
 
 function user_relasi_label(array $d): string {
     switch ($d['role']) {
-        case 'cabang':   return !empty($d['nama_cabang']) ? h($d['nama_cabang']) : '<span class="badge bg-light text-muted border">Belum dipilih</span>';
-        case 'pic':      return '<span class="badge bg-light text-muted border">Multi-cabang &mdash; lihat Data Pengelola</span>';
-        case 'investor': return !empty($d['nama_investor']) ? h($d['nama_investor']) : '<span class="badge bg-light text-muted border">Belum dipilih</span>';
+        case 'cabang':    return !empty($d['nama_cabang']) ? h($d['nama_cabang']) : '<span class="badge bg-light text-muted border">Belum dipilih</span>';
+        case 'pic':       return '<span class="badge bg-light text-muted border">Multi-cabang &mdash; lihat Data Pengelola</span>';
+        case 'investor':  return !empty($d['nama_investor']) ? h($d['nama_investor']) : '<span class="badge bg-light text-muted border">Belum dipilih</span>';
+        case 'rekrutmen': return '<span class="badge bg-light text-muted border">Rekrutmen</span>';
         default:          return '<span class="badge bg-light text-muted border">Pusat</span>';
     }
 }
 
 function role_badge_class(string $role): string {
     switch ($role) {
-        case 'pusat':    return 'bg-primary';
-        case 'pic':      return 'bg-warning text-dark';
-        case 'investor': return 'bg-purple text-white';
+        case 'pusat':     return 'bg-primary';
+        case 'pic':       return 'bg-warning text-dark';
+        case 'investor':  return 'bg-purple text-white';
+        case 'rekrutmen': return 'bg-dark text-white';
         default:          return 'bg-info text-dark';
     }
 }
@@ -88,7 +90,7 @@ if (isset($_POST['simpan'])) {
     $id_user   = !empty($_POST['id_user']) ? (int)$_POST['id_user'] : null;
     $username  = trim($_POST['username'] ?? '');
     $password  = $_POST['password'] ?? '';
-    $role      = in_array($_POST['role'] ?? '', ['pusat', 'pic', 'cabang', 'investor'], true) ? $_POST['role'] : 'cabang';
+    $role      = in_array($_POST['role'] ?? '', ['pusat', 'pic', 'cabang', 'investor', 'rekrutmen'], true) ? $_POST['role'] : 'cabang';
     $id_cabang   = ($role === 'cabang' && !empty($_POST['id_cabang'])) ? (int)$_POST['id_cabang'] : null;
     $id_investor = ($role === 'investor' && !empty($_POST['id_investor'])) ? (int)$_POST['id_investor'] : null;
     $status    = $_POST['status'] ?? 'aktif';
@@ -495,6 +497,7 @@ $stmt->close();
                             <option value="cabang">Cabang (kirim nota)</option>
                             <option value="pic">PIC (isi laporan, pegang cabang)</option>
                             <option value="investor">Investor (lihat dashboard)</option>
+                            <option value="rekrutmen">Admin Rekrutmen (input calon pengelola)</option>
                             <option value="pusat">Pusat</option>
                         </select>
                     </div>

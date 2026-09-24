@@ -216,6 +216,12 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
             </a>
         </li>
 
+        <li class="nav-item">
+            <a class="nav-link <?=($current_page=='data_calon_pengelola')?'active':''?>" href="data_calon_pengelola">
+                <i class="bi bi-person-lines-fill"></i> Data Calon Pengelola
+            </a>
+        </li>
+
         <div class="nav-section">Sistem</div>
         <li class="nav-item">
             <a class="nav-link <?=($current_page=='simulasi')?'active':''?>" href="simulasi">

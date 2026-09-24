@@ -92,6 +92,7 @@ Sudah diterapkan:
 - `2026_09_01_000001_arsip_laporan_terhapus.sql` — tabel `laporan_cabang_arsip` (snapshot sebelum hapus).
 - `2026_09_01_000002_2fa_pusat.sql` — kolom `totp_secret`/`totp_enabled`/`totp_backup_codes` di `users`.
 - `2026_09_01_000003_bridge_production_legacy.sql` — KHUSUS untuk database yang masih di schema lama (mis. production sebelum deploy 2026-09-01): rename `cabang.no_rekening`/`nama_bank` → `no_rekening_cabang`/`nama_bank_cabang`, tambah `cabang.atas_nama_cabang`, buat tabel `pengelola` dan pindahkan datanya dari kolom-kolom lama di `users` (`nama_pengelola`/`no_rekening`/`nama_bank`/`atas_nama_rekening`/`tgl_mulai`/`tgl_selesai` — kolom itu SENGAJA dibiarkan dorman di `users`, tidak dihapus). Jalankan file ini SEBELUM 4 migration di atas kalau database tujuan belum punya tabel `pengelola`.
+- `2026_09_24_000001_calon_pengelola.sql` — role baru `rekrutmen` (`users.role`), tabel `calon_pengelola` (hasil interview calon pengelola diinput admin rekrutmen via `admin_rekrutmen/`, dilihat & di-tindak-lanjuti admin pusat via `admin_pusat/data_calon_pengelola.php`). Notifikasi otomatis ke semua user `pusat` lewat `kirim_notifikasi()`/`semua_user_pusat()` yang sudah ada.
 
 ## Jaring pengaman otomatis (tests)
 
