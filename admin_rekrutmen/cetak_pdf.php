@@ -81,6 +81,7 @@ ob_start();
 <head>
 <meta charset="UTF-8">
 <style>
+    @page { margin: 12mm; }
     body { font-family: 'Times New Roman', Times, serif; color: #111; font-size: 11px; line-height: 1.5; }
     table.kop { width: 100%; border-bottom: 3px double #334155; padding-bottom: 8px; margin-bottom: 10px; border-collapse: collapse; }
     table.kop td.logo { width: 50px; vertical-align: middle; }
@@ -105,10 +106,11 @@ ob_start();
     table.ttd td { width: 45%; }
     table.ttd .garis { margin-top: 50px; border-top: 1px solid #111; padding-top: 4px; }
     .lampiran-page { page-break-before: always; }
-    table.dokumen-grid { width: 100%; margin-top: 10px; border-collapse: collapse; }
-    table.dokumen-grid td { width: 50%; text-align: center; font-size: 11px; padding: 8px; vertical-align: middle; }
-    table.dokumen-grid img { max-width: 100%; max-height: 78mm; border: 1px solid #ccc; }
-    table.dokumen-grid .lbl { margin-top: 6px; font-weight: bold; }
+    table.dokumen-grid { width: 100%; margin-top: 8px; border-collapse: collapse; }
+    table.dokumen-grid tr { page-break-inside: avoid; }
+    table.dokumen-grid td { width: 50%; text-align: center; font-size: 10px; padding: 5px; vertical-align: middle; }
+    table.dokumen-grid img { max-width: 100%; max-height: 62mm; border: 1px solid #ccc; }
+    table.dokumen-grid .lbl { margin-top: 3px; font-weight: bold; }
     .footer-wm { text-align: center; font-size: 10px; color: #555; margin-top: 20px; letter-spacing: 1px; }
 </style>
 </head>
