@@ -1,5 +1,12 @@
 <?php
 require '../config/koneksi.php';
+
+// Cegah browser/proxy nge-cache halaman ini -- kalau ada perbaikan JS di
+// halaman ini (mis. logika cetak PDF), user harus selalu dapat versi
+// terbaru, bukan versi lama yang ke-cache dari kunjungan sebelumnya.
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+
 include 'sidebar.php';
 
 // Catatan: sidebar.php di atas SUDAH mengirim output HTML (<!DOCTYPE>, dst),
@@ -572,8 +579,19 @@ function cetak_isi($val) {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
-<?php if ($id_calon): ?>
-const CETAK_FILENAME = <?= json_encode('Interview Calon Pengelola - ' . $d['nama_calon'] . '.pdf') ?>;
+<?php if ($id_calon):
+    // Nama file: "No Urut - Nama Pengelola - Tanggal Interview". No_urut sering
+    // berisi "/" (mis. "001/HRD/IX") yang tidak boleh ada di nama file -> ganti "-".
+    function nama_file_aman(string $s): string {
+        $s = str_replace(['/', '\\'], '-', $s);
+        return preg_replace('/[<>:"|?*]/', '', $s);
+    }
+    $bagian_no_urut = $d['no_urut'] !== null && $d['no_urut'] !== '' ? nama_file_aman($d['no_urut']) : '-';
+    $bagian_nama    = nama_file_aman($d['nama_calon']);
+    $bagian_tanggal = date('d-m-Y', strtotime($d['tanggal_interview']));
+    $nama_file_cetak = "$bagian_no_urut - $bagian_nama - $bagian_tanggal.pdf";
+?>
+const CETAK_FILENAME = <?= json_encode($nama_file_cetak) ?>;
 
 function cetakPdfOpt() {
     return {
@@ -586,18 +604,35 @@ function cetakPdfOpt() {
     };
 }
 
-function cetakPDF(btn) {
+// Tunggu SEMUA <img> di area cetak selesai dimuat & di-decode sebelum
+// html2canvas membaca DOM-nya -- foto dokumen (KTP/KK/dst) ukurannya bisa
+// ratusan KB, kalau belum selesai dimuat saat capture, hasilnya bisa
+// kosong/blank (terutama di koneksi HP yang lebih lambat dari server).
+async function tungguGambarSiap(area) {
+    const imgs = Array.from(area.querySelectorAll('img'));
+    await Promise.all(imgs.map(function (img) {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise(function (resolve) {
+            img.addEventListener('load', resolve, { once: true });
+            img.addEventListener('error', resolve, { once: true }); // jangan sampai macet gara-gara 1 foto rusak
+            setTimeout(resolve, 8000); // jaring pengaman kalau event tidak pernah muncul
+        });
+    }));
+}
+
+async function cetakPDF(btn) {
     const area = document.getElementById('area-cetak');
     if (btn) { btn.disabled = true; }
     area.style.display = 'block';
-    html2pdf().set(cetakPdfOpt()).from(area).save().then(function () {
-        area.style.display = 'none';
-        if (btn) btn.disabled = false;
-    }).catch(function () {
-        area.style.display = 'none';
-        if (btn) btn.disabled = false;
+    try {
+        await tungguGambarSiap(area);
+        await html2pdf().set(cetakPdfOpt()).from(area).save();
+    } catch (e) {
         alert('Gagal membuat PDF. Coba lagi.');
-    });
+    } finally {
+        area.style.display = 'none';
+        if (btn) btn.disabled = false;
+    }
 }
 
 async function bagikanWA(btn) {
@@ -606,7 +641,9 @@ async function bagikanWA(btn) {
     area.style.display = 'block';
 
     const teks = CETAK_FILENAME.replace(/\.pdf$/i, '');
-    html2pdf().set(cetakPdfOpt()).from(area).outputPdf('blob').then(async function (blob) {
+    try {
+        await tungguGambarSiap(area);
+        const blob = await html2pdf().set(cetakPdfOpt()).from(area).outputPdf('blob');
         area.style.display = 'none';
         if (btn) btn.disabled = false;
 
@@ -624,11 +661,11 @@ async function bagikanWA(btn) {
         a.download = CETAK_FILENAME;
         a.click();
         window.open('https://wa.me/?text=' + encodeURIComponent(teks + ' (PDF terlampir, silakan unggah manual)'), '_blank');
-    }).catch(function () {
+    } catch (e) {
         area.style.display = 'none';
         if (btn) btn.disabled = false;
         alert('Gagal membuat PDF. Coba lagi.');
-    });
+    }
 }
 
 <?php if (isset($_GET['saved'])): ?>
