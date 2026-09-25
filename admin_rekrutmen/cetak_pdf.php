@@ -68,6 +68,12 @@ $opsi_kesimpulan = [
     'belum_direkomendasikan' => 'Belum Direkomendasikan',
 ];
 
+// Kop surat -- logo & alamat kantor pusat, gaya sama dengan cetak PDF di
+// menu Rekapitulasi/Laporan Mingguan.
+$logo_uri = img_data_uri(__DIR__ . '/../assets/img/wbb.png');
+$alamat_pusat = 'Kantor Pusat : Jl. Pamulang Permai Raya, Pamulang Bar., Kec. Pamulang, Kota Tangerang Selatan, Banten 15417';
+$telp_pusat = '087784838769';
+
 ob_start();
 ?>
 <!DOCTYPE html>
@@ -76,8 +82,13 @@ ob_start();
 <meta charset="UTF-8">
 <style>
     body { font-family: 'Times New Roman', Times, serif; color: #111; font-size: 11px; line-height: 1.5; }
-    h1 { text-align: center; font-size: 16px; margin: 0 0 2px; }
-    h2 { text-align: center; font-size: 13px; margin: 0 0 14px; font-weight: normal; }
+    table.kop { width: 100%; border-bottom: 3px double #334155; padding-bottom: 8px; margin-bottom: 10px; border-collapse: collapse; }
+    table.kop td.logo { width: 50px; vertical-align: middle; }
+    table.kop td.logo img { width: 46px; height: 46px; }
+    table.kop td.nama { vertical-align: middle; }
+    table.kop .kop-title { font-size: 15px; font-weight: bold; color: #111; }
+    table.kop .kop-addr { font-size: 9px; color: #444; margin-top: 2px; line-height: 1.4; }
+    h1 { text-align: center; font-size: 14px; margin: 0 0 14px; letter-spacing: .5px; }
     table.f-head { width: 100%; margin-bottom: 14px; border-collapse: collapse; }
     table.f-head td { padding: 2px 8px 2px 0; vertical-align: top; }
     table.f-head td.lbl { font-weight: bold; width: 140px; }
@@ -93,15 +104,25 @@ ob_start();
     table.ttd { width: 100%; margin-top: 40px; text-align: center; border-collapse: collapse; }
     table.ttd td { width: 45%; }
     table.ttd .garis { margin-top: 50px; border-top: 1px solid #111; padding-top: 4px; }
-    table.dokumen-grid { width: 100%; margin-top: 8px; border-collapse: collapse; }
-    table.dokumen-grid td { width: 33%; text-align: center; font-size: 10px; padding: 4px; }
-    table.dokumen-grid img { max-width: 100%; max-height: 75px; border: 1px solid #ccc; }
+    .lampiran-page { page-break-before: always; }
+    table.dokumen-grid { width: 100%; margin-top: 10px; border-collapse: collapse; }
+    table.dokumen-grid td { width: 50%; text-align: center; font-size: 11px; padding: 8px; vertical-align: middle; }
+    table.dokumen-grid img { max-width: 100%; max-height: 78mm; border: 1px solid #ccc; }
+    table.dokumen-grid .lbl { margin-top: 6px; font-weight: bold; }
     .footer-wm { text-align: center; font-size: 10px; color: #555; margin-top: 20px; letter-spacing: 1px; }
 </style>
 </head>
 <body>
-    <h1>INTERVIEW CALON PENGELOLA</h1>
-    <h2>WARTEG BUMI BAHARI (WBB)</h2>
+    <table class="kop">
+        <tr>
+            <?php if ($logo_uri): ?><td class="logo"><img src="<?= $logo_uri ?>"></td><?php endif; ?>
+            <td class="nama">
+                <div class="kop-title">WARTEG BUMI BAHARI</div>
+                <div class="kop-addr"><?= h($alamat_pusat) ?><br>Telp. <?= h($telp_pusat) ?></div>
+            </td>
+        </tr>
+    </table>
+    <h1>FORMULIR INTERVIEW CALON PENGELOLA</h1>
 
     <table class="f-head">
         <tr><td class="lbl">No. Urut</td><td><?= cetak_isi($d['no_urut'] ?? '') ?></td></tr>
@@ -174,20 +195,22 @@ ob_start();
     $foto_ada = array_values(array_filter($UPLOAD_FIELDS, fn($f) => !empty($d[$f])));
     if ($foto_ada):
     ?>
-    <div class="sect" style="margin-top:20px;">LAMPIRAN DOKUMEN</div>
-    <table class="dokumen-grid">
-        <tr>
-        <?php foreach ($foto_ada as $i => $f):
-            if ($i > 0 && $i % 3 === 0) echo '</tr><tr>';
-            $uri = img_data_uri($UPLOAD_DIR . $d[$f]);
-        ?>
-            <td>
-                <?php if ($uri): ?><img src="<?= $uri ?>"><?php endif; ?>
-                <div><?= h($UPLOAD_LABEL[$f]) ?></div>
-            </td>
-        <?php endforeach; ?>
-        </tr>
-    </table>
+    <div class="lampiran-page">
+        <div class="sect">LAMPIRAN DOKUMEN</div>
+        <table class="dokumen-grid">
+            <tr>
+            <?php foreach ($foto_ada as $i => $f):
+                if ($i > 0 && $i % 2 === 0) echo '</tr><tr>';
+                $uri = img_data_uri($UPLOAD_DIR . $d[$f]);
+            ?>
+                <td>
+                    <?php if ($uri): ?><img src="<?= $uri ?>"><?php endif; ?>
+                    <div class="lbl"><?= h($UPLOAD_LABEL[$f]) ?></div>
+                </td>
+            <?php endforeach; ?>
+            </tr>
+        </table>
+    </div>
     <?php endif; ?>
 
     <div class="footer-wm">WARTEG BUMI BAHARI MANAGEMENT</div>
