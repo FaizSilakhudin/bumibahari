@@ -438,150 +438,18 @@ $d = $data ?? [];
 
         <?php if ($id_calon): ?>
         <div class="d-flex justify-content-end gap-2 mt-3 pt-3 border-top no-print">
-            <button type="button" class="btn btn-premium-outline" onclick="cetakPDF(this)"><i class="bi bi-file-earmark-pdf me-1"></i> Cetak PDF</button>
+            <a href="cetak_pdf.php?id=<?= $id_calon ?>" target="_blank" class="btn btn-premium-outline"><i class="bi bi-file-earmark-pdf me-1"></i> Cetak PDF</a>
             <button type="button" class="btn btn-wa" onclick="bagikanWA(this)"><i class="bi bi-whatsapp me-1"></i> Kirim ke WA</button>
         </div>
         <?php endif; ?>
     </div>
 </div>
 
-<?php if ($id_calon): ?>
-<!-- ================= AREA CETAK PDF (replika formulir, disembunyikan dari layar) ================= -->
-<?php
-function cetak_yt($val) {
-    $ya = $val === 'ya';
-    $tidak = $val === 'tidak';
-    return '<span class="chk' . ($ya ? ' checked' : '') . '"></span> Ya&nbsp;&nbsp;&nbsp;'
-         . '<span class="chk' . ($tidak ? ' checked' : '') . '"></span> Tidak';
-}
-function cetak_isi($val) {
-    $val = trim((string) $val);
-    return $val !== '' ? nl2br(h($val)) : '<span class="kosong">-</span>';
-}
-?>
-<div id="area-cetak" style="display: none; width: 190mm; background: #fff; padding: 10mm; font-family: 'Times New Roman', serif; color: #111; font-size: 11px; line-height: 1.5;">
-    <style>
-        #area-cetak h1 { text-align: center; font-size: 16px; margin: 0 0 2px; }
-        #area-cetak h2 { text-align: center; font-size: 13px; margin: 0 0 14px; font-weight: normal; }
-        #area-cetak .f-head { display: grid; grid-template-columns: 140px 1fr; gap: 4px 8px; margin-bottom: 14px; }
-        #area-cetak .f-head b { font-weight: bold; }
-        #area-cetak .sect { background: #e5e5e5; font-weight: bold; padding: 5px 8px; margin: 14px 0 8px; font-size: 12px; }
-        #area-cetak .q { margin-bottom: 8px; }
-        #area-cetak .q .no { font-weight: bold; }
-        #area-cetak .jawab { border-bottom: 1px dotted #999; padding: 2px 0 3px 4px; min-height: 14px; }
-        #area-cetak .kosong { color: #999; }
-        #area-cetak .desc { font-size: 10px; color: #333; text-align: justify; margin-bottom: 8px; }
-        #area-cetak .chk { display: inline-block; width: 10px; height: 10px; border: 1.4px solid #111; margin-right: 4px; vertical-align: middle; }
-        #area-cetak .chk.checked { background: #111; }
-        #area-cetak .kesimpulan-item { margin-bottom: 4px; }
-        #area-cetak .ttd { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; }
-        #area-cetak .ttd .kolom { width: 45%; }
-        #area-cetak .ttd .garis { margin-top: 50px; border-top: 1px solid #111; padding-top: 4px; }
-        #area-cetak .dokumen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
-        #area-cetak .dokumen-grid div { text-align: center; font-size: 10px; }
-        #area-cetak .dokumen-grid img { width: 100%; height: 80px; object-fit: cover; border: 1px solid #ccc; }
-        #area-cetak .footer-wm { text-align: center; font-size: 10px; color: #555; margin-top: 20px; letter-spacing: 1px; }
-    </style>
-
-    <h1>INTERVIEW CALON PENGELOLA</h1>
-    <h2>WARTEG BUMI BAHARI (WBB)</h2>
-
-    <div class="f-head">
-        <b>No. Urut</b><span><?= cetak_isi($d['no_urut'] ?? '') ?></span>
-        <b>Nama Calon Pengelola</b><span><?= h($d['nama_calon']) ?></span>
-        <b>Usia</b><span><?= $d['usia'] ? (int) $d['usia'] . ' Tahun' : '-' ?></span>
-        <b>Alamat</b><span><?= cetak_isi($d['alamat'] ?? '') ?></span>
-        <b>No. HP</b><span><?= cetak_isi($d['no_hp'] ?? '') ?></span>
-        <b>Tanggal Interview</b><span><?= date('d F Y', strtotime($d['tanggal_interview'])) ?></span>
-        <b>Interviewer</b><span><?= cetak_isi($d['interviewer'] ?? '') ?></span>
-    </div>
-
-    <div class="sect">A. IDENTITAS &amp; PENGALAMAN KERJA</div>
-    <div class="q"><div class="no">1. Perkenalan &amp; pengalaman kerja sebelumnya</div><div class="jawab"><?= cetak_isi($d['a_perkenalan']) ?></div></div>
-    <div class="q"><div class="no">2. Bekerja/mengelola usaha sebelumnya</div>
-        <div class="jawab">Nama tempat/usaha: <?= cetak_isi($d['a_nama_tempat_usaha']) ?> &mdash; Posisi/jabatan: <?= cetak_isi($d['a_posisi_jabatan']) ?> &mdash; Lama bekerja: <?= cetak_isi($d['a_lama_bekerja']) ?></div>
-    </div>
-    <div class="q"><div class="no">3. Pernah mengelola warteg?</div>
-        <div class="jawab"><?= cetak_yt($d['a_pernah_kelola_warteg']) ?><br>
-        Lama: <?= cetak_isi($d['a_lama_kelola_warteg']) ?> &mdash; Omzet rata-rata: <?= cetak_isi($d['a_omzet_rata_rata']) ?> &mdash; Omzet tertinggi: <?= cetak_isi($d['a_omzet_tertinggi']) ?></div>
-    </div>
-    <div class="q"><div class="no">4. Alasan berhenti/keluar</div><div class="jawab"><?= cetak_isi($d['a_alasan_berhenti']) ?></div></div>
-    <div class="q"><div class="no">Punya video hasil masakan?</div><div class="jawab"><?= cetak_yt($d['a_video_masakan']) ?></div></div>
-    <div class="q"><div class="no">Menu yang dikuasai</div><div class="jawab"><?= cetak_isi($d['a_menu_dikuasai']) ?></div></div>
-    <div class="q"><div class="no">Catatan Interviewer</div><div class="jawab"><?= cetak_isi($d['a_catatan_interviewer']) ?></div></div>
-
-    <div class="sect">B. PENGETAHUAN TENTANG WARTEG BUMI BAHARI</div>
-    <div class="q"><div class="no">1. Tahu WBB dari mana</div><div class="jawab"><?= cetak_isi($d['b_tahu_dari_mana']) ?></div></div>
-    <div class="q"><div class="no">2. Alasan tertarik bergabung</div><div class="jawab"><?= cetak_isi($d['b_alasan_tertarik']) ?></div></div>
-    <div class="q"><div class="no">3. Pernah lihat/kunjungi outlet WBB?</div>
-        <div class="jawab"><?= cetak_yt($d['b_pernah_kunjungi_outlet']) ?><br>Outlet: <?= cetak_isi($d['b_outlet_mana']) ?> &mdash; Yang diperhatikan: <?= cetak_isi($d['b_yang_diperhatikan']) ?></div>
-    </div>
-    <div class="q"><div class="no">4. Pendapat agar penjualan outlet baik</div><div class="jawab"><?= cetak_isi($d['b_pendapat_penjualan_baik']) ?></div></div>
-    <div class="q"><div class="no">Catatan Interviewer</div><div class="jawab"><?= cetak_isi($d['b_catatan_interviewer']) ?></div></div>
-
-    <div class="sect">C. PENJELASAN SISTEM &amp; KARAKTER WBB</div>
-    <div class="desc">WBB tidak hanya berorientasi membuka warung, tetapi membangun perusahaan dan jaringan usaha yang kuat serta berkelanjutan. Lokasi outlet dipilih selektif berdasarkan potensi pasar, kepadatan konsumen, lingkungan, akses, dan peluang omzet. Pengelola harus siap mengikuti sistem, SOP, evaluasi, dan arahan manajemen.</div>
-    <div class="q"><div class="no">Jawaban kesiapan ikuti standar &amp; kebijakan Manajemen WBB</div><div class="jawab"><?= cetak_isi($d['c_jawaban_kesiapan']) ?></div></div>
-
-    <div class="sect">D. KOMITMEN &amp; JENJANG KARIER PENGELOLA</div>
-    <div class="desc">Evaluasi berdasarkan: 1) Komunikatif, 2) Kemampuan memasak, 3) Disiplin &amp; dapat diarahkan, 4) Kemampuan mengelola outlet, 5) Integritas &amp; tanggung jawab.</div>
-
-    <div class="sect">E. PELUANG PENEMPATAN OUTLET</div>
-    <div class="desc">Pengelola berkinerja baik dapat dipertimbangkan mengelola outlet berpotensi omzet lebih tinggi, berdasarkan kinerja, kesiapan, kemampuan, dan kebutuhan operasional perusahaan.</div>
-
-    <div class="sect">F. PERTANYAAN KOMITMEN AKHIR</div>
-    <div class="q"><div class="no">1. Siap ikuti SOP &amp; arahan manajemen?</div><div class="jawab"><?= cetak_yt($d['f_siap_sop']) ?></div></div>
-    <div class="q"><div class="no">2. Siap dievaluasi berkala?</div><div class="jawab"><?= cetak_yt($d['f_siap_evaluasi']) ?></div></div>
-    <div class="q"><div class="no">3. Siap ditempatkan/dipindahkan?</div><div class="jawab"><?= cetak_yt($d['f_siap_dipindah']) ?></div></div>
-    <div class="q"><div class="no">4. Siap jaga kualitas masakan/pelayanan/kebersihan/laporan?</div><div class="jawab"><?= cetak_yt($d['f_siap_jaga_kualitas']) ?></div></div>
-    <div class="q"><div class="no">5. Rencana tingkatkan penjualan (outlet omzet besar)</div><div class="jawab"><?= cetak_isi($d['f_rencana_tingkatkan_penjualan']) ?></div></div>
-    <div class="q"><div class="no">6. Target bergabung dengan WBB</div><div class="jawab"><?= cetak_isi($d['f_target_bergabung']) ?></div></div>
-
-    <div class="sect">KESIMPULAN INTERVIEWER</div>
-    <?php
-    $opsi_kesimpulan = [
-        'direkomendasikan' => 'Direkomendasikan',
-        'dipertimbangkan' => 'Dipertimbangkan / Tes Lanjutan',
-        'tes_memasak' => 'Tes Memasak',
-        'belum_direkomendasikan' => 'Belum Direkomendasikan',
-    ];
-    foreach ($opsi_kesimpulan as $key => $label):
-        $checked = ($d['kesimpulan_interviewer'] ?? '') === $key;
-    ?>
-        <div class="kesimpulan-item"><span class="chk<?= $checked ? ' checked' : '' ?>"></span> <?= h($label) ?></div>
-    <?php endforeach; ?>
-    <div class="q" style="margin-top:8px;"><div class="no">Catatan</div><div class="jawab"><?= cetak_isi($d['catatan_kesimpulan']) ?></div></div>
-
-    <div class="ttd">
-        <div class="kolom"><div class="garis"><?= h($d['interviewer'] ?: '.....................') ?></div>Interviewer</div>
-        <div class="kolom"><div class="garis"><?= h($d['nama_calon']) ?></div>Calon Pengelola</div>
-    </div>
-
-    <?php
-    $ada_dokumen = false;
-    foreach ($UPLOAD_FIELDS as $f) { if (!empty($d[$f])) { $ada_dokumen = true; break; } }
-    if ($ada_dokumen):
-    ?>
-    <div class="sect" style="margin-top:20px;">LAMPIRAN DOKUMEN</div>
-    <div class="dokumen-grid">
-        <?php foreach ($UPLOAD_FIELDS as $f): if (empty($d[$f])) continue; ?>
-            <div>
-                <img src="<?= h($UPLOAD_DIR . $d[$f]) ?>">
-                <div><?= h($UPLOAD_LABEL[$f]) ?></div>
-            </div>
-        <?php endforeach; ?>
-    </div>
-    <?php endif; ?>
-
-    <div class="footer-wm">WARTEG BUMI BAHARI MANAGEMENT</div>
-</div>
-<?php endif; ?>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 <?php if ($id_calon):
     // Nama file: "No Urut - Nama Pengelola - Tanggal Interview". No_urut sering
-    // berisi "/" (mis. "001/HRD/IX") yang tidak boleh ada di nama file -> ganti "-".
+    // berisi "/" (mis. "001/HRD/IX") yang tidak boleh ada di nama file -> ganti "-"
+    // (harus SAMA PERSIS dengan nama_file_aman() di cetak_pdf.php).
     function nama_file_aman(string $s): string {
         $s = str_replace(['/', '\\'], '-', $s);
         return preg_replace('/[<>:"|?*]/', '', $s);
@@ -592,60 +460,19 @@ function cetak_isi($val) {
     $nama_file_cetak = "$bagian_no_urut - $bagian_nama - $bagian_tanggal.pdf";
 ?>
 const CETAK_FILENAME = <?= json_encode($nama_file_cetak) ?>;
+const CETAK_URL = <?= json_encode('cetak_pdf.php?id=' . $id_calon) ?>;
 
-function cetakPdfOpt() {
-    return {
-        margin: [10, 10, 10, 10],
-        filename: CETAK_FILENAME,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-}
-
-// Tunggu SEMUA <img> di area cetak selesai dimuat & di-decode sebelum
-// html2canvas membaca DOM-nya -- foto dokumen (KTP/KK/dst) ukurannya bisa
-// ratusan KB, kalau belum selesai dimuat saat capture, hasilnya bisa
-// kosong/blank (terutama di koneksi HP yang lebih lambat dari server).
-async function tungguGambarSiap(area) {
-    const imgs = Array.from(area.querySelectorAll('img'));
-    await Promise.all(imgs.map(function (img) {
-        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-        return new Promise(function (resolve) {
-            img.addEventListener('load', resolve, { once: true });
-            img.addEventListener('error', resolve, { once: true }); // jangan sampai macet gara-gara 1 foto rusak
-            setTimeout(resolve, 8000); // jaring pengaman kalau event tidak pernah muncul
-        });
-    }));
-}
-
-async function cetakPDF(btn) {
-    const area = document.getElementById('area-cetak');
-    if (btn) { btn.disabled = true; }
-    area.style.display = 'block';
-    try {
-        await tungguGambarSiap(area);
-        await html2pdf().set(cetakPdfOpt()).from(area).save();
-    } catch (e) {
-        alert('Gagal membuat PDF. Coba lagi.');
-    } finally {
-        area.style.display = 'none';
-        if (btn) btn.disabled = false;
-    }
-}
-
+// PDF dibuat sepenuhnya di server (Dompdf) -- di sini kita hanya mengambil
+// berkasnya lewat fetch biasa untuk dibagikan lewat Web Share API. Tidak ada
+// lagi html2canvas/kanvas browser yang terlibat, jadi tidak bisa lagi kosong
+// gara-gara ekstensi/antivirus/driver GPU di perangkat pengguna.
 async function bagikanWA(btn) {
-    const area = document.getElementById('area-cetak');
     if (btn) { btn.disabled = true; }
-    area.style.display = 'block';
-
     const teks = CETAK_FILENAME.replace(/\.pdf$/i, '');
     try {
-        await tungguGambarSiap(area);
-        const blob = await html2pdf().set(cetakPdfOpt()).from(area).outputPdf('blob');
-        area.style.display = 'none';
-        if (btn) btn.disabled = false;
+        const resp = await fetch(CETAK_URL);
+        if (!resp.ok) throw new Error('Gagal mengambil PDF');
+        const blob = await resp.blob();
 
         const file = new File([blob], CETAK_FILENAME, { type: 'application/pdf' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -662,9 +489,9 @@ async function bagikanWA(btn) {
         a.click();
         window.open('https://wa.me/?text=' + encodeURIComponent(teks + ' (PDF terlampir, silakan unggah manual)'), '_blank');
     } catch (e) {
-        area.style.display = 'none';
-        if (btn) btn.disabled = false;
         alert('Gagal membuat PDF. Coba lagi.');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
