@@ -45,7 +45,8 @@ function cetak_isi($val) {
 // tidak mungkin kena masalah cache/CORS/canvas seperti pendekatan client-side lama.
 function img_data_uri(string $path): ?string {
     if (!is_file($path)) return null;
-    $mime = @mime_content_type($path);
+    $info = @getimagesize($path);
+    $mime = is_array($info) ? ($info['mime'] ?? '') : '';
     $data = @file_get_contents($path);
     if ($data === false) return null;
     return 'data:' . ($mime ?: 'image/jpeg') . ';base64,' . base64_encode($data);
