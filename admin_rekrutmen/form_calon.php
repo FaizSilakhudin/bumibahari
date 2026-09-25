@@ -566,7 +566,7 @@ function cetak_isi($val) {
     <div class="dokumen-grid">
         <?php foreach ($UPLOAD_FIELDS as $f): if (empty($d[$f])) continue; ?>
             <div>
-                <img src="<?= h($UPLOAD_DIR . $d[$f]) ?>" crossorigin="anonymous">
+                <img src="<?= h($UPLOAD_DIR . $d[$f]) ?>">
                 <div><?= h($UPLOAD_LABEL[$f]) ?></div>
             </div>
         <?php endforeach; ?>
