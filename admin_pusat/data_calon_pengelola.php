@@ -153,6 +153,44 @@ $stmt->close();
         .search-container input { width: 100% !important; }
         .saas-card { padding: 12px; }
     }
+
+    /* ===== Detail Calon Pengelola — modal view ===== */
+    #modalDetail .modal-content { background: #f4f7fe; }
+    #modalDetail .modal-header { background: linear-gradient(135deg, #4318ff 0%, #6a3dfb 100%); border-radius: 24px 24px 0 0 !important; padding: 22px 26px; }
+    #modalDetail .modal-header .btn-close { filter: brightness(0) invert(1); opacity: .85; }
+    #modalDetail .modal-body { padding: 22px; }
+    .dv-badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .dv-badge-row .badge { font-weight: 600; padding: 6px 12px; }
+    .dv-meta { color: rgba(255,255,255,.8); font-size: 12.5px; margin-top: 4px; }
+
+    .dv-sect { background: #ffffff; border-radius: 18px; padding: 18px 20px; margin-bottom: 16px; box-shadow: 0px 6px 20px rgba(112,144,176,.06); }
+    .dv-sect-head { display: flex; align-items: center; gap: 10px; font-weight: 700; color: #1b2559; font-size: 14px; margin-bottom: 14px; }
+    .dv-sect-head .dv-ico { width: 32px; height: 32px; border-radius: 10px; background: #f0edff; color: #4318ff; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+
+    .dv-item { margin-bottom: 12px; }
+    .dv-item:last-child { margin-bottom: 0; }
+    .dv-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #a3aed0; margin-bottom: 3px; }
+    .dv-value { font-size: 14px; color: #2b3674; line-height: 1.55; white-space: pre-line; }
+    .dv-value.empty { color: #cbd5e1; font-style: italic; }
+
+    .dv-yt { display: inline-flex; align-items: center; gap: 5px; padding: 3px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }
+    .dv-yt.ya { background: #dcfce7; color: #15803d; }
+    .dv-yt.tidak { background: #fee2e2; color: #b91c1c; }
+    .dv-yt.na { background: #f1f5f9; color: #94a3b8; }
+
+    .dv-doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .dv-doc { text-align: center; cursor: pointer; }
+    .dv-doc img { width: 100%; height: 110px; object-fit: cover; border-radius: 12px; border: 1px solid #eef2f9; transition: transform .15s ease, box-shadow .15s ease; }
+    .dv-doc:hover img { transform: scale(1.04); box-shadow: 0 8px 20px rgba(67,24,255,.18); }
+    .dv-doc .dv-doc-label { font-size: 12px; color: #707eae; margin-top: 6px; font-weight: 600; }
+    .dv-empty-note { color: #a3aed0; font-size: 13px; font-style: italic; }
+
+    @media (max-width: 576px) {
+        #modalDetail .modal-header { padding: 18px 18px; }
+        #modalDetail .modal-body { padding: 14px; }
+        .dv-sect { padding: 14px 16px; border-radius: 16px; }
+        .dv-doc-grid { grid-template-columns: repeat(2, 1fr); }
+    }
 </style>
 
 <div class="container-fluid py-4">
@@ -259,16 +297,28 @@ $stmt->close();
 
 <!-- MODAL DETAIL (read-only) -->
 <div class="modal fade modal-premium" id="modalDetail" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl modal-fullscreen-sm-down">
         <div class="modal-content">
-            <div class="modal-header border-bottom-0 pb-0">
+            <div class="modal-header border-0">
                 <div>
-                    <h5 class="modal-title fw-bold" id="detailNama" style="color: #1b2559;"></h5>
-                    <small class="text-muted" id="detailMeta"></small>
+                    <h5 class="modal-title fw-bold text-white mb-0" id="detailNama"></h5>
+                    <div class="dv-meta" id="detailMeta"></div>
+                    <div class="dv-badge-row" id="detailBadges"></div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;" id="detailBody"></div>
+            <div class="modal-body" id="detailBody"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL LIGHTBOX FOTO -->
+<div class="modal fade" id="modalFoto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <button type="button" class="btn-close btn-close-white ms-auto mb-2" data-bs-dismiss="modal" aria-label="Close"></button>
+            <img id="fotoLightboxImg" src="" alt="" class="img-fluid rounded-4 shadow" style="max-height: 80vh; object-fit: contain; width: 100%; background:#000;">
+            <div class="text-center text-white small mt-2 fw-semibold" id="fotoLightboxLabel"></div>
         </div>
     </div>
 </div>
@@ -319,7 +369,18 @@ const KESIMPULAN_LABEL = {
     tes_memasak: 'Tes Memasak',
     belum_direkomendasikan: 'Belum Direkomendasikan'
 };
+const KESIMPULAN_BADGE = {
+    direkomendasikan: 'bg-success-subtle text-success',
+    tes_memasak: 'bg-info-subtle text-info',
+    belum_direkomendasikan: 'bg-danger-subtle text-danger',
+    dipertimbangkan: 'bg-warning-subtle text-warning'
+};
 const STATUS_LABEL = { menunggu: 'Menunggu', diterima: 'Diterima', ditolak: 'Ditolak' };
+const STATUS_BADGE = {
+    diterima: 'bg-success-subtle text-success',
+    ditolak: 'bg-danger-subtle text-danger',
+    menunggu: 'bg-secondary-subtle text-secondary'
+};
 
 function getModalInstance(id) {
     const modalEl = document.getElementById(id);
@@ -328,60 +389,136 @@ function getModalInstance(id) {
 
 function esc(s) {
     const d = document.createElement('div');
-    d.innerText = s || '-';
+    d.innerText = (s === null || s === undefined || s === '') ? '' : s;
     return d.innerHTML;
 }
 
-function yt(v) { return v === 'ya' ? 'Ya' : (v === 'tidak' ? 'Tidak' : '-'); }
+function yt(v) {
+    if (v === 'ya') return '<span class="dv-yt ya"><i class="bi bi-check-circle-fill"></i> Ya</span>';
+    if (v === 'tidak') return '<span class="dv-yt tidak"><i class="bi bi-x-circle-fill"></i> Tidak</span>';
+    return '<span class="dv-yt na">-</span>';
+}
+
+// Satu blok label+value yang dipakai berulang di seluruh detail view.
+function item(label, value, full) {
+    const v = (value === null || value === undefined || value === '') ? '<span class="dv-value empty">Tidak diisi</span>' : '<span class="dv-value">' + esc(value) + '</span>';
+    return '<div class="' + (full ? 'col-12' : 'col-md-6') + ' dv-item"><div class="dv-label">' + esc(label) + '</div>' + v + '</div>';
+}
+// Sama seperti item(), tapi value-nya sudah HTML jadi (badge Ya/Tidak, dll) -- tidak di-escape lagi.
+function itemHtml(label, valueHtml, full) {
+    return '<div class="' + (full ? 'col-12' : 'col-md-6') + ' dv-item"><div class="dv-label">' + esc(label) + '</div><div class="dv-value">' + valueHtml + '</div></div>';
+}
+function sectHead(icon, title) {
+    return '<div class="dv-sect-head"><span class="dv-ico"><i class="bi ' + icon + '"></i></span>' + esc(title) + '</div>';
+}
+
 const UPLOAD_DIR = '../uploads/calon_pengelola/';
 const UPLOAD_LABEL = { foto_ktp: 'KTP', foto_kk: 'Kartu Keluarga', foto_buku_nikah: 'Buku Nikah', foto_masakan1: 'Foto Masakan 1', foto_masakan2: 'Foto Masakan 2', foto_masakan3: 'Foto Masakan 3' };
 
+function bukaFoto(src, label) {
+    document.getElementById('fotoLightboxImg').src = src;
+    document.getElementById('fotoLightboxLabel').innerText = label;
+    getModalInstance('modalFoto').show();
+}
+
+// Delegasi klik (bukan inline onclick) karena src/label bisa mengandung karakter
+// yang bentrok dengan tanda kutip atribut HTML kalau ditulis langsung di markup.
+document.getElementById('detailBody').addEventListener('click', function (e) {
+    const el = e.target.closest('.dv-doc');
+    if (el) bukaFoto(el.dataset.src, el.dataset.label);
+});
+
 function lihatDetail(d) {
     document.getElementById('detailNama').innerText = (d.no_urut ? 'No. ' + d.no_urut + ' — ' : '') + (d.nama_calon || '');
-    document.getElementById('detailMeta').innerText =
-        (d.tanggal_interview || '-') + ' · Interviewer: ' + (d.interviewer || '-') + ' · Diinput oleh: ' + (d.nama_input || '-');
+    document.getElementById('detailMeta').innerHTML =
+        '<i class="bi bi-calendar-event me-1"></i>' + esc(d.tanggal_interview || '-') +
+        ' &nbsp;·&nbsp; <i class="bi bi-person-badge me-1"></i>Interviewer: ' + esc(d.interviewer || '-') +
+        ' &nbsp;·&nbsp; <i class="bi bi-pencil-square me-1"></i>Diinput: ' + esc(d.nama_input || '-');
+
+    const kesLabel = KESIMPULAN_LABEL[d.kesimpulan_interviewer] || 'Dipertimbangkan / Tes Lanjutan';
+    const kesBadge = KESIMPULAN_BADGE[d.kesimpulan_interviewer] || KESIMPULAN_BADGE.dipertimbangkan;
+    const statLabel = STATUS_LABEL[d.status_tindak_lanjut] || 'Menunggu';
+    const statBadge = STATUS_BADGE[d.status_tindak_lanjut] || STATUS_BADGE.menunggu;
+    document.getElementById('detailBadges').innerHTML =
+        '<span class="badge rounded-pill ' + kesBadge + '"><i class="bi bi-clipboard-check me-1"></i>' + kesLabel + '</span>' +
+        '<span class="badge rounded-pill ' + statBadge + '"><i class="bi bi-flag-fill me-1"></i>' + statLabel + '</span>';
 
     let dokumenHtml = '';
     Object.keys(UPLOAD_LABEL).forEach(function (f) {
-        if (d[f]) dokumenHtml += '<div class="col-4 text-center"><img src="' + UPLOAD_DIR + d[f] + '" style="width:100%;height:90px;object-fit:cover;border-radius:8px;border:1px solid #eef2f9;"><div class="small text-muted mt-1">' + UPLOAD_LABEL[f] + '</div></div>';
+        if (!d[f]) return;
+        const src = UPLOAD_DIR + d[f];
+        const label = UPLOAD_LABEL[f];
+        dokumenHtml += '<div class="dv-doc" data-src="' + esc(src) + '" data-label="' + esc(label) + '">' +
+            '<img src="' + src + '" alt="' + esc(label) + '"><div class="dv-doc-label">' + esc(label) + '</div></div>';
     });
 
     document.getElementById('detailBody').innerHTML = `
-        <div class="form-section-title" style="margin-top:0;border-top:none;">Identitas</div>
-        <p class="mb-2"><strong>Usia:</strong> ${esc(d.usia)} tahun &middot; <strong>No. HP:</strong> ${esc(d.no_hp)}</p>
-        <p class="mb-3"><strong>Alamat:</strong> ${esc(d.alamat)}</p>
+        <div class="dv-sect">
+            ${sectHead('bi-person-vcard', 'Identitas')}
+            <div class="row">
+                ${item('Usia', d.usia ? d.usia + ' tahun' : '')}
+                ${item('No. HP', d.no_hp)}
+                ${item('Alamat', d.alamat, true)}
+            </div>
+        </div>
 
-        <div class="form-section-title">A. Identitas &amp; Pengalaman Kerja</div>
-        <p class="mb-1"><strong>1. Perkenalan &amp; pengalaman kerja:</strong> ${esc(d.a_perkenalan)}</p>
-        <p class="mb-1"><strong>2. Tempat kerja sebelumnya:</strong> ${esc(d.a_nama_tempat_usaha)} &mdash; ${esc(d.a_posisi_jabatan)} &mdash; ${esc(d.a_lama_bekerja)}</p>
-        <p class="mb-1"><strong>3. Pernah kelola warteg:</strong> ${yt(d.a_pernah_kelola_warteg)} &mdash; Lama: ${esc(d.a_lama_kelola_warteg)}, Omzet rata-rata: ${esc(d.a_omzet_rata_rata)}, Omzet tertinggi: ${esc(d.a_omzet_tertinggi)}</p>
-        <p class="mb-1"><strong>4. Alasan berhenti:</strong> ${esc(d.a_alasan_berhenti)}</p>
-        <p class="mb-1"><strong>Video hasil masakan:</strong> ${yt(d.a_video_masakan)} &middot; <strong>Menu dikuasai:</strong> ${esc(d.a_menu_dikuasai)}</p>
-        <p class="mb-3"><strong>Catatan interviewer:</strong> ${esc(d.a_catatan_interviewer)}</p>
+        <div class="dv-sect">
+            ${sectHead('bi-briefcase', 'A. Identitas & Pengalaman Kerja')}
+            <div class="row">
+                ${item('1. Perkenalan & pengalaman kerja', d.a_perkenalan, true)}
+                ${item('2. Tempat kerja sebelumnya', [d.a_nama_tempat_usaha, d.a_posisi_jabatan, d.a_lama_bekerja].filter(Boolean).join(' — '), true)}
+                ${itemHtml('3. Pernah kelola warteg?', yt(d.a_pernah_kelola_warteg))}
+                ${item('Lama / omzet rata-rata / tertinggi', [d.a_lama_kelola_warteg, d.a_omzet_rata_rata, d.a_omzet_tertinggi].filter(Boolean).join(' / '))}
+                ${item('4. Alasan berhenti', d.a_alasan_berhenti, true)}
+                ${itemHtml('Punya video hasil masakan?', yt(d.a_video_masakan))}
+                ${item('Menu yang dikuasai', d.a_menu_dikuasai)}
+                ${item('Catatan interviewer', d.a_catatan_interviewer, true)}
+            </div>
+        </div>
 
-        <div class="form-section-title">B. Pengetahuan tentang WBB</div>
-        <p class="mb-1"><strong>1. Tahu dari mana:</strong> ${esc(d.b_tahu_dari_mana)}</p>
-        <p class="mb-1"><strong>2. Alasan tertarik:</strong> ${esc(d.b_alasan_tertarik)}</p>
-        <p class="mb-1"><strong>3. Pernah kunjungi outlet:</strong> ${yt(d.b_pernah_kunjungi_outlet)} &mdash; Outlet: ${esc(d.b_outlet_mana)}, Yang diperhatikan: ${esc(d.b_yang_diperhatikan)}</p>
-        <p class="mb-1"><strong>4. Pendapat penjualan baik:</strong> ${esc(d.b_pendapat_penjualan_baik)}</p>
-        <p class="mb-3"><strong>Catatan interviewer:</strong> ${esc(d.b_catatan_interviewer)}</p>
+        <div class="dv-sect">
+            ${sectHead('bi-lightbulb', 'B. Pengetahuan tentang Warteg Bumi Bahari')}
+            <div class="row">
+                ${item('1. Tahu WBB dari mana', d.b_tahu_dari_mana, true)}
+                ${item('2. Alasan tertarik bergabung', d.b_alasan_tertarik, true)}
+                ${itemHtml('3. Pernah kunjungi outlet WBB?', yt(d.b_pernah_kunjungi_outlet))}
+                ${item('Outlet / yang diperhatikan', [d.b_outlet_mana, d.b_yang_diperhatikan].filter(Boolean).join(' — '))}
+                ${item('4. Pendapat agar penjualan baik', d.b_pendapat_penjualan_baik, true)}
+                ${item('Catatan interviewer', d.b_catatan_interviewer, true)}
+            </div>
+        </div>
 
-        <div class="form-section-title">C. Kesiapan Ikuti Sistem</div>
-        <p class="mb-3">${esc(d.c_jawaban_kesiapan)}</p>
+        <div class="dv-sect">
+            ${sectHead('bi-shield-check', 'C. Kesiapan Ikuti Sistem')}
+            <div class="row">${item('Jawaban kesiapan calon', d.c_jawaban_kesiapan, true)}</div>
+        </div>
 
-        <div class="form-section-title">F. Pertanyaan Komitmen Akhir</div>
-        <p class="mb-1"><strong>1. Siap ikuti SOP:</strong> ${yt(d.f_siap_sop)} &middot; <strong>2. Siap dievaluasi:</strong> ${yt(d.f_siap_evaluasi)}</p>
-        <p class="mb-1"><strong>3. Siap dipindah:</strong> ${yt(d.f_siap_dipindah)} &middot; <strong>4. Siap jaga kualitas:</strong> ${yt(d.f_siap_jaga_kualitas)}</p>
-        <p class="mb-1"><strong>5. Rencana tingkatkan penjualan:</strong> ${esc(d.f_rencana_tingkatkan_penjualan)}</p>
-        <p class="mb-3"><strong>6. Target bergabung:</strong> ${esc(d.f_target_bergabung)}</p>
+        <div class="dv-sect">
+            ${sectHead('bi-clipboard2-check', 'F. Pertanyaan Komitmen Akhir')}
+            <div class="row">
+                ${itemHtml('1. Siap ikuti SOP?', yt(d.f_siap_sop))}
+                ${itemHtml('2. Siap dievaluasi berkala?', yt(d.f_siap_evaluasi))}
+                ${itemHtml('3. Siap dipindah tugas?', yt(d.f_siap_dipindah))}
+                ${itemHtml('4. Siap jaga kualitas?', yt(d.f_siap_jaga_kualitas))}
+                ${item('5. Rencana tingkatkan penjualan', d.f_rencana_tingkatkan_penjualan, true)}
+                ${item('6. Target bergabung dengan WBB', d.f_target_bergabung, true)}
+            </div>
+        </div>
 
-        ${dokumenHtml ? '<div class="form-section-title">Dokumen &amp; Foto</div><div class="row g-2 mb-3">' + dokumenHtml + '</div>' : ''}
+        <div class="dv-sect">
+            ${sectHead('bi-images', 'Dokumen & Foto')}
+            ${dokumenHtml ? '<div class="dv-doc-grid">' + dokumenHtml + '</div>' : '<div class="dv-empty-note">Belum ada dokumen/foto yang diunggah.</div>'}
+        </div>
 
-        <div class="form-section-title">Kesimpulan</div>
-        <p class="mb-1"><strong>Interviewer:</strong> ${KESIMPULAN_LABEL[d.kesimpulan_interviewer] || '-'}</p>
-        <p class="mb-1"><strong>Catatan:</strong> ${esc(d.catatan_kesimpulan)}</p>
-        <p class="mb-1"><strong>Status tindak lanjut:</strong> ${STATUS_LABEL[d.status_tindak_lanjut] || 'Menunggu'}</p>
-        ${d.catatan_pusat ? '<p class="mb-0"><strong>Catatan Admin Pusat:</strong> ' + esc(d.catatan_pusat) + '</p>' : ''}
+        <div class="dv-sect mb-0">
+            ${sectHead('bi-flag', 'Kesimpulan & Tindak Lanjut')}
+            <div class="row">
+                ${itemHtml('Kesimpulan interviewer', '<span class="badge rounded-pill ' + kesBadge + '">' + kesLabel + '</span>')}
+                ${itemHtml('Status tindak lanjut', '<span class="badge rounded-pill ' + statBadge + '">' + statLabel + '</span>')}
+                ${item('Catatan kesimpulan', d.catatan_kesimpulan, true)}
+                ${d.catatan_pusat ? item('Catatan Admin Pusat', d.catatan_pusat, true) : ''}
+            </div>
+        </div>
     `;
     getModalInstance('modalDetail').show();
 }
