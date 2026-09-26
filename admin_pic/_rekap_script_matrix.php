@@ -30,6 +30,34 @@
                 return 'Rp ' + Math.round(angka || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
             }
 
+            // Input nominal manual (Modal Awal, Kasbon Pengelola) — tampil dengan
+            // pemisah ribuan "." (gaya Indonesia, sama seperti semua nilai Rupiah
+            // lain di halaman ini) SAAT DIKETIK, bukan angka mentah "2000000".
+            // angkaBersih() membaca kembali nilai bersihnya (tanpa titik) untuk kalkulasi.
+            function formatRibuanTitik(str) {
+                if (str === '' || str === null || str === undefined) return '';
+                const bersih = str.toString().replace(/[^0-9]/g, '');
+                if (bersih === '') return '';
+                return parseInt(bersih, 10).toLocaleString('id-ID');
+            }
+            function angkaBersih(elId) {
+                const el = document.getElementById(elId);
+                if (!el) return 0;
+                const bersih = (el.value || '').toString().replace(/[^0-9]/g, '');
+                return bersih === '' ? 0 : parseInt(bersih, 10);
+            }
+            document.querySelectorAll('.mask-ribuan-titik').forEach(function (el) {
+                el.addEventListener('input', function () {
+                    let cursorPosition = this.selectionStart;
+                    let oldLength = this.value.length;
+                    this.value = formatRibuanTitik(this.value);
+                    let newLength = this.value.length;
+                    cursorPosition += (newLength - oldLength);
+                    this.setSelectionRange(cursorPosition, cursorPosition);
+                    hitungCascade();
+                });
+            });
+
             document.addEventListener('DOMContentLoaded', function() {
                 const inputCabang = document.getElementById('inputCabang');
                 const idCabang = document.getElementById('idCabang');
@@ -118,7 +146,7 @@
             // admin fee dihitung). Tidak di-nol-kan: kalau rugi (minus) tetap
             // ditampilkan apa adanya.
             function getNetProfitEfektif() {
-                const modalAwal = parseFloat(document.getElementById('matrik_modal_awal')?.value) || 0;
+                const modalAwal = angkaBersih('matrik_modal_awal');
                 return RK_NET_PROFIT_100 - modalAwal;
             }
 
@@ -176,7 +204,7 @@
             function hitungInvestor() {
                 const profit       = parseFloat(document.getElementById('inv_profit')?.value) || 0;
                 const sewa         = parseFloat(document.getElementById('inv_sewa')?.value) || 0;
-                const kasbon       = parseFloat(document.getElementById('inv_kasbon')?.value) || 0;
+                const kasbon       = angkaBersih('inv_kasbon');
                 const kasbonSumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const talangan     = parseFloat(document.getElementById('inv_modal')?.value) || 0;
                 const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
@@ -214,7 +242,7 @@
             function hitungPengelola() {
                 const profit      = parseFloat(document.getElementById('pgl_profit')?.value) || 0;
                 const adminPersen = parseFloat(document.getElementById('pgl_admin_persen')?.value) || 0;
-                const kasbon      = parseFloat(document.getElementById('inv_kasbon')?.value) || 0;
+                const kasbon      = angkaBersih('inv_kasbon');
 
                 RK_serviceFee = (profit * adminPersen) / 100;
                 const profitBersih = Math.max(0, profit - RK_serviceFee - kasbon);
@@ -247,4 +275,40 @@
             }
 
             document.addEventListener('DOMContentLoaded', hitungCascade);
+
+            // =========================================================
+            // 3. Matrik Akumulasi — tombol "Simpan Akumulasi" (Modal Awal)
+            // Sama pola dengan simpanRevenueSharing(): AJAX ke handler khusus,
+            // supaya nilai Modal Awal tidak hilang saat halaman di-refresh.
+            // =========================================================
+            function simpanAkumulasi(btn) {
+                const modalAwal = angkaBersih('matrik_modal_awal');
+                const asalHtml = btn.innerHTML;
+
+                const fd = new FormData();
+                fd.append('csrf', <?= json_encode(csrf_token()) ?>);
+                fd.append('id_cabang', <?= (int) $id_cabang ?>);
+                fd.append('tahun', <?= (int) $tahun ?>);
+                fd.append('bulan', <?= (int) $bulan ?>);
+                fd.append('modal_awal', modalAwal);
+
+                btn.disabled = true;
+                fetch('akumulasi_modal_awal_handler.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        btn.disabled = false;
+                        if (!data.ok) { alert('Gagal: ' + (data.msg || 'unknown')); return; }
+                        btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersimpan';
+                        setTimeout(function () { btn.innerHTML = asalHtml; }, 1500);
+                    })
+                    .catch(function (err) {
+                        btn.disabled = false;
+                        alert('Gagal mengirim: ' + err);
+                    });
+            }
+
+            (function () {
+                const btn = document.getElementById('btnSimpanAkumulasi');
+                if (btn) btn.addEventListener('click', function () { simpanAkumulasi(btn); });
+            })();
         </script>

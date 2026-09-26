@@ -286,6 +286,19 @@ if ($id_cabang !== '') {
     }
 }
 
+// Modal Awal (3. Matrik Akumulasi) — diisi manual & disimpan per cabang+periode
+// (BUKAN per segmen pengelola, beda dengan revenue_sharing) lewat tombol
+// "Simpan Akumulasi", supaya nilainya tidak hilang saat halaman di-refresh.
+$modal_awal_tersimpan = 0.0;
+if ($id_cabang !== '') {
+    $stmt_ama = $conn->prepare("SELECT modal_awal FROM akumulasi_modal_awal WHERE id_cabang = ? AND tahun = ? AND bulan = ?");
+    $stmt_ama->bind_param('iii', $id_cabang, $tahun, $bulan);
+    $stmt_ama->execute();
+    $row_ama = $stmt_ama->get_result()->fetch_assoc();
+    $stmt_ama->close();
+    $modal_awal_tersimpan = $row_ama ? (float) $row_ama['modal_awal'] : 0.0;
+}
+
 // Perhitungan Laba Default (Sebelum pilihan dinamis di UI)
 // Urutan: Net Profit -> dikurangi Klaim Bulanan -> BARU admin fee 3% dihitung
 // dari sisanya -> split 50/50 investor-pengelola.
@@ -888,9 +901,9 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                             <td class="text-end px-3">
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text bg-transparent border-0 text-warning fw-bold pe-1">Rp</span>
-                                    <input type="number" id="matrik_modal_awal"
-                                           class="form-control text-end fw-bold text-warning border-0 bg-transparent p-0"
-                                           value="0" min="0" step="1000" oninput="hitungCascade()">
+                                    <input type="text" inputmode="numeric" id="matrik_modal_awal"
+                                           class="form-control text-end fw-bold text-warning border-0 bg-transparent p-0 mask-ribuan-titik"
+                                           value="<?= number_format($modal_awal_tersimpan, 0, ',', '.') ?>">
                                 </div>
                             </td>
                         </tr>
@@ -902,6 +915,11 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                 </table>
                 <div class="p-3 bg-light text-muted border-top" style="font-size: 0.8rem; line-height: 1.4;">
                     <i class="bi bi-info-circle me-1 text-primary"></i> Angka lain diambil otomatis dari rekapitulasi harian bulan <?= date('F Y', strtotime("$tahun-$bulan-01")) ?>. <strong>Modal Awal</strong> diisi manual &mdash; nilainya mengurangi Net Profit awal 100% (sebelum potong admin 3%).
+                </div>
+                <div class="p-3 border-top d-flex justify-content-end">
+                    <button type="button" id="btnSimpanAkumulasi" class="btn btn-sm btn-outline-warning fw-semibold">
+                        <i class="bi bi-save me-1"></i>Simpan Akumulasi
+                    </button>
                 </div>
             </div>
         </div>
@@ -1134,7 +1152,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Kasbon Pengelola</label>
                         <div class="input-group">
-                            <input type="number" id="inv_kasbon" class="form-control border-2" style="border-radius: 8px 0 0 8px;" value="0" min="0" oninput="hitungCascade()">
+                            <input type="text" inputmode="numeric" id="inv_kasbon" class="form-control border-2 mask-ribuan-titik" style="border-radius: 8px 0 0 8px;" value="0">
                             <select id="inv_kasbon_sumber" class="form-select border-2" style="max-width: 120px; border-radius: 0 8px 8px 0;" title="Sumber Kasbon — siapa yang menalangi kasbon ini" onchange="hitungCascade()">
                                 <option value="investor" selected>Dana Investor</option>
                                 <option value="pusat">Dana Pusat</option>

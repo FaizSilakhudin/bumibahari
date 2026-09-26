@@ -234,7 +234,7 @@
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
                 const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "4. Klaim Bulanan"
                 const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
-                const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
+                const modal_awal      = angkaBersih('matrik_modal_awal');
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal;   // = Net Profit efektif (sebelum klaim)
                 const net_profit_setelah_klaim = laba_akumulasi - total_klaim_bulanan;
@@ -322,7 +322,7 @@
                 const inv_profit = share_inv_base;
                 const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($bo_db['sewa'] ?? 0) ?>);
                 const inv_modal = talangan_val;
-                const inv_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
+                const inv_kasbon = angkaBersih('inv_kasbon');
                 const inv_kasbon_sumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
 
@@ -356,7 +356,7 @@
                 const elSelectFee = document.getElementById('pgl_admin_persen');
                 const pct_admin = parseFloat(elSelectFee?.value || <?= (float)($persen_admin ?? 3) ?>);
                 const pgl_service_fee = (pgl_profit * pct_admin) / 100;
-                const pgl_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
+                const pgl_kasbon = angkaBersih('inv_kasbon');
                 const pct_bersih = 50 - pct_admin; // FIX: ini yang tadinya undefined
                 const pgl_total_val = Math.max(0, pgl_profit - pgl_service_fee - pgl_kasbon);
 
@@ -470,7 +470,7 @@
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
                 const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "4. Klaim Bulanan"
                 const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
-                const modal_awal      = parseFloat(document.getElementById('matrik_modal_awal')?.value || 0);
+                const modal_awal      = angkaBersih('matrik_modal_awal');
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal;
                 const net_profit_setelah_klaim = laba_akumulasi - total_klaim_bulanan;
@@ -535,7 +535,7 @@
                 const inv_profit = share_inv_base;
                 const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($bo_db['sewa'] ?? 0) ?>);
                 const inv_modal = talangan_val;
-                const inv_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
+                const inv_kasbon = angkaBersih('inv_kasbon');
                 const inv_kasbon_sumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
 
@@ -563,7 +563,7 @@
                 const elSelectFee = document.getElementById('pgl_admin_persen');
                 const pct_admin = parseFloat(elSelectFee?.value || <?= (float)($persen_admin ?? 3) ?>);
                 const pgl_service_fee = (pgl_profit * pct_admin) / 100;
-                const pgl_kasbon = parseFloat(document.getElementById('inv_kasbon')?.value || 0);
+                const pgl_kasbon = angkaBersih('inv_kasbon');
                 const pct_bersih = 50 - pct_admin;
                 const pgl_total_val = Math.max(0, pgl_profit - pgl_service_fee - pgl_kasbon);
                 const str_pct_admin = pct_admin.toString().replace('.', ',');
