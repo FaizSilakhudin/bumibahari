@@ -34,6 +34,19 @@
                     return;
                 }
 
+                // Kolom QRIS (Sisa) di layar sekarang punya dropdown detail (QRIS asli &
+                // pencairan QRIS) untuk kroscek -- dropdown itu TIDAK BOLEH ikut ke PDF
+                // (baik terbuka maupun tertutup; includeHiddenHtml:true di atas membuat
+                // textContent elemen tersembunyi tetap terbaca kalau tidak di-override
+                // manual di sini). Ambil nilai bersihnya dari data-pdf-text pada <td>,
+                // bukan dari isi dropdown-nya.
+                if (idx === 3) {
+                    const raw = data.cell.raw;
+                    if (raw && raw.dataset && raw.dataset.pdfText !== undefined) {
+                        data.cell.text = [raw.dataset.pdfText];
+                    }
+                }
+
                 if (idx === 14) {
                     data.cell.styles.textColor = [220, 53, 69];
                 } else if (idx === 15) {

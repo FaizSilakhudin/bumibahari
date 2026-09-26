@@ -104,7 +104,11 @@ $rk_no = 1;
                 $rk_tunai     = (float) ($rk_h['tunai'] ?? 0);
                 // Kolom "QRIS" di rekap harian menampilkan SISA QRIS (qris - pencairan_qris),
                 // sama seperti yang dilihat PIC saat input — bukan QRIS kotor masuk.
+                // QRIS asli & pencairan tetap disimpan (untuk dropdown detail kroscek di
+                // layar) — TIDAK memengaruhi nilai/kolom yang dihitung atau di-export PDF.
                 $rk_qris      = (float) ($rk_h['sisa_qris'] ?? 0);
+                $rk_qris_asli = (float) ($rk_h['qris'] ?? 0);
+                $rk_pencairan = (float) ($rk_h['pencairan_qris'] ?? 0);
                 $rk_gofood    = (float) ($rk_h['go_food'] ?? 0);
                 $rk_grab      = (float) ($rk_h['grab_food'] ?? 0);
                 $rk_omzet     = (float) ($rk_h['total_omset'] ?? 0);
@@ -146,7 +150,28 @@ $rk_no = 1;
                     <td class="text-center text-muted"><?= $rk_no++ ?></td>
                     <td class="fw-medium"><?= date('d/m/Y', strtotime($rk_h['tanggal'])) ?></td>
                     <td class="text-end"><?= number_format($rk_tunai, 0, ',', '.') ?></td>
-                    <td class="text-end"><?= $rk_qris != 0 ? number_format($rk_qris, 0, ',', '.') : '-' ?></td>
+                    <?php
+                    $rk_qris_text = $rk_qris != 0 ? number_format($rk_qris, 0, ',', '.') : '-';
+                    $rk_ada_qris  = $rk_qris_asli != 0 || $rk_pencairan != 0 || $rk_qris != 0;
+                    ?>
+                    <td class="text-end" data-pdf-text="<?= h($rk_qris_text) ?>">
+                        <?php if ($rk_ada_qris): ?>
+                        <div class="dropdown d-inline-block">
+                            <span><?= $rk_qris_text ?></span>
+                            <button type="button" class="btn btn-link btn-sm p-0 ms-1 text-muted align-baseline" data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false" title="Detail QRIS (kroscek)">
+                                <i class="bi bi-chevron-down" style="font-size: 10px;"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm p-2 qris-dd-menu">
+                                <li class="d-flex justify-content-between gap-3 px-2 py-1"><span class="text-muted small">QRIS Asli (Masuk)</span><span class="fw-semibold small"><?= number_format($rk_qris_asli, 0, ',', '.') ?></span></li>
+                                <li class="d-flex justify-content-between gap-3 px-2 py-1"><span class="text-muted small">Pencairan QRIS</span><span class="fw-semibold small text-danger">- <?= number_format($rk_pencairan, 0, ',', '.') ?></span></li>
+                                <li><hr class="dropdown-divider my-1"></li>
+                                <li class="d-flex justify-content-between gap-3 px-2 py-1"><span class="text-muted small">Sisa QRIS</span><span class="fw-bold small"><?= $rk_qris_text ?></span></li>
+                            </ul>
+                        </div>
+                        <?php else: ?>
+                            -
+                        <?php endif; ?>
+                    </td>
                     <td class="text-end"><?= $rk_gofood > 0 ? number_format($rk_gofood, 0, ',', '.') : '-' ?></td>
                     <td class="text-end"><?= $rk_grab > 0 ? number_format($rk_grab, 0, ',', '.') : '-' ?></td>
                     <td class="text-end fw-semibold"><?= number_format($rk_omzet, 0, ',', '.') ?></td>

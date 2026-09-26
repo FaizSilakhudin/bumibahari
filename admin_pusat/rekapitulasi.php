@@ -444,6 +444,10 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         border-color: #3b82f6 !important;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
     }
+
+    /* Dropdown detail QRIS (Sisa) di tabel Rekapitulasi Harian -- kroscek QRIS asli & pencairan */
+    .qris-dd-menu { min-width: 230px; }
+    .qris-dd-menu li { list-style: none; }
 </style>
 
 <div class="container-fluid py-4 main-wrapper">
