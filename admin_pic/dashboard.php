@@ -27,7 +27,7 @@ if (!in_array($granularitas_tren, ['harian', 'mingguan', 'bulanan', 'tahunan'], 
     $granularitas_tren = 'harian';
 }
 $label_periode_tren = [
-    'harian'   => '30 Hari Terakhir',
+    'harian'   => $nama_periode,
     'mingguan' => '12 Minggu Terakhir',
     'bulanan'  => '6 Bulan Terakhir',
     'tahunan'  => '5 Tahun Terakhir',

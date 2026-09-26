@@ -547,7 +547,7 @@ if (!function_exists('ambil_tren_performa')) {
     {
         switch ($granularitas) {
             case 'harian':
-                $mulai    = date('Y-m-d', strtotime("$anchor_tanggal -29 days")); // 30 hari terakhir
+                $mulai    = date('Y-m-01', strtotime($anchor_tanggal)); // awal bulan kalender dari $anchor_tanggal
                 $group    = 'l.tanggal';
                 $label_sql = "DATE_FORMAT(MIN(l.tanggal), '%d %b')";
                 break;

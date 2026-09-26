@@ -45,7 +45,7 @@ try {
     $types = 'i';
 
     // ---------------------------------------------------------------
-    // HARIAN — 2 hari beda dalam jendela 30 hari, harus jadi 2 titik terpisah.
+    // HARIAN — 2 hari beda dalam bulan yang sama, harus jadi 2 titik terpisah.
     // ---------------------------------------------------------------
     $isi('2026-08-30', 1000000, 300000);
     $isi('2026-08-31', 2000000, 500000);
@@ -56,6 +56,21 @@ try {
     cek('jumlah titik = 2 hari berbeda', count($tren['label']), 2);
     cek('label hari pertama', $tren['label'][0], '30 Aug');
     cek('omzet hari kedua', $tren['omzet'][1], 2000000.0);
+    echo "\n";
+
+    // ---------------------------------------------------------------
+    // HARIAN — jendela sekarang 1 BULAN KALENDER dari anchor, bukan rolling
+    // 30 hari terakhir -> laporan bulan SEBELUMNYA tidak boleh ikut muncul
+    // walau jaraknya < 30 hari dari anchor.
+    // ---------------------------------------------------------------
+    $conn->query("DELETE FROM laporan_cabang WHERE id_cabang = $id_cabang");
+    $isi('2026-08-31', 1000000, 300000); // bulan sebelumnya, harus DIBUANG
+    $isi('2026-09-01', 2000000, 500000); // awal bulan anchor, harus muncul
+
+    $tren = ambil_tren_performa($conn, 'harian', '2026-09-05', $where, $params, $types);
+    echo "[harian - batas bulan kalender]\n";
+    cek('laporan bulan lalu tidak ikut -> hanya 1 titik', count($tren['label']), 1);
+    cek('titik yang tersisa adalah awal bulan anchor', $tren['label'][0], '01 Sep');
     echo "\n";
 
     // ---------------------------------------------------------------
