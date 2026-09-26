@@ -30,21 +30,24 @@
                 return 'Rp ' + Math.round(angka || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
             }
 
-            // Input nominal manual (Modal Awal, Kasbon Pengelola) — tampil dengan
-            // pemisah ribuan "." (gaya Indonesia, sama seperti semua nilai Rupiah
-            // lain di halaman ini) SAAT DIKETIK, bukan angka mentah "2000000".
-            // angkaBersih() membaca kembali nilai bersihnya (tanpa titik) untuk kalkulasi.
+            // Input nominal manual (Modal Awal, Kasbon Pengelola, Klaim Bulanan) —
+            // tampil dengan pemisah ribuan "." (gaya Indonesia, sama seperti semua
+            // nilai Rupiah lain di halaman ini & di PDF/Excel export) SAAT DIKETIK,
+            // bukan angka mentah "2000000". bersihkanAngka()/angkaBersih() membaca
+            // kembali nilai bersihnya (tanpa titik) untuk kalkulasi.
             function formatRibuanTitik(str) {
                 if (str === '' || str === null || str === undefined) return '';
                 const bersih = str.toString().replace(/[^0-9]/g, '');
                 if (bersih === '') return '';
                 return parseInt(bersih, 10).toLocaleString('id-ID');
             }
+            function bersihkanAngka(nilai) {
+                const bersih = (nilai || '').toString().replace(/[^0-9]/g, '');
+                return bersih === '' ? 0 : parseInt(bersih, 10);
+            }
             function angkaBersih(elId) {
                 const el = document.getElementById(elId);
-                if (!el) return 0;
-                const bersih = (el.value || '').toString().replace(/[^0-9]/g, '');
-                return bersih === '' ? 0 : parseInt(bersih, 10);
+                return el ? bersihkanAngka(el.value) : 0;
             }
             document.querySelectorAll('.mask-ribuan-titik').forEach(function (el) {
                 el.addEventListener('input', function () {
@@ -207,7 +210,7 @@
                 const kasbon       = angkaBersih('inv_kasbon');
                 const kasbonSumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const talangan     = parseFloat(document.getElementById('inv_modal')?.value) || 0;
-                const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
+                const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'plus';
 
                 let total = profit;
                 total += (operatorSewa === 'plus') ? sewa : -sewa;

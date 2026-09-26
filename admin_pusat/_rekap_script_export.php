@@ -295,8 +295,8 @@
                 let dataMatriks = [
                     ['Omzet Penjualan', formatRupiahPDF(omzet_akumulasi), 'Pendapatan bruto masuk'],
                     ['Pengeluaran Belanja', formatRupiahPDF(belanja_akumulasi), 'Total belanja 1 bulan'],
-                    ['Beban Operasional', formatRupiahPDF(bo_akumulasi), 'Total BO 1 bulan'],
-                    ['Total Pengeluaran', formatRupiahPDF(pengeluaran_akumulasi), 'Belanja + BO'],
+                    ['Beban Operasional', formatRupiahPDF(bo_akumulasi), 'Total Beban Operasional 1 bulan'],
+                    ['Total Pengeluaran', formatRupiahPDF(pengeluaran_akumulasi), 'Belanja + Beban Operasional'],
                     ['Modal Awal', formatRupiahPDF(modal_awal), 'Diisi manual, mengurangi Net Profit awal'],
                     ['Laba Bersih (Net Profit efektif)', formatRupiahPDF(laba_akumulasi), 'Net Profit 100% - Modal Awal'],
                     ['Klaim Bulanan', formatRupiahPDF(total_klaim_bulanan), 'Lihat rincian "4. Klaim Bulanan" di bawah'],
@@ -324,7 +324,7 @@
                 const inv_modal = talangan_val;
                 const inv_kasbon = angkaBersih('inv_kasbon');
                 const inv_kasbon_sumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
-                const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
+                const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'plus';
 
                 // Kasbon SELALU dipotong dari sisi Pengelola (di bawah), tapi
                 // penggantiannya cuma masuk Total Bersih Investor kalau sumbernya
@@ -439,7 +439,7 @@
                 const elBO = t2 && (t2.tagName === 'TABLE' ? t2 : t2.querySelector('table'));
                 const wsBO = XLSX.utils.aoa_to_sheet([['2. Rincian Beban Operasional - ' + blnIni], []]);
                 if (elBO) XLSX.utils.sheet_add_dom(wsBO, elBO, { origin: -1, raw: true });
-                XLSX.utils.book_append_sheet(wb, wsBO, 'Rincian BO');
+                XLSX.utils.book_append_sheet(wb, wsBO, 'Rincian Beban Operasional');
 
                 // Tanggal KEMARIN juga di sini, samakan dengan filenameHarian (PDF) di atas.
                 const filenameHarianXLS = <?= json_encode(
@@ -508,7 +508,7 @@
                 const elBO = t2 && (t2.tagName === 'TABLE' ? t2 : t2.querySelector('table'));
                 const ws2 = XLSX.utils.aoa_to_sheet([['2. Rincian Beban Operasional'], []]);
                 if (elBO) XLSX.utils.sheet_add_dom(ws2, elBO, { origin: -1, raw: true });
-                XLSX.utils.book_append_sheet(wb, ws2, 'Rincian BO');
+                XLSX.utils.book_append_sheet(wb, ws2, 'Rincian Beban Operasional');
 
                 // Sheet: 4. Klaim Bulanan
                 const elKlaimX = document.getElementById('tabelKlaimBulanan');
@@ -523,8 +523,8 @@
                     ['Komponen Pokok', 'Jumlah', 'Catatan Ringkas'],
                     ['Omzet Penjualan', formatRupiahXLS(omzet_akumulasi), 'Pendapatan bruto masuk'],
                     ['Pengeluaran Belanja', formatRupiahXLS(belanja_akumulasi), 'Total belanja 1 bulan'],
-                    ['Beban Operasional', formatRupiahXLS(bo_akumulasi), 'Total BO 1 bulan'],
-                    ['Total Pengeluaran', formatRupiahXLS(pengeluaran_akumulasi), 'Belanja + BO'],
+                    ['Beban Operasional', formatRupiahXLS(bo_akumulasi), 'Total Beban Operasional 1 bulan'],
+                    ['Total Pengeluaran', formatRupiahXLS(pengeluaran_akumulasi), 'Belanja + Beban Operasional'],
                     ['Modal Awal', formatRupiahXLS(modal_awal), 'Diisi manual, mengurangi Net Profit awal'],
                     ['Laba Bersih (Net Profit efektif)', formatRupiahXLS(laba_akumulasi), 'Net Profit 100% - Modal Awal'],
                     ['Klaim Bulanan', formatRupiahXLS(total_klaim_bulanan), 'Lihat rincian "4. Klaim Bulanan" di sheet lain'],
@@ -537,7 +537,7 @@
                 const inv_modal = talangan_val;
                 const inv_kasbon = angkaBersih('inv_kasbon');
                 const inv_kasbon_sumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
-                const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'minus';
+                const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'plus';
 
                 const kasbon_ke_investor = inv_kasbon_sumber === 'investor' ? inv_kasbon : 0;
                 const kasbon_dana_pusat = inv_kasbon_sumber === 'pusat' ? inv_kasbon : 0;

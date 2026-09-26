@@ -1131,8 +1131,8 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                         <label class="form-label text-muted small fw-semibold">Sewa Ruko</label>
                         <div class="input-group">
                             <select id="inv_sewa_operator" class="form-select border-2" style="max-width: 70px; border-radius: 8px 0 0 8px;" onchange="hitungCascade()">
-                                <option value="minus" selected>−</option>
-                                <option value="plus">+</option>
+                                <option value="minus">−</option>
+                                <option value="plus" selected>+</option>
                             </select>
                             <input type="number" id="inv_sewa" class="form-control border-2 bg-light" style="border-radius: 0 8px 8px 0;" value="<?= $bo_db['sewa'] ?? 0 ?>" readonly>
                         </div>

@@ -60,7 +60,7 @@
                             <td class="text-center text-muted fw-medium klaim-no"><?= $kb_no++ ?></td>
                             <td><input type="text" class="form-control form-control-sm border-0 bg-transparent klaim-uraian" value="<?= h($kb['uraian']) ?>" placeholder="Uraian klaim..."></td>
                             <td class="text-end">
-                                <input type="number" class="form-control form-control-sm border-0 bg-transparent text-end fw-bold klaim-nominal" value="<?= (float) $kb['nominal'] ?>" min="0" step="1000">
+                                <input type="text" inputmode="numeric" class="form-control form-control-sm border-0 bg-transparent text-end fw-bold klaim-nominal" value="<?= number_format((float) $kb['nominal'], 0, ',', '.') ?>">
                             </td>
                             <td class="text-center">
                                 <select class="form-select form-select-sm border-0 bg-transparent klaim-sumber">
@@ -116,7 +116,7 @@
         let no = 1;
         tbody.querySelectorAll('tr.klaim-row').forEach(function (tr) {
             tr.querySelector('.klaim-no').textContent = no++;
-            const nominal = parseFloat(tr.querySelector('.klaim-nominal').value) || 0;
+            const nominal = bersihkanAngka(tr.querySelector('.klaim-nominal').value);
             const sumber = tr.querySelector('.klaim-sumber').value;
             total += nominal;
             if (sumber === 'investor') totalInvestor += nominal;
@@ -144,7 +144,7 @@
         tr.innerHTML =
             '<td class="text-center text-muted fw-medium klaim-no"></td>' +
             '<td><input type="text" class="form-control form-control-sm border-0 bg-transparent klaim-uraian" placeholder="Uraian klaim..."></td>' +
-            '<td class="text-end"><input type="number" class="form-control form-control-sm border-0 bg-transparent text-end fw-bold klaim-nominal" value="0" min="0" step="1000"></td>' +
+            '<td class="text-end"><input type="text" inputmode="numeric" class="form-control form-control-sm border-0 bg-transparent text-end fw-bold klaim-nominal" value="0"></td>' +
             '<td class="text-center"><select class="form-select form-select-sm border-0 bg-transparent klaim-sumber"><option value="warung" selected>Dana Warung</option><option value="investor">Dana Investor</option><option value="pusat">Dana Pusat</option></select></td>' +
             '<td class="ps-4"><input type="text" class="form-control form-control-sm border-0 bg-transparent klaim-keterangan" placeholder="Ketik keterangan..."></td>' +
             '<td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger p-0 klaim-hapus" title="Hapus baris"><i class="bi bi-trash"></i></button></td>';
@@ -169,7 +169,15 @@
     });
 
     tbody.addEventListener('input', function (ev) {
-        if (ev.target.classList.contains('klaim-nominal')) hitungUlangNoDanTotal();
+        if (!ev.target.classList.contains('klaim-nominal')) return;
+        const el = ev.target;
+        let cursorPosition = el.selectionStart;
+        let oldLength = el.value.length;
+        el.value = formatRibuanTitik(el.value);
+        let newLength = el.value.length;
+        cursorPosition += (newLength - oldLength);
+        el.setSelectionRange(cursorPosition, cursorPosition);
+        hitungUlangNoDanTotal();
     });
 
     tbody.addEventListener('change', function (ev) {
@@ -180,7 +188,7 @@
         const rows = [];
         tbody.querySelectorAll('tr.klaim-row').forEach(function (tr, idx) {
             const uraian = tr.querySelector('.klaim-uraian').value.trim();
-            const nominal = parseFloat(tr.querySelector('.klaim-nominal').value) || 0;
+            const nominal = bersihkanAngka(tr.querySelector('.klaim-nominal').value);
             const sumber = tr.querySelector('.klaim-sumber').value;
             const keterangan = tr.querySelector('.klaim-keterangan').value.trim();
             if (uraian === '' && nominal === 0 && keterangan === '') return; // baris kosong, skip
