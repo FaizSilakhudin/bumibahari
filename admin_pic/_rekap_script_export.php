@@ -2,9 +2,17 @@
         <script>
             // Pewarnaan kolom tabel "1. Rekapitulasi Pendapatan & Pengeluaran Harian" saat
             // di-export ke PDF — menyamai warna yang tampil di layar (lihat _rekap_tabel_harian.php).
-            // Baris harian, kolom (index 0-based): 14 Total Pengeluaran -> merah,
-            // 15 Sisa Tunai -> hitam (merah kalau minus), 16 Net Profit -> hijau (merah kalau minus),
-            // 17 Margin -> biru (merah kalau minus).
+            // Kolom di layar (index 0-based): 0 No, 1 Tanggal, 2 Tunai, 3 QRIS Asli,
+            // 4 Pencairan QRIS, 5 QRIS Sisa, 6 Go-Food, 7 Grab-Food, 8 OMZET, 9-12
+            // Pengeluaran Belanja, 13-15 Beban Operasional, 16 Total Pengeluaran,
+            // 17 Sisa Tunai, 18 Net Profit, 19 Margin, 20 Keterangan.
+            //
+            // Export PDF HARIAN memakai versi RINGKAS tabel ini (3 kolom QRIS digabung
+            // balik jadi 1 "QRIS (Sisa)" lewat buatKloneTabelHarianRingkas()) supaya PDF
+            // Harian tetap ringkas seperti sebelumnya — kolom geser -2 dari index layar.
+            // Export PDF BULANAN memakai tabel APA ADANYA (3 kolom QRIS lengkap).
+            // colOffset: 0 untuk versi ringkas (Harian), 2 untuk versi lengkap (Bulanan).
+            //
             // Baris JUMLAH (tfoot): latar hijau, SEMUA tulisan putih tanpa kecuali
             // (termasuk Net Profit/Margin walau minus) — beda dengan baris harian biasa.
             //
@@ -13,7 +21,8 @@
             // ambil .textContent-nya. Deteksi baris JUMLAH juga dicek langsung lewat
             // tr.closest('tfoot') supaya tidak bergantung 100% pada data.section (beberapa versi
             // jspdf-autotable kurang konsisten mengklasifikasikan baris tfoot lewat html:).
-            function rekapHarianDidParseCell(data) {
+            function rekapHarianDidParseCell(data, colOffset) {
+                colOffset = colOffset || 0;
                 if (data.section === 'head') return;
 
                 function teksSel() {
@@ -34,28 +43,52 @@
                     return;
                 }
 
-                // Kolom QRIS (Sisa) di layar sekarang punya dropdown detail (QRIS asli &
-                // pencairan QRIS) untuk kroscek -- dropdown itu TIDAK BOLEH ikut ke PDF
-                // (baik terbuka maupun tertutup; includeHiddenHtml:true di atas membuat
-                // textContent elemen tersembunyi tetap terbaca kalau tidak di-override
-                // manual di sini). Ambil nilai bersihnya dari data-pdf-text pada <td>,
-                // bukan dari isi dropdown-nya.
-                if (idx === 3) {
-                    const raw = data.cell.raw;
-                    if (raw && raw.dataset && raw.dataset.pdfText !== undefined) {
-                        data.cell.text = [raw.dataset.pdfText];
-                    }
-                }
-
-                if (idx === 14) {
+                if (idx === 14 + colOffset) {
                     data.cell.styles.textColor = [220, 53, 69];
-                } else if (idx === 15) {
+                } else if (idx === 15 + colOffset) {
                     if (minus()) data.cell.styles.textColor = [220, 53, 69];
-                } else if (idx === 16) {
+                } else if (idx === 16 + colOffset) {
                     data.cell.styles.textColor = minus() ? [220, 53, 69] : [25, 135, 84];
-                } else if (idx === 17) {
+                } else if (idx === 17 + colOffset) {
                     data.cell.styles.textColor = minus() ? [220, 53, 69] : [13, 110, 253];
                 }
+            }
+
+            // Klon tabel #tabelRekapHarian(Prev) LALU gabungkan 3 kolom QRIS (Asli,
+            // Pencairan, Sisa — index leaf 3,4,5) balik jadi 1 kolom "QRIS (Sisa)" saja
+            // (index 4 & 3 dihapus, sisakan index 3 dengan label diganti) — dipakai KHUSUS
+            // export PDF Harian supaya tetap ringkas seperti sebelum kolom QRIS dipecah 3
+            // di layar. Baris grup header (thead baris ke-1) & baris data/tfoot biasa (>=6
+            // sel = 1:1 dgn kolom leaf) diproses beda dari baris "libur"/"belum ada data"
+            // (sedikit sel, pakai colspan besar -- cukup dikurangi 2, bukan dihapus per index).
+            function buatKloneTabelHarianRingkas(tableId) {
+                const original = document.getElementById(tableId);
+                if (!original) return null;
+                const clone = original.cloneNode(true);
+
+                const headRow1 = clone.querySelector('thead tr:nth-child(1)');
+                if (headRow1 && headRow1.children[3]) headRow1.children[3].setAttribute('colspan', '3');
+
+                const headRow2 = clone.querySelector('thead tr:nth-child(2)');
+                if (headRow2 && headRow2.children.length >= 6) {
+                    headRow2.children[4].remove();
+                    headRow2.children[3].remove();
+                    if (headRow2.children[3]) headRow2.children[3].textContent = 'QRIS (Sisa)';
+                }
+
+                clone.querySelectorAll('tbody tr, tfoot tr').forEach(function (tr) {
+                    if (tr.children.length >= 6) {
+                        tr.children[4].remove();
+                        tr.children[3].remove();
+                    } else {
+                        Array.from(tr.children).forEach(function (cell) {
+                            const cs = parseInt(cell.getAttribute('colspan') || '1', 10);
+                            if (cs > 2) cell.setAttribute('colspan', String(cs - 2));
+                        });
+                    }
+                });
+
+                return clone;
             }
 
             // Dipakai saat tabel yang di-html:-capture ke PDF punya sel berisi
@@ -172,13 +205,21 @@
                 }
 
                 // Hal. 1 — Rekap harian bulan berjalan
+                // PDF Harian sengaja RINGKAS: 3 kolom QRIS (Asli/Pencairan/Sisa) di layar
+                // digabung balik jadi 1 kolom "QRIS (Sisa)" saja lewat klon tabel.
                 let ty = kop('1. Rekapitulasi Pendapatan & Pengeluaran Harian - ' + blnIni, blnIni);
-                doc.autoTable({ html: '#tabelRekapHarian', startY: ty, ...baseStyles, didParseCell: rekapHarianDidParseCell });
+                const klonHarianIni = buatKloneTabelHarianRingkas('tabelRekapHarian');
+                if (klonHarianIni) {
+                    doc.autoTable({ html: klonHarianIni, startY: ty, ...baseStyles, didParseCell: function (d) { rekapHarianDidParseCell(d, 0); } });
+                }
 
                 // Hal. 2 — Rekap harian bulan sebelumnya
                 doc.addPage('a4', 'landscape');
                 ty = kop('2. Rekapitulasi Pendapatan & Pengeluaran Harian - ' + blnLalu, blnLalu);
-                doc.autoTable({ html: '#tabelRekapHarianPrev', startY: ty, ...baseStyles, didParseCell: rekapHarianDidParseCell });
+                const klonHarianLalu = buatKloneTabelHarianRingkas('tabelRekapHarianPrev');
+                if (klonHarianLalu) {
+                    doc.autoTable({ html: klonHarianLalu, startY: ty, ...baseStyles, didParseCell: function (d) { rekapHarianDidParseCell(d, 0); } });
+                }
 
                 // Hal. 3 — Rincian Beban Operasional bulan berjalan
                 doc.addPage('a4', 'landscape');
@@ -288,7 +329,9 @@
                 doc.text('1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>', margin, yTabelHarian);
                 // fontSize/cellPadding kecil supaya tabel yang bisa ~32+ baris (bulan
                 // penuh / periode gabungan closing) tetap muat 1 halaman, tidak meluber.
-                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 4.5, cellPadding: 0.5 }, headStyles: { fillColor: [52, 58, 64], textColor: 255, halign: 'center', fontSize: 4.5 }, didParseCell: rekapHarianDidParseCell });
+                // PDF Bulanan sengaja LENGKAP: tabel apa adanya (3 kolom QRIS Asli/
+                // Pencairan/Sisa), tidak digabung seperti PDF Harian -> colOffset 2.
+                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 4.5, cellPadding: 0.5 }, headStyles: { fillColor: [52, 58, 64], textColor: 255, halign: 'center', fontSize: 4.5 }, didParseCell: function (d) { rekapHarianDidParseCell(d, 2); } });
 
                 // HALAMAN 2 — Rincian Beban Operasional SAJA
                 doc.addPage(); addWatermark(doc); let y = 15;
