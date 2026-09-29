@@ -268,6 +268,7 @@ $persen_admin = 3; // Admin Fee Pusat: 3%
 $total_klaim_bulanan = 0.0;
 $total_klaim_dana_investor = 0.0;
 $total_klaim_dana_pusat = 0.0;
+$total_klaim_dana_ruko = 0.0;
 $daftar_klaim_bulanan = [];
 if ($id_cabang !== '') {
     $stmt_kb = $conn->prepare("SELECT id, uraian, nominal, sumber_dana, keterangan FROM klaim_bulanan WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ? ORDER BY urutan ASC, id ASC");
@@ -283,6 +284,9 @@ if ($id_cabang !== '') {
         if (($kb['sumber_dana'] ?? 'warung') === 'pusat') {
             $total_klaim_dana_pusat += (float) $kb['nominal'];
         }
+        if (($kb['sumber_dana'] ?? 'warung') === 'ruko') {
+            $total_klaim_dana_ruko += (float) $kb['nominal'];
+        }
     }
 }
 
@@ -297,6 +301,21 @@ if ($id_cabang !== '') {
     $row_ama = $stmt_ama->get_result()->fetch_assoc();
     $stmt_ama->close();
     $modal_awal_tersimpan = $row_ama ? (float) $row_ama['modal_awal'] : 0.0;
+}
+
+// Service Fee (7. Koreksi Dividen: Sisi Pengelola) — persentase yang sudah
+// disimpan lewat tombol "Simpan Service Fee" (revenue_sharing.persen_service_fee),
+// supaya dropdown-nya tidak selalu balik ke default 3% tiap halaman dibuka lagi.
+$persen_service_fee_tersimpan = 3.0;
+if ($id_cabang !== '') {
+    $stmt_psf = $conn->prepare("SELECT persen_service_fee FROM revenue_sharing WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ?");
+    $stmt_psf->bind_param('iiii', $id_cabang, $tahun, $bulan, $urutan_pengelola_aktif);
+    $stmt_psf->execute();
+    $row_psf = $stmt_psf->get_result()->fetch_assoc();
+    $stmt_psf->close();
+    if ($row_psf) {
+        $persen_service_fee_tersimpan = (float) $row_psf['persen_service_fee'];
+    }
 }
 
 // Perhitungan Laba Default (Sebelum pilihan dinamis di UI)
@@ -1129,13 +1148,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
 
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Sewa Ruko</label>
-                        <div class="input-group">
-                            <select id="inv_sewa_operator" class="form-select border-2" style="max-width: 70px; border-radius: 8px 0 0 8px;" onchange="hitungCascade()">
-                                <option value="minus">−</option>
-                                <option value="plus" selected>+</option>
-                            </select>
-                            <input type="number" id="inv_sewa" class="form-control border-2 bg-light" style="border-radius: 0 8px 8px 0;" value="<?= $bo_db['sewa'] ?? 0 ?>" readonly>
-                        </div>
+                        <input type="number" id="inv_sewa" class="form-control border-2 bg-light" style="border-radius: 8px;" value="<?= $bo_db['sewa'] ?? 0 ?>" readonly>
                     </div>
 
                     <div class="col-sm-6">
@@ -1146,6 +1159,17 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                         <div class="form-control border-2 bg-light d-flex align-items-center" style="border-radius: 8px; height: 38px;">
                             <span id="inv_modal_val" class="fw-bold text-primary">Rp <?= number_format($total_klaim_dana_investor ?? 0, 0, ',', '.') ?></span>
                             <input type="hidden" id="inv_modal" value="<?= (float) ($total_klaim_dana_investor ?? 0) ?>">
+                        </div>
+                    </div>
+
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small fw-semibold">
+                            Potongan Dana Ruko
+                            <i class="bi bi-info-circle text-muted" title="Otomatis dari total baris &quot;Dana Ruko&quot; di Klaim Bulanan — tidak bisa diisi manual di sini."></i>
+                        </label>
+                        <div class="form-control border-2 bg-light d-flex align-items-center" style="border-radius: 8px; height: 38px;">
+                            <span id="inv_ruko_val" class="fw-bold text-danger">- Rp <?= number_format($total_klaim_dana_ruko ?? 0, 0, ',', '.') ?></span>
+                            <input type="hidden" id="inv_ruko" value="<?= (float) ($total_klaim_dana_ruko ?? 0) ?>">
                         </div>
                     </div>
 
@@ -1189,9 +1213,9 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                 <div class="col-sm-6">
                     <label class="form-label text-muted small fw-semibold">Service Fee</label>
                     <select id="pgl_admin_persen" class="form-select border-2" style="border-radius: 8px;" onchange="hitungPengelola()">
-                        <option value="7.5">7,5%</option>
-                        <option value="5">5%</option>
-                        <option value="3" selected>3%</option>
+                        <option value="7.5" <?= abs($persen_service_fee_tersimpan - 7.5) < 0.001 ? 'selected' : '' ?>>7,5%</option>
+                        <option value="5" <?= abs($persen_service_fee_tersimpan - 5) < 0.001 ? 'selected' : '' ?>>5%</option>
+                        <option value="3" <?= abs($persen_service_fee_tersimpan - 3) < 0.001 ? 'selected' : '' ?>>3%</option>
                     </select>
                 </div>
             </div>

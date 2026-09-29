@@ -52,11 +52,12 @@ try {
     $del->execute();
     $del->close();
 
-    $sumber_dana_sah = ['investor', 'warung', 'pusat'];
+    $sumber_dana_sah = ['investor', 'warung', 'pusat', 'ruko'];
     $ins = $conn->prepare('INSERT INTO klaim_bulanan (id_cabang, tahun, bulan, urutan_pengelola, urutan, uraian, nominal, sumber_dana, keterangan, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $total = 0.0;
     $total_dana_investor = 0.0;
     $total_dana_pusat = 0.0;
+    $total_dana_ruko = 0.0;
     $jumlah_baris = 0;
     foreach ($rows_raw as $r) {
         $uraian = trim((string) ($r['uraian'] ?? ''));
@@ -74,6 +75,7 @@ try {
         $total += $nominal;
         if ($sumber_dana === 'investor') $total_dana_investor += $nominal;
         if ($sumber_dana === 'pusat') $total_dana_pusat += $nominal;
+        if ($sumber_dana === 'ruko') $total_dana_ruko += $nominal;
         $jumlah_baris++;
     }
     $ins->close();
@@ -87,7 +89,7 @@ try {
 
 audit($conn, 'rekap_klaim_bulanan_simpan', 'klaim_bulanan', $id_cabang, [
     'id_cabang' => $id_cabang, 'tahun' => $tahun, 'bulan' => $bulan, 'urutan_pengelola' => $urutan_pengelola,
-    'jumlah_baris' => $jumlah_baris, 'total' => $total, 'total_dana_investor' => $total_dana_investor, 'total_dana_pusat' => $total_dana_pusat,
+    'jumlah_baris' => $jumlah_baris, 'total' => $total, 'total_dana_investor' => $total_dana_investor, 'total_dana_pusat' => $total_dana_pusat, 'total_dana_ruko' => $total_dana_ruko,
 ]);
 
-echo json_encode(['ok' => true, 'total' => $total, 'total_dana_investor' => $total_dana_investor, 'total_dana_pusat' => $total_dana_pusat, 'jumlah_baris' => $jumlah_baris]);
+echo json_encode(['ok' => true, 'total' => $total, 'total_dana_investor' => $total_dana_investor, 'total_dana_pusat' => $total_dana_pusat, 'total_dana_ruko' => $total_dana_ruko, 'jumlah_baris' => $jumlah_baris]);

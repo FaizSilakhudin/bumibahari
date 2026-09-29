@@ -131,6 +131,10 @@
             // Baris Klaim Bulanan ber-sumber_dana='pusat' — otomatis masuk Admin
             // Management Pusat (8. Rekapan Hasil Akhir), lihat updateFinalRekap().
             let RK_TOTAL_KLAIM_DANA_PUSAT = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>;
+            // Baris Klaim Bulanan ber-sumber_dana='ruko' — otomatis MEMOTONG Total
+            // Bersih Investor (Koreksi Dividen: Sisi Investor), kebalikan dari
+            // RK_TOTAL_KLAIM_DANA_INVESTOR yang menambah.
+            let RK_TOTAL_KLAIM_DANA_RUKO = <?= (float) ($total_klaim_dana_ruko ?? 0) ?>;
             // Kasbon Pengelola kalau sumbernya "Dana Pusat" (bukan "Dana Investor")
             // — diisi ulang tiap hitungInvestor() dipanggil, dipakai updateFinalRekap().
             let RK_KASBON_DANA_PUSAT = 0;
@@ -195,6 +199,12 @@
                 if (invModalEl) invModalEl.value = RK_TOTAL_KLAIM_DANA_INVESTOR;
                 setTxt('inv_modal_val', formatRupiah(RK_TOTAL_KLAIM_DANA_INVESTOR));
 
+                // Potongan Dana Ruko — read-only, otomatis dari Klaim Bulanan (kebalikan
+                // dari Pengembalian Dana Talangan: MEMOTONG, bukan menambah).
+                const invRukoEl = document.getElementById('inv_ruko');
+                if (invRukoEl) invRukoEl.value = RK_TOTAL_KLAIM_DANA_RUKO;
+                setTxt('inv_ruko_val', '- ' + formatRupiah(RK_TOTAL_KLAIM_DANA_RUKO));
+
                 hitungInvestor();
             }
 
@@ -210,10 +220,10 @@
                 const kasbon       = angkaBersih('inv_kasbon');
                 const kasbonSumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const talangan     = parseFloat(document.getElementById('inv_modal')?.value) || 0;
-                const operatorSewa = document.getElementById('inv_sewa_operator')?.value || 'plus';
+                const potonganRuko = parseFloat(document.getElementById('inv_ruko')?.value) || 0;
 
                 let total = profit;
-                total += (operatorSewa === 'plus') ? sewa : -sewa;
+                total += sewa;
 
                 // Kasbon Pengelola TETAP dipotong dari sisi Pengelola apapun
                 // sumbernya (lihat hitungPengelola()) — tapi PENGGANTIANNYA cuma
@@ -232,6 +242,10 @@
                 // sudah pasti "Dana Investor" (nilai ini hanya berisi total
                 // baris Klaim Bulanan ber-sumber_dana='investor').
                 total += talangan;
+
+                // Potongan Dana Ruko SELALU dikurangkan — sumbernya sudah pasti
+                // "Dana Ruko" (total baris Klaim Bulanan ber-sumber_dana='ruko').
+                total -= potonganRuko;
 
                 total = Math.max(0, total);
                 setTxt('inv_total', formatRupiah(total));
