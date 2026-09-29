@@ -258,13 +258,17 @@ $persen_pengelola = 50;
 $persen_admin = 3; // Admin Fee Pusat: 3%
 
 // Klaim Bulanan (baris manual, lihat "5. Klaim Bulanan" & _rekap_klaim_bulanan.php)
-// — nominalnya (SEMUA baris, apapun sumber dananya) mengurangi Net Profit
-// SEBELUM admin fee 3% dipotong. Baris ber-sumber_dana='investor' JUGA
-// otomatis masuk ke "Pengembalian Dana Talangan" (Koreksi Dividen: Sisi
+// — nominalnya mengurangi Net Profit SEBELUM admin fee 3% dipotong, KECUALI
+// baris ber-sumber_dana='ruko' (lihat di bawah). Baris ber-sumber_dana='investor'
+// JUGA otomatis masuk ke "Pengembalian Dana Talangan" (Koreksi Dividen: Sisi
 // Investor); baris ber-sumber_dana='pusat' JUGA otomatis masuk ke "Admin
 // Management Pusat" (8. Rekapan Hasil Akhir Keuntungan) — keduanya di luar
 // potongan Net Profit di atas. urutan_pengelola_aktif = segmen pengelola
 // yang sedang dipilih (1 kalau cuma 1 pengelola di periode ini).
+//
+// Baris ber-sumber_dana='ruko' TIDAK memotong Net Profit sama sekali —
+// nominalnya mengurangi "Sewa Ruko (Total)" (4. Kontrak Pembagian Hasil)
+// yang lalu mengalir jadi nilai Sewa Ruko di Koreksi Dividen: Sisi Investor.
 $total_klaim_bulanan = 0.0;
 $total_klaim_dana_investor = 0.0;
 $total_klaim_dana_pusat = 0.0;
@@ -277,18 +281,26 @@ if ($id_cabang !== '') {
     $daftar_klaim_bulanan = $stmt_kb->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt_kb->close();
     foreach ($daftar_klaim_bulanan as $kb) {
+        $kb_sumber_loop = $kb['sumber_dana'] ?? 'warung';
+        if ($kb_sumber_loop === 'ruko') {
+            $total_klaim_dana_ruko += (float) $kb['nominal'];
+            continue; // TIDAK memotong Net Profit -- lihat komentar di atas
+        }
         $total_klaim_bulanan += (float) $kb['nominal'];
-        if (($kb['sumber_dana'] ?? 'warung') === 'investor') {
+        if ($kb_sumber_loop === 'investor') {
             $total_klaim_dana_investor += (float) $kb['nominal'];
         }
-        if (($kb['sumber_dana'] ?? 'warung') === 'pusat') {
+        if ($kb_sumber_loop === 'pusat') {
             $total_klaim_dana_pusat += (float) $kb['nominal'];
-        }
-        if (($kb['sumber_dana'] ?? 'warung') === 'ruko') {
-            $total_klaim_dana_ruko += (float) $kb['nominal'];
         }
     }
 }
+
+// Sewa Ruko (Total) — dasar dari Beban Operasional (bo_db.sewa), dikurangi
+// SEMUA klaim bulanan ber-sumber_dana='ruko' periode ini. Nilai ini yang
+// mengalir ke "4. Kontrak Pembagian Hasil" (baris baru) DAN ke "Sewa Ruko"
+// di "6. Koreksi Dividen: Sisi Investor" (bukan lagi angka BO mentah).
+$sewa_ruko_total = (float) ($bo_db['sewa'] ?? 0) - $total_klaim_dana_ruko;
 
 // Modal Awal (3. Matrik Akumulasi) — diisi manual & disimpan per cabang+periode
 // (BUKAN per segmen pengelola, beda dengan revenue_sharing) lewat tombol
@@ -973,6 +985,20 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                             </td>
                         </tr>
 
+                        <!-- SEWA RUKO (TOTAL) — di luar Net Profit, dikurangi Klaim Bulanan "Dana Ruko" -->
+                        <tr>
+                            <td class="px-3 fw-medium text-dark">
+                                <i class="bi bi-building text-secondary me-2"></i>Sewa Ruko (Total)
+                                <i class="bi bi-info-circle text-muted" title="Dari Beban Operasional, dikurangi Klaim Bulanan ber-sumber &quot;Dana Ruko&quot; — TIDAK memotong Net Profit."></i>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary px-2.5 py-1.5 fw-bold" style="font-size: 0.8rem;">&mdash;</span>
+                            </td>
+                            <td class="text-end fw-bold text-secondary px-3" id="rev_sewa_ruko">
+                                Rp <?= number_format($sewa_ruko_total ?? 0, 0, ',', '.') ?>
+                            </td>
+                        </tr>
+
                         <!-- KLAIM BULANAN (dipotong SEBELUM admin fee) -->
                         <tr>
                             <td class="px-3 fw-medium text-dark">
@@ -1144,8 +1170,11 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     </div>
 
                     <div class="col-sm-6">
-                        <label class="form-label text-muted small fw-semibold">Sewa Ruko</label>
-                        <input type="number" id="inv_sewa" class="form-control border-2 bg-light" style="border-radius: 8px;" value="<?= $bo_db['sewa'] ?? 0 ?>" readonly>
+                        <label class="form-label text-muted small fw-semibold">
+                            Sewa Ruko
+                            <i class="bi bi-info-circle text-muted" title="Sewa Ruko (Total) dari Kontrak Pembagian Hasil — sudah dikurangi Klaim Bulanan ber-sumber &quot;Dana Ruko&quot;, kalau ada."></i>
+                        </label>
+                        <input type="number" id="inv_sewa" class="form-control border-2 bg-light" style="border-radius: 8px;" value="<?= $sewa_ruko_total ?? 0 ?>" readonly>
                     </div>
 
                     <div class="col-sm-6">
@@ -1156,17 +1185,6 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                         <div class="form-control border-2 bg-light d-flex align-items-center" style="border-radius: 8px; height: 38px;">
                             <span id="inv_modal_val" class="fw-bold text-primary">Rp <?= number_format($total_klaim_dana_investor ?? 0, 0, ',', '.') ?></span>
                             <input type="hidden" id="inv_modal" value="<?= (float) ($total_klaim_dana_investor ?? 0) ?>">
-                        </div>
-                    </div>
-
-                    <div class="col-sm-6">
-                        <label class="form-label text-muted small fw-semibold">
-                            Potongan Dana Ruko
-                            <i class="bi bi-info-circle text-muted" title="Otomatis dari total baris &quot;Dana Ruko&quot; di Klaim Bulanan — tidak bisa diisi manual di sini."></i>
-                        </label>
-                        <div class="form-control border-2 bg-light d-flex align-items-center" style="border-radius: 8px; height: 38px;">
-                            <span id="inv_ruko_val" class="fw-bold text-danger">- Rp <?= number_format($total_klaim_dana_ruko ?? 0, 0, ',', '.') ?></span>
-                            <input type="hidden" id="inv_ruko" value="<?= (float) ($total_klaim_dana_ruko ?? 0) ?>">
                         </div>
                     </div>
 

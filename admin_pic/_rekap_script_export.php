@@ -281,7 +281,6 @@
                 const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
                 const modal_awal      = angkaBersih('matrik_modal_awal');
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
-                const potongan_ruko_val = parseFloat(document.getElementById('inv_ruko')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal;   // = Net Profit efektif (sebelum klaim)
                 const net_profit_setelah_klaim = laba_akumulasi - total_klaim_bulanan;
                 const admin_fee_val   = net_profit_setelah_klaim * persen_admin / 100;
@@ -370,9 +369,10 @@
                 doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('5. Koreksi Dividen: Sisi Investor', margin, y);
 
                 const inv_profit = share_inv_base;
-                const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($bo_db['sewa'] ?? 0) ?>);
+                // inv_sewa = Sewa Ruko (Total) -- sudah dikurangi Klaim Bulanan "Dana Ruko"
+                // (lihat hitungCascade() di _rekap_script_matrix.php), bukan angka BO mentah.
+                const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($sewa_ruko_total ?? 0) ?>);
                 const inv_modal = talangan_val;
-                const inv_ruko = potongan_ruko_val;
                 const inv_kasbon = angkaBersih('inv_kasbon');
                 const inv_kasbon_sumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
 
@@ -388,14 +388,12 @@
                 inv_total_val += inv_sewa;
                 inv_total_val += kasbon_ke_investor;
                 inv_total_val += inv_modal;   // Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor") — selalu ditambahkan
-                inv_total_val -= inv_ruko;    // Potongan Dana Ruko (otomatis dari Klaim Bulanan "Dana Ruko") — selalu dikurangkan
                 inv_total_val = Math.max(0, inv_total_val);
 
                 let dataInvestor = [
                     ['Profit Investor (50%)', formatRupiahPDF(inv_profit)],
-                    ['Sewa Ruko', formatRupiahPDF(inv_sewa)],
+                    ['Sewa Ruko (Total)', formatRupiahPDF(inv_sewa)],
                     ['Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor")', formatRupiahPDF(inv_modal)],
-                    ['Potongan Dana Ruko (otomatis dari Klaim Bulanan "Dana Ruko")', '- ' + formatRupiahPDF(inv_ruko)],
                     ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + (inv_kasbon_sumber === 'investor' ? 'Dana Investor' : 'Dana Pusat') + ')', formatRupiahPDF(kasbon_ke_investor)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahPDF(inv_total_val)],
                 ];
@@ -524,7 +522,6 @@
                 const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
                 const modal_awal      = angkaBersih('matrik_modal_awal');
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
-                const potongan_ruko_val = parseFloat(document.getElementById('inv_ruko')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal;
                 const net_profit_setelah_klaim = laba_akumulasi - total_klaim_bulanan;
                 const admin_fee_val   = net_profit_setelah_klaim * persen_admin / 100;
@@ -586,9 +583,9 @@
 
                 // Sheet 4: Koreksi Dividen — Investor
                 const inv_profit = share_inv_base;
-                const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($bo_db['sewa'] ?? 0) ?>);
+                // inv_sewa = Sewa Ruko (Total) -- sudah dikurangi Klaim Bulanan "Dana Ruko".
+                const inv_sewa = parseFloat(document.getElementById('inv_sewa')?.value || <?= (float)($sewa_ruko_total ?? 0) ?>);
                 const inv_modal = talangan_val;
-                const inv_ruko = potongan_ruko_val;
                 const inv_kasbon = angkaBersih('inv_kasbon');
                 const inv_kasbon_sumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
 
@@ -599,15 +596,13 @@
                 inv_total_val += inv_sewa;
                 inv_total_val += kasbon_ke_investor;
                 inv_total_val += inv_modal; // Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor") — selalu ditambahkan
-                inv_total_val -= inv_ruko;  // Potongan Dana Ruko (otomatis dari Klaim Bulanan "Dana Ruko") — selalu dikurangkan
                 inv_total_val = Math.max(0, inv_total_val);
 
                 const dataInvestorX = [
                     ['Keterangan Komponen', 'Nilai'],
                     ['Profit Investor (50%)', formatRupiahXLS(inv_profit)],
-                    ['Sewa Ruko', formatRupiahXLS(inv_sewa)],
+                    ['Sewa Ruko (Total)', formatRupiahXLS(inv_sewa)],
                     ['Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor")', formatRupiahXLS(inv_modal)],
-                    ['Potongan Dana Ruko (otomatis dari Klaim Bulanan "Dana Ruko")', '- ' + formatRupiahXLS(inv_ruko)],
                     ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + (inv_kasbon_sumber === 'investor' ? 'Dana Investor' : 'Dana Pusat') + ')', formatRupiahXLS(kasbon_ke_investor)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahXLS(inv_total_val)],
                 ];

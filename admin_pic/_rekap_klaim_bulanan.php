@@ -8,7 +8,7 @@
  *   $conn                        mysqli
  *   $id_cabang, $tahun, $bulan
  *   $daftar_klaim_bulanan        array  hasil query klaim_bulanan (lihat rekapitulasi.php)
- *   $total_klaim_bulanan         float  SEMUA baris (investor + warung + pusat + ruko)
+ *   $total_klaim_bulanan         float  baris investor + warung + pusat SAJA (BUKAN ruko -- lihat di bawah)
  *   $total_klaim_dana_investor   float  baris ber-sumber_dana='investor' SAJA
  *   $total_klaim_dana_pusat      float  baris ber-sumber_dana='pusat' SAJA
  *   $total_klaim_dana_ruko       float  baris ber-sumber_dana='ruko' SAJA
@@ -19,12 +19,14 @@
  *                Bersih Investor) SELAIN memotong Net Profit.
  *   - pusat    : nominal masuk Admin Management Pusat (8. Rekapan Hasil
  *                Akhir Keuntungan) SELAIN memotong Net Profit.
- *   - ruko     : nominal MEMOTONG Total Bersih Investor (Koreksi Dividen:
- *                Sisi Investor) SELAIN memotong Net Profit -- kebalikan
- *                dari 'investor'.
+ *   - ruko     : nominal MENGURANGI "Sewa Ruko (Total)" (4. Kontrak
+ *                Pembagian Hasil), yang lalu mengalir ke Sewa Ruko di
+ *                Koreksi Dividen: Sisi Investor -- TIDAK memotong Net
+ *                Profit sama sekali (beda dari 3 sumber lain).
  *   - warung   : nominal HANYA memotong Net Profit.
- * Semua baris (apapun sumber dananya) memotong Net Profit SEBELUM admin fee
- * 3% dipotong (lihat rekapitulasi.php & _rekap_script_matrix.php).
+ * Baris investor/warung/pusat memotong Net Profit SEBELUM admin fee 3%
+ * dipotong (lihat rekapitulasi.php & _rekap_script_matrix.php). Baris ruko
+ * dikecualikan total dari perhitungan Net Profit.
  *
  * Baris ditambah/dihapus bebas oleh user (JS murni) — saat Simpan, SEMUA
  * baris lama utk (id_cabang,tahun,bulan,urutan_pengelola) dihapus lalu
@@ -92,7 +94,7 @@
         </div>
         <div class="px-3 pb-2 pt-1" style="font-size: 0.78rem; color: #64748b;">
             <i class="bi bi-info-circle me-1"></i>
-            Semua baris memotong Net Profit sebelum Admin Fee 3%. Baris "Dana Investor" tambahan otomatis masuk Pengembalian Dana Talangan (Koreksi Dividen: Sisi Investor); baris "Dana Pusat" tambahan otomatis masuk Admin Management Pusat (8. Rekapan Hasil Akhir Keuntungan); baris "Dana Ruko" otomatis memotong Total Bersih Investor (Koreksi Dividen: Sisi Investor).
+            Baris "Dana Warung", "Dana Investor", dan "Dana Pusat" memotong Net Profit sebelum Admin Fee 3%. Baris "Dana Investor" tambahan otomatis masuk Pengembalian Dana Talangan (Koreksi Dividen: Sisi Investor); baris "Dana Pusat" tambahan otomatis masuk Admin Management Pusat (8. Rekapan Hasil Akhir Keuntungan). Baris "Dana Ruko" TIDAK memotong Net Profit — otomatis mengurangi Sewa Ruko (Total) di Kontrak Pembagian Hasil.
         </div>
         <div class="p-3 border-top d-flex justify-content-between align-items-center" style="background-color: #f8fafc;">
             <button type="button" id="btnTambahKlaimBulanan" class="btn btn-sm btn-outline-secondary fw-semibold">
@@ -115,6 +117,11 @@
     const fmtRp = (n) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID');
 
     function hitungUlangNoDanTotal() {
+        // "total" (& footer TOTAL KLAIM BULANAN) SENGAJA tidak menghitung baris
+        // "Dana Ruko" -- baris itu TIDAK memotong Net Profit sama sekali, jadi
+        // tidak ikut angka yang merepresentasikan "total yang memotong Net
+        // Profit". Nominalnya tetap dijumlah terpisah lewat totalRuko, dipakai
+        // untuk mengurangi Sewa Ruko (Total) di Kontrak Pembagian Hasil.
         let total = 0;
         let totalInvestor = 0;
         let totalPusat = 0;
@@ -124,10 +131,13 @@
             tr.querySelector('.klaim-no').textContent = no++;
             const nominal = bersihkanAngka(tr.querySelector('.klaim-nominal').value);
             const sumber = tr.querySelector('.klaim-sumber').value;
+            if (sumber === 'ruko') {
+                totalRuko += nominal;
+                return;
+            }
             total += nominal;
             if (sumber === 'investor') totalInvestor += nominal;
             if (sumber === 'pusat') totalPusat += nominal;
-            if (sumber === 'ruko') totalRuko += nominal;
         });
         totalCell.textContent = fmtRp(total);
 

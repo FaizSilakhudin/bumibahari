@@ -131,10 +131,14 @@
             // Baris Klaim Bulanan ber-sumber_dana='pusat' — otomatis masuk Admin
             // Management Pusat (8. Rekapan Hasil Akhir), lihat updateFinalRekap().
             let RK_TOTAL_KLAIM_DANA_PUSAT = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>;
-            // Baris Klaim Bulanan ber-sumber_dana='ruko' — otomatis MEMOTONG Total
-            // Bersih Investor (Koreksi Dividen: Sisi Investor), kebalikan dari
-            // RK_TOTAL_KLAIM_DANA_INVESTOR yang menambah.
+            // Baris Klaim Bulanan ber-sumber_dana='ruko' — TIDAK memotong Net Profit
+            // sama sekali (dikecualikan sebelum masuk RK_TOTAL_KLAIM_BULANAN di
+            // _rekap_klaim_bulanan.php); nominalnya otomatis mengurangi RK_SEWA_RUKO_RAW
+            // untuk membentuk "Sewa Ruko (Total)" (4. Kontrak Pembagian Hasil), yang lalu
+            // mengalir jadi nilai Sewa Ruko di Koreksi Dividen: Sisi Investor.
             let RK_TOTAL_KLAIM_DANA_RUKO = <?= (float) ($total_klaim_dana_ruko ?? 0) ?>;
+            // Sewa Ruko mentah dari Beban Operasional (SEBELUM dikurangi Dana Ruko).
+            const RK_SEWA_RUKO_RAW = <?= (float) ($bo_db['sewa'] ?? 0) ?>;
             // Kasbon Pengelola kalau sumbernya "Dana Pusat" (bukan "Dana Investor")
             // — diisi ulang tiap hitungInvestor() dipanggil, dipakai updateFinalRekap().
             let RK_KASBON_DANA_PUSAT = 0;
@@ -199,11 +203,14 @@
                 if (invModalEl) invModalEl.value = RK_TOTAL_KLAIM_DANA_INVESTOR;
                 setTxt('inv_modal_val', formatRupiah(RK_TOTAL_KLAIM_DANA_INVESTOR));
 
-                // Potongan Dana Ruko — read-only, otomatis dari Klaim Bulanan (kebalikan
-                // dari Pengembalian Dana Talangan: MEMOTONG, bukan menambah).
-                const invRukoEl = document.getElementById('inv_ruko');
-                if (invRukoEl) invRukoEl.value = RK_TOTAL_KLAIM_DANA_RUKO;
-                setTxt('inv_ruko_val', '- ' + formatRupiah(RK_TOTAL_KLAIM_DANA_RUKO));
+                // Sewa Ruko (Total) — RK_SEWA_RUKO_RAW dikurangi Klaim Bulanan "Dana
+                // Ruko" (TIDAK memotong Net Profit, lihat komentar RK_TOTAL_KLAIM_DANA_RUKO
+                // di atas). Hasilnya yang mengalir jadi nilai Sewa Ruko di Koreksi Dividen
+                // Investor (inv_sewa), bukan angka BO mentah lagi.
+                const sewaRukoTotal = RK_SEWA_RUKO_RAW - RK_TOTAL_KLAIM_DANA_RUKO;
+                setTxt('rev_sewa_ruko', formatRupiah(sewaRukoTotal));
+                const invSewaEl = document.getElementById('inv_sewa');
+                if (invSewaEl) invSewaEl.value = sewaRukoTotal;
 
                 hitungInvestor();
             }
@@ -216,11 +223,12 @@
             // =========================================================
             function hitungInvestor() {
                 const profit       = parseFloat(document.getElementById('inv_profit')?.value) || 0;
+                // inv_sewa sudah berisi Sewa Ruko (Total) -- RK_SEWA_RUKO_RAW dikurangi
+                // Klaim Bulanan "Dana Ruko" (lihat hitungCascade()) -- bukan angka BO mentah.
                 const sewa         = parseFloat(document.getElementById('inv_sewa')?.value) || 0;
                 const kasbon       = angkaBersih('inv_kasbon');
                 const kasbonSumber = document.getElementById('inv_kasbon_sumber')?.value || 'investor';
                 const talangan     = parseFloat(document.getElementById('inv_modal')?.value) || 0;
-                const potonganRuko = parseFloat(document.getElementById('inv_ruko')?.value) || 0;
 
                 let total = profit;
                 total += sewa;
@@ -242,10 +250,6 @@
                 // sudah pasti "Dana Investor" (nilai ini hanya berisi total
                 // baris Klaim Bulanan ber-sumber_dana='investor').
                 total += talangan;
-
-                // Potongan Dana Ruko SELALU dikurangkan — sumbernya sudah pasti
-                // "Dana Ruko" (total baris Klaim Bulanan ber-sumber_dana='ruko').
-                total -= potonganRuko;
 
                 total = Math.max(0, total);
                 setTxt('inv_total', formatRupiah(total));
