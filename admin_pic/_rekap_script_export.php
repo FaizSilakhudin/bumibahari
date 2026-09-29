@@ -104,8 +104,12 @@
 
                 const baseStyles = {
                     theme: 'grid',
-                    styles: { fontSize: 6.5, cellPadding: 1, overflow: 'linebreak' },
-                    headStyles: { fillColor: [33, 37, 41], textColor: 255, halign: 'center', fontSize: 6.5 },
+                    // fontSize/cellPadding sengaja kecil -- tabel "1. Rekapitulasi
+                    // Pendapatan & Pengeluaran Harian" bisa sampai ~32+ baris (bulan
+                    // penuh, atau periode gabungan closing) dan HARUS selalu muat 1
+                    // halaman, tidak boleh meluber ke halaman berikutnya.
+                    styles: { fontSize: 5, cellPadding: 0.6, overflow: 'linebreak' },
+                    headStyles: { fillColor: [33, 37, 41], textColor: 255, halign: 'center', fontSize: 5 },
                     includeHiddenHtml: true
                 };
 
@@ -281,7 +285,9 @@
                 let yLine = startYContent + 24; doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.4); doc.line(margin, yLine, 283, yLine);
                 let yTabelHarian = yLine + 7; doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
                 doc.text('1. Rekapitulasi Pendapatan & Pengeluaran Harian - <?= date("F Y", strtotime("$tahun-$bulan-01")) ?>', margin, yTabelHarian);
-                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 5.8, cellPadding: 0.9 }, didParseCell: rekapHarianDidParseCell });
+                // fontSize/cellPadding kecil supaya tabel yang bisa ~32+ baris (bulan
+                // penuh / periode gabungan closing) tetap muat 1 halaman, tidak meluber.
+                doc.autoTable({ html: '#tabelRekapHarian', startY: yTabelHarian + 4, ...baseTableStyles, styles: { fontSize: 4.5, cellPadding: 0.5 }, headStyles: { fillColor: [52, 58, 64], textColor: 255, halign: 'center', fontSize: 4.5 }, didParseCell: rekapHarianDidParseCell });
 
                 // HALAMAN 2 — Rincian Beban Operasional SAJA
                 doc.addPage(); addWatermark(doc); let y = 15;

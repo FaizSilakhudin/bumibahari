@@ -1292,14 +1292,14 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         <div class="col-md-6">
             <div class="d-flex gap-2 mb-2">
                 <button onclick="exportPDF('save')" class="btn btn-danger flex-fill py-3 fw-semibold" style="border-radius: 10px; font-size: 1rem;">
-                    <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF
+                    <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF Bulanan
                 </button>
                 <button onclick="exportPDF('share')" class="btn btn-outline-danger py-3 fw-semibold px-3" style="border-radius: 10px;" title="Bagikan ke WhatsApp">
                     <i class="bi bi-whatsapp"></i>
                 </button>
             </div>
             <button onclick="exportExcel()" class="btn btn-outline-danger w-100 py-2 fw-semibold" style="border-radius: 10px;">
-                <i class="bi bi-file-earmark-excel me-2"></i>Export Excel
+                <i class="bi bi-file-earmark-excel me-2"></i>Export Excel Bulanan
             </button>
         </div>
     </div>
