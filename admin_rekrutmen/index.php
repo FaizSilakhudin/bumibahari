@@ -121,6 +121,8 @@ $stmt->close();
     .form-control-premium, .form-select-premium { border-radius: 12px !important; border: 1px solid #e0e7ff !important; padding: 10px 16px; color: #1b2559; font-size: 14px; background-color: #ffffff; }
     .form-control-premium:focus, .form-select-premium:focus { border-color: #0d9488 !important; box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.1) !important; }
 
+    .btn-action-view { background-color: #e0f2fe; color: #0369a1; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+    .btn-action-view:hover { background-color: #bae6fd; color: #0369a1; }
     .btn-action-edit { background-color: #fff3cd; color: #856404; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
     .btn-action-edit:hover { background-color: #ffe8a1; color: #856404; }
     .btn-action-delete { background-color: #fde8e8; color: #ef4444; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -201,7 +203,8 @@ $stmt->close();
                         <td class="text-muted small"><?= h($d['nama_input'] ?? '-') ?></td>
                         <td class="text-center">
                             <div class="d-inline-flex gap-2 justify-content-center">
-                                <a href="form_calon?id=<?= (int) $d['id'] ?>" class="btn-action-edit"><i class="bi bi-eye-fill"></i></a>
+                                <a href="lihat_calon?id=<?= (int) $d['id'] ?>" class="btn-action-view" title="Lihat Formulir"><i class="bi bi-eye-fill"></i></a>
+                                <a href="form_calon?id=<?= (int) $d['id'] ?>" class="btn-action-edit" title="Edit"><i class="bi bi-pencil-fill"></i></a>
                                 <form method="POST" class="d-inline" onsubmit="return confirm('Yakin menghapus data <?= h($d['nama_calon']) ?>?')">
                                     <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
                                     <input type="hidden" name="id_calon" value="<?= (int) $d['id'] ?>">
@@ -227,7 +230,8 @@ $stmt->close();
                     <div class="text-muted small mb-1">No. <?= h($d['no_urut'] ?: '-') ?> &middot; <?= date('d/m/Y', strtotime($d['tanggal_interview'])) ?> &middot; <?= h($d['interviewer'] ?: '-') ?></div>
                     <div class="mb-3"><span class="badge <?= kesimpulan_badge_class($d['kesimpulan_interviewer']) ?>"><?= kesimpulan_label($d['kesimpulan_interviewer']) ?></span></div>
                     <div class="d-flex gap-2">
-                        <a href="form_calon?id=<?= (int) $d['id'] ?>" class="btn btn-action-edit flex-fill py-2"><i class="bi bi-eye-fill me-1"></i> Lihat / Edit</a>
+                        <a href="lihat_calon?id=<?= (int) $d['id'] ?>" class="btn btn-action-view flex-fill py-2"><i class="bi bi-eye-fill me-1"></i> Lihat</a>
+                        <a href="form_calon?id=<?= (int) $d['id'] ?>" class="btn btn-action-edit flex-fill py-2"><i class="bi bi-pencil-fill me-1"></i> Edit</a>
                         <form method="POST" class="flex-fill" onsubmit="return confirm('Yakin menghapus data <?= h($d['nama_calon']) ?>?')">
                             <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
                             <input type="hidden" name="id_calon" value="<?= (int) $d['id'] ?>">
