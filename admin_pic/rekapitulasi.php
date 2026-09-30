@@ -330,6 +330,26 @@ if ($id_cabang !== '') {
     }
 }
 
+// Kasbon Pengelola (6. Koreksi Dividen: Sisi Investor) — nominal/sumber/
+// keterangan yang sudah disimpan lewat tombol "Simpan Kasbon", supaya
+// tidak balik ke 0/default tiap halaman di-refresh (pola sama seperti
+// $persen_service_fee_tersimpan di atas).
+$kasbon_nominal_tersimpan    = 0.0;
+$kasbon_sumber_tersimpan     = 'investor';
+$kasbon_keterangan_tersimpan = '';
+if ($id_cabang !== '') {
+    $stmt_kb = $conn->prepare("SELECT kasbon_nominal, kasbon_sumber, kasbon_keterangan FROM revenue_sharing WHERE id_cabang = ? AND tahun = ? AND bulan = ? AND urutan_pengelola = ?");
+    $stmt_kb->bind_param('iiii', $id_cabang, $tahun, $bulan, $urutan_pengelola_aktif);
+    $stmt_kb->execute();
+    $row_kb = $stmt_kb->get_result()->fetch_assoc();
+    $stmt_kb->close();
+    if ($row_kb) {
+        $kasbon_nominal_tersimpan    = (float) $row_kb['kasbon_nominal'];
+        $kasbon_sumber_tersimpan     = (string) $row_kb['kasbon_sumber'];
+        $kasbon_keterangan_tersimpan = (string) ($row_kb['kasbon_keterangan'] ?? '');
+    }
+}
+
 // Perhitungan Laba Default (Sebelum pilihan dinamis di UI)
 // Urutan: Net Profit -> dikurangi Klaim Bulanan -> BARU admin fee 3% dihitung
 // dari sisanya -> split 50/50 investor-pengelola.
@@ -1143,6 +1163,39 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         const btn = document.getElementById('btnSimpanRevenueSharing');
         if (btn) btn.addEventListener('click', function () { simpanRevenueSharing(btn); });
     })();
+
+    // Tombol "Simpan Kasbon" (Koreksi Dividen: Sisi Investor) — simpan
+    // kasbon_nominal/kasbon_sumber/kasbon_keterangan supaya tidak balik ke
+    // 0/default tiap halaman di-refresh (baris DB sama dengan Revenue
+    // Sharing/Service Fee, tapi kolom yang disentuh berbeda).
+    function simpanKasbon(btn) {
+        const asalHtml = btn.innerHTML;
+
+        const fd = new FormData();
+        fd.append('csrf', <?= json_encode(csrf_token()) ?>);
+        fd.append('aksi', 'simpan_kasbon');
+        fd.append('id_cabang', <?= (int) $id_cabang ?>);
+        fd.append('tahun', <?= (int) $tahun ?>);
+        fd.append('bulan', <?= (int) $bulan ?>);
+        fd.append('urutan_pengelola', <?= (int) $urutan_pengelola_aktif ?>);
+        fd.append('kasbon_nominal', angkaBersih('inv_kasbon'));
+        fd.append('kasbon_sumber', document.getElementById('inv_kasbon_sumber')?.value || 'investor');
+        fd.append('kasbon_keterangan', document.getElementById('inv_kasbon_keterangan')?.value || '');
+
+        btn.disabled = true;
+        fetch('revenue_sharing_handler.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                if (!data.ok) { alert('Gagal: ' + (data.msg || 'unknown')); return; }
+                btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersimpan';
+                setTimeout(function () { btn.innerHTML = asalHtml; }, 1500);
+            })
+            .catch(function (err) {
+                btn.disabled = false;
+                alert('Gagal mengirim: ' + err);
+            });
+    }
     </script>
 </div>
 
@@ -1191,24 +1244,30 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     <div class="col-sm-6">
                         <label class="form-label text-muted small fw-semibold">Kasbon Pengelola</label>
                         <div class="input-group">
-                            <input type="text" inputmode="numeric" id="inv_kasbon" class="form-control border-2 mask-ribuan-titik" style="border-radius: 8px 0 0 8px;" value="0">
+                            <input type="text" inputmode="numeric" id="inv_kasbon" class="form-control border-2 mask-ribuan-titik" style="border-radius: 8px 0 0 8px;" value="<?= number_format($kasbon_nominal_tersimpan, 0, ',', '.') ?>" oninput="hitungCascade()">
                             <select id="inv_kasbon_sumber" class="form-select border-2" style="max-width: 120px; border-radius: 0 8px 8px 0;" title="Sumber Kasbon — siapa yang menalangi kasbon ini" onchange="hitungCascade()">
-                                <option value="investor" selected>Dana Investor</option>
-                                <option value="pusat">Dana Pusat</option>
-                                <option value="warung">Dana Warung</option>
+                                <option value="investor" <?= $kasbon_sumber_tersimpan === 'investor' ? 'selected' : '' ?>>Dana Investor</option>
+                                <option value="pusat" <?= $kasbon_sumber_tersimpan === 'pusat' ? 'selected' : '' ?>>Dana Pusat</option>
+                                <option value="warung" <?= $kasbon_sumber_tersimpan === 'warung' ? 'selected' : '' ?>>Dana Warung</option>
                             </select>
                         </div>
                     </div>
 
                     <div class="col-12">
                         <label class="form-label text-muted small fw-semibold">Keterangan Kasbon <span class="fw-normal">(opsional)</span></label>
-                        <input type="text" id="inv_kasbon_keterangan" class="form-control border-2" style="border-radius: 8px;" placeholder="Contoh: kasbon beli gas 3kg, servis kompor, dll." maxlength="255">
+                        <input type="text" id="inv_kasbon_keterangan" class="form-control border-2" style="border-radius: 8px;" placeholder="Contoh: kasbon beli gas 3kg, servis kompor, dll." maxlength="255" value="<?= h($kasbon_keterangan_tersimpan) ?>">
                     </div>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 p-3 rounded-3 mt-auto border border-primary border-opacity-10">
+                <div class="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 p-3 rounded-3 mt-auto border border-primary border-opacity-10 mb-3">
                     <span class="fw-bold text-primary small">TOTAL BERSIH INVESTOR:</span>
                     <h4 class="fw-bold text-primary mb-0" id="inv_total">Rp 0</h4>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="button" id="btnSimpanKasbon" class="btn btn-sm btn-outline-primary fw-semibold" onclick="simpanKasbon(this)">
+                        <i class="bi bi-save me-1"></i>Simpan Kasbon
+                    </button>
                 </div>
             </div>
         </div>

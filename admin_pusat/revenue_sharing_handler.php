@@ -6,6 +6,8 @@
  * Aksi (field POST 'aksi'):
  *   - simpan_dari_rekap : simpan admin_fee + persen/nominal_service_fee dari
  *                         Rekapitulasi utk (id_cabang, tahun, bulan, urutan_pengelola)
+ *   - simpan_kasbon     : simpan kasbon_nominal/kasbon_sumber/kasbon_keterangan
+ *                         (tombol "Simpan Kasbon" di Koreksi Dividen: Sisi Investor)
  *   - update_status     : simpan status_pembayaran untuk (id_cabang, tahun, bulan)
  *                         — satu-satunya yang masih editable inline di revenue_sharing.php
  *
@@ -141,6 +143,66 @@ if ($aksi === 'simpan_dari_rekap') {
         'admin_fee'           => $admin_fee,
         'persen_service_fee'  => $persen_mentah,
         'nominal_service_fee' => $nominal_service_fee,
+    ]);
+    exit;
+}
+
+// ---- Aksi: simpan Kasbon Pengelola dari Koreksi Dividen: Sisi Investor ----
+if ($aksi === 'simpan_kasbon') {
+    $urutan_pengelola  = (int) ($_POST['urutan_pengelola'] ?? 1);
+    $kasbon_nominal    = (float) ($_POST['kasbon_nominal'] ?? 0);
+    $kasbon_sumber     = (string) ($_POST['kasbon_sumber'] ?? 'investor');
+    $kasbon_keterangan = trim((string) ($_POST['kasbon_keterangan'] ?? ''));
+
+    if ($urutan_pengelola < 1 || $urutan_pengelola > 9) {
+        echo json_encode(['ok' => false, 'msg' => 'Segmen pengelola tidak valid']);
+        exit;
+    }
+    if (!in_array($kasbon_sumber, ['investor', 'pusat', 'warung'], true)) {
+        echo json_encode(['ok' => false, 'msg' => 'Sumber kasbon tidak valid']);
+        exit;
+    }
+    if ($kasbon_nominal < 0) {
+        echo json_encode(['ok' => false, 'msg' => 'Nominal kasbon tidak boleh negatif']);
+        exit;
+    }
+    if ($kasbon_keterangan !== '' && mb_strlen($kasbon_keterangan) > 255) {
+        $kasbon_keterangan = mb_substr($kasbon_keterangan, 0, 255);
+    }
+
+    $sebelum = ambil_nilai_sebelum($conn, $id_cabang, $tahun, $bulan, $urutan_pengelola);
+    $uid = current_user_id();
+
+    // INSERT … ON DUPLICATE KEY UPDATE pada baris (id_cabang,tahun,bulan,
+    // urutan_pengelola) yang sama dengan admin_fee/service_fee -- hanya
+    // kolom kasbon_* yang disentuh di sini, service fee tidak diubah.
+    $sql = "INSERT INTO revenue_sharing (id_cabang, tahun, bulan, urutan_pengelola, persen_service_fee, status_pembayaran, kasbon_nominal, kasbon_sumber, kasbon_keterangan, updated_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+              kasbon_nominal = VALUES(kasbon_nominal),
+              kasbon_sumber = VALUES(kasbon_sumber),
+              kasbon_keterangan = VALUES(kasbon_keterangan),
+              updated_by = VALUES(updated_by)";
+    $st = $conn->prepare($sql);
+    $st->bind_param('iiiidsdssi', $id_cabang, $tahun, $bulan, $urutan_pengelola, $sebelum['persen_service_fee'], $sebelum['status_pembayaran'], $kasbon_nominal, $kasbon_sumber, $kasbon_keterangan, $uid);
+    $st->execute();
+    $st->close();
+
+    audit($conn, 'revenue_sharing_simpan_kasbon', 'revenue_sharing', $id_cabang, [
+        'id_cabang'         => $id_cabang,
+        'tahun'             => $tahun,
+        'bulan'             => $bulan,
+        'urutan_pengelola'  => $urutan_pengelola,
+        'kasbon_nominal'    => $kasbon_nominal,
+        'kasbon_sumber'     => $kasbon_sumber,
+        'kasbon_keterangan' => $kasbon_keterangan,
+    ]);
+
+    echo json_encode([
+        'ok'                => true,
+        'kasbon_nominal'    => $kasbon_nominal,
+        'kasbon_sumber'     => $kasbon_sumber,
+        'kasbon_keterangan' => $kasbon_keterangan,
     ]);
     exit;
 }
