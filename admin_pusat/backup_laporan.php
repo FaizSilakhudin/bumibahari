@@ -35,31 +35,40 @@ function ambil_cabang_valid(mysqli $conn, int $id_cabang): ?array
     return $row ?: null;
 }
 
-if (isset($_POST['tandai_libur'], $_POST['id_cabang'], $_POST['tanggal'])) {
+// "Tandai Libur/Tutup" DI SINI (Backup Laporan, admin_pusat) mendukung RENTANG
+// tanggal (dari - sampai), BUKAN cuma 1 hari — beda dengan admin_cabang/
+// input_data.php yang tetap 1 hari saja (tidak diubah). Setiap tanggal dalam
+// rentang diproses satu-satu; tanggal yang statusnya SUDAH 'lengkap' (sudah
+// diproses PIC) dilewati saja, tidak menggagalkan seluruh rentang.
+if (isset($_POST['tandai_libur'], $_POST['id_cabang'], $_POST['tanggal_mulai'], $_POST['tanggal_selesai'])) {
     if (!csrf_check($_POST['csrf'] ?? '')) {
         die("<script>alert('Token tidak valid!'); history.back();</script>");
     }
     $p_id_cabang = (int) $_POST['id_cabang'];
-    $p_tanggal   = $_POST['tanggal'];
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $p_tanggal) || $p_tanggal > date('Y-m-d') || !ambil_cabang_valid($conn, $p_id_cabang)) {
-        echo "<script>alert('Data tidak valid.'); history.back();</script>";
+    $p_mulai     = $_POST['tanggal_mulai'];
+    $p_selesai   = $_POST['tanggal_selesai'];
+
+    if (
+        !preg_match('/^\d{4}-\d{2}-\d{2}$/', $p_mulai) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $p_selesai)
+        || $p_selesai < $p_mulai || $p_selesai > date('Y-m-d') || !ambil_cabang_valid($conn, $p_id_cabang)
+    ) {
+        echo "<script>alert('Rentang tanggal tidak valid.'); history.back();</script>";
         exit;
     }
 
-    $stmt = $conn->prepare("SELECT status_laporan FROM laporan_cabang WHERE id_cabang = ? AND tanggal = ?");
-    $stmt->bind_param("is", $p_id_cabang, $p_tanggal);
-    $stmt->execute();
-    $status_now = $stmt->get_result()->fetch_assoc()['status_laporan'] ?? null;
-    $stmt->close();
-
-    if ($status_now === 'lengkap') {
-        echo "<script>alert('Laporan tanggal ini sudah diproses PIC, tidak bisa ditandai libur.'); history.back();</script>";
+    // Batasi rentang maksimal 3 bulan sekali tandai — jaring pengaman kalau
+    // salah pilih tanggal, bukan batasan bisnis yang ketat.
+    $jumlah_hari_rentang = ((int) (strtotime($p_selesai) - strtotime($p_mulai)) / 86400) + 1;
+    if ($jumlah_hari_rentang > 92) {
+        echo "<script>alert('Rentang tanggal maksimal 3 bulan sekali tandai.'); history.back();</script>";
         exit;
     }
 
-    $nama_pengelola_p = pengelola_pada_tanggal($conn, $p_id_cabang, $p_tanggal);
     $id_user = current_user_id();
-    $stmt = $conn->prepare("
+    $ditandai = 0;
+    $dilewati = 0;
+    $stmt_cek = $conn->prepare("SELECT status_laporan FROM laporan_cabang WHERE id_cabang = ? AND tanggal = ?");
+    $stmt_ins = $conn->prepare("
         INSERT INTO laporan_cabang (id_cabang, nama_pengelola, tanggal, id_user_nota, status_laporan)
         VALUES (?, ?, ?, ?, 'libur')
         ON DUPLICATE KEY UPDATE
@@ -67,12 +76,36 @@ if (isset($_POST['tandai_libur'], $_POST['id_cabang'], $_POST['tanggal'])) {
             id_user_nota   = VALUES(id_user_nota),
             status_laporan = 'libur'
     ");
-    $stmt->bind_param("issi", $p_id_cabang, $nama_pengelola_p, $p_tanggal, $id_user);
-    $stmt->execute();
-    audit($conn, 'tandai_libur_oleh_pusat', 'laporan_cabang', $p_id_cabang . '@' . $p_tanggal, [
-        'id_cabang' => $p_id_cabang, 'tanggal' => $p_tanggal,
+
+    $cur = strtotime($p_mulai);
+    $akhir = strtotime($p_selesai);
+    while ($cur <= $akhir) {
+        $tgl_loop = date('Y-m-d', $cur);
+
+        $stmt_cek->bind_param("is", $p_id_cabang, $tgl_loop);
+        $stmt_cek->execute();
+        $status_now = $stmt_cek->get_result()->fetch_assoc()['status_laporan'] ?? null;
+
+        if ($status_now === 'lengkap') {
+            $dilewati++;
+        } else {
+            $nama_pengelola_p = pengelola_pada_tanggal($conn, $p_id_cabang, $tgl_loop);
+            $stmt_ins->bind_param("issi", $p_id_cabang, $nama_pengelola_p, $tgl_loop, $id_user);
+            $stmt_ins->execute();
+            $ditandai++;
+        }
+        $cur = strtotime('+1 day', $cur);
+    }
+    $stmt_cek->close();
+    $stmt_ins->close();
+
+    audit($conn, 'tandai_libur_oleh_pusat', 'laporan_cabang', $p_id_cabang . '@' . $p_mulai . '_sd_' . $p_selesai, [
+        'id_cabang' => $p_id_cabang, 'tanggal_mulai' => $p_mulai, 'tanggal_selesai' => $p_selesai,
+        'jumlah_ditandai' => $ditandai, 'jumlah_dilewati' => $dilewati,
     ]);
-    echo "<script>window.location.replace('backup_laporan.php?tanggal=$p_tanggal&id_cabang=$p_id_cabang');</script>";
+
+    $pesan = "$ditandai hari ditandai Libur/Tutup" . ($dilewati > 0 ? ", $dilewati hari dilewati (sudah diproses PIC)" : "") . ".";
+    echo "<script>alert(" . json_encode($pesan) . "); window.location.replace('backup_laporan.php?tanggal=$p_mulai&id_cabang=$p_id_cabang');</script>";
     exit;
 }
 
@@ -432,15 +465,42 @@ body { background-color: #f6f8fa; }
 
     <?php if ($status_terpilih !== 'libur' && $status_terpilih !== 'lengkap'): ?>
         <div class="d-flex justify-content-end mb-4">
-            <form method="POST" onsubmit="return confirm('Tandai warung <?= h($cabang_terpilih['nama_cabang']) ?> LIBUR/TUTUP untuk tanggal <?= date('d M Y', strtotime($tanggal)) ?>?')">
-                <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
-                <input type="hidden" name="id_cabang" value="<?= (int) $id_cabang_pilih ?>">
-                <input type="hidden" name="tanggal" value="<?= h($tanggal) ?>">
-                <button type="submit" name="tandai_libur" class="btn btn-outline-dark btn-sm rounded-pill px-3">
+            <div class="text-end">
+                <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="document.getElementById('formTandaiLiburRange').classList.toggle('d-none')">
                     <i class="bi bi-moon-stars-fill me-1"></i> Tandai Libur / Tutup
                 </button>
-            </form>
+                <form method="POST" id="formTandaiLiburRange" class="d-none mt-2 p-3 border rounded-4 bg-light text-start" style="min-width: 320px;" onsubmit="return konfirmasiTandaiLiburRange(this)">
+                    <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="id_cabang" value="<?= (int) $id_cabang_pilih ?>">
+                    <label class="form-label small text-muted fw-semibold mb-2">Tandai Libur/Tutup dari tanggal berapa sampai tanggal berapa?</label>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Dari Tanggal</label>
+                            <input type="date" name="tanggal_mulai" class="form-control form-control-sm" value="<?= h($tanggal) ?>" max="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Sampai Tanggal</label>
+                            <input type="date" name="tanggal_selesai" class="form-control form-control-sm" value="<?= h($tanggal) ?>" max="<?= date('Y-m-d') ?>" required>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <button type="submit" name="tandai_libur" class="btn btn-dark btn-sm rounded-pill px-3">
+                            <i class="bi bi-check2 me-1"></i> Konfirmasi Tandai Libur
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
+        <script>
+        function konfirmasiTandaiLiburRange(form) {
+            const mulai = form.querySelector('[name="tanggal_mulai"]').value;
+            const selesai = form.querySelector('[name="tanggal_selesai"]').value;
+            if (!mulai || !selesai) { alert('Isi kedua tanggal.'); return false; }
+            if (selesai < mulai) { alert('Tanggal "Sampai" tidak boleh sebelum tanggal "Dari".'); return false; }
+            const namaCabang = <?= json_encode($cabang_terpilih['nama_cabang'] ?? '') ?>;
+            return confirm('Tandai warung ' + namaCabang + ' LIBUR/TUTUP dari ' + mulai + ' sampai ' + selesai + '?');
+        }
+        </script>
     <?php endif; ?>
 
     <?php if ($status_terpilih !== 'libur'): ?>
