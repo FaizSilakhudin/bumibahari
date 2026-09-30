@@ -1199,6 +1199,11 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                             </select>
                         </div>
                     </div>
+
+                    <div class="col-12">
+                        <label class="form-label text-muted small fw-semibold">Keterangan Kasbon <span class="fw-normal">(opsional)</span></label>
+                        <input type="text" id="inv_kasbon_keterangan" class="form-control border-2" style="border-radius: 8px;" placeholder="Contoh: kasbon beli gas 3kg, servis kompor, dll." maxlength="255">
+                    </div>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 p-3 rounded-3 mt-auto border border-primary border-opacity-10">
