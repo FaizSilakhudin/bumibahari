@@ -184,6 +184,73 @@ function yt_checked($data, $key, $val) {
     return (($data[$key] ?? '') === $val) ? 'checked' : '';
 }
 $d = $data ?? [];
+
+// ---- "Cetak Redaksi": ringkasan teks polos (bukan PDF) untuk dibagikan
+// langsung ke WA bareng foto dokumen (harus SAMA PERSIS dengan lihat_calon.php).
+function redaksi_yt($val) {
+    return $val === 'ya' ? 'Ya' : ($val === 'tidak' ? 'Tidak' : '-');
+}
+function redaksi_isi($val) {
+    $val = trim((string) $val);
+    return $val !== '' ? $val : '-';
+}
+function redaksi_gab(array $parts, string $pemisah = ' — '): string {
+    $isi = array_map('redaksi_isi', $parts);
+    $ada_isi = array_filter($isi, fn($v) => $v !== '-');
+    return empty($ada_isi) ? '-' : implode($pemisah, $isi);
+}
+function bangun_redaksi_teks(array $d): string {
+    $opsi_kesimpulan = [
+        'direkomendasikan' => 'Direkomendasikan',
+        'dipertimbangkan' => 'Dipertimbangkan / Tes Lanjutan',
+        'tes_memasak' => 'Tes Memasak',
+        'belum_direkomendasikan' => 'Belum Direkomendasikan',
+    ];
+    $baris = [];
+    $baris[] = "*FORMULIR INTERVIEW CALON PENGELOLA*";
+    $baris[] = "*WARTEG BUMI BAHARI (WBB)*";
+    $baris[] = "";
+    $baris[] = "No. Urut : " . redaksi_isi($d['no_urut'] ?? '');
+    $baris[] = "Nama : " . $d['nama_calon'];
+    $baris[] = "Usia : " . ($d['usia'] ? (int) $d['usia'] . " Tahun" : '-');
+    $baris[] = "Alamat : " . redaksi_isi($d['alamat'] ?? '');
+    $baris[] = "No. HP : " . redaksi_isi($d['no_hp'] ?? '');
+    $baris[] = "Tanggal Interview : " . date('d F Y', strtotime($d['tanggal_interview']));
+    $baris[] = "Interviewer : " . redaksi_isi($d['interviewer'] ?? '');
+    $baris[] = "";
+    $baris[] = "*A. Identitas & Pengalaman Kerja*";
+    $baris[] = "1. Perkenalan & pengalaman kerja: " . redaksi_isi($d['a_perkenalan']);
+    $baris[] = "2. Tempat kerja sebelumnya: " . redaksi_gab([$d['a_nama_tempat_usaha'], $d['a_posisi_jabatan'], $d['a_lama_bekerja']]);
+    $baris[] = "3. Pernah kelola warteg: " . redaksi_yt($d['a_pernah_kelola_warteg']) . " (Lama: " . redaksi_isi($d['a_lama_kelola_warteg']) . ", Omzet rata-rata: " . redaksi_isi($d['a_omzet_rata_rata']) . ", Omzet tertinggi: " . redaksi_isi($d['a_omzet_tertinggi']) . ")";
+    $baris[] = "4. Alasan berhenti: " . redaksi_isi($d['a_alasan_berhenti']);
+    $baris[] = "Video hasil masakan: " . redaksi_yt($d['a_video_masakan']);
+    $baris[] = "Menu dikuasai: " . redaksi_isi($d['a_menu_dikuasai']);
+    $baris[] = "Catatan interviewer: " . redaksi_isi($d['a_catatan_interviewer']);
+    $baris[] = "";
+    $baris[] = "*B. Pengetahuan tentang Warteg Bumi Bahari*";
+    $baris[] = "1. Tahu WBB dari mana: " . redaksi_isi($d['b_tahu_dari_mana']);
+    $baris[] = "2. Alasan tertarik bergabung: " . redaksi_isi($d['b_alasan_tertarik']);
+    $baris[] = "3. Pernah kunjungi outlet: " . redaksi_yt($d['b_pernah_kunjungi_outlet']) . " (Outlet: " . redaksi_isi($d['b_outlet_mana']) . ", Yang diperhatikan: " . redaksi_isi($d['b_yang_diperhatikan']) . ")";
+    $baris[] = "4. Pendapat agar penjualan baik: " . redaksi_isi($d['b_pendapat_penjualan_baik']);
+    $baris[] = "Catatan interviewer: " . redaksi_isi($d['b_catatan_interviewer']);
+    $baris[] = "";
+    $baris[] = "*C. Kesiapan Ikuti Sistem*";
+    $baris[] = redaksi_isi($d['c_jawaban_kesiapan']);
+    $baris[] = "";
+    $baris[] = "*F. Pertanyaan Komitmen Akhir*";
+    $baris[] = "1. Siap ikuti SOP: " . redaksi_yt($d['f_siap_sop']);
+    $baris[] = "2. Siap dievaluasi berkala: " . redaksi_yt($d['f_siap_evaluasi']);
+    $baris[] = "3. Siap dipindah tugas: " . redaksi_yt($d['f_siap_dipindah']);
+    $baris[] = "4. Siap jaga kualitas: " . redaksi_yt($d['f_siap_jaga_kualitas']);
+    $baris[] = "5. Rencana tingkatkan penjualan: " . redaksi_isi($d['f_rencana_tingkatkan_penjualan']);
+    $baris[] = "6. Target bergabung dengan WBB: " . redaksi_isi($d['f_target_bergabung']);
+    $baris[] = "";
+    $baris[] = "*Kesimpulan Interviewer:* " . ($opsi_kesimpulan[$d['kesimpulan_interviewer']] ?? 'Dipertimbangkan / Tes Lanjutan');
+    $baris[] = "Catatan: " . redaksi_isi($d['catatan_kesimpulan']);
+    $baris[] = "";
+    $baris[] = "_WARTEG BUMI BAHARI MANAGEMENT_";
+    return implode("\n", $baris);
+}
 ?>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -437,9 +504,10 @@ $d = $data ?? [];
         </form>
 
         <?php if ($id_calon): ?>
-        <div class="d-flex justify-content-end gap-2 mt-3 pt-3 border-top no-print">
+        <div class="d-flex justify-content-end gap-2 flex-wrap mt-3 pt-3 border-top no-print">
             <a href="cetak_pdf.php?id=<?= $id_calon ?>" target="_blank" class="btn btn-premium-outline"><i class="bi bi-file-earmark-pdf me-1"></i> Cetak PDF</a>
-            <button type="button" class="btn btn-wa" onclick="bagikanWA(this)"><i class="bi bi-whatsapp me-1"></i> Kirim ke WA</button>
+            <button type="button" class="btn btn-wa" onclick="bagikanWA(this)"><i class="bi bi-whatsapp me-1"></i> Cetak PDF (Kirim ke WA)</button>
+            <button type="button" class="btn btn-wa" onclick="cetakRedaksi(this)"><i class="bi bi-whatsapp me-1"></i> Cetak Redaksi</button>
         </div>
         <?php endif; ?>
     </div>
@@ -490,6 +558,51 @@ async function bagikanWA(btn) {
         window.open('https://wa.me/?text=' + encodeURIComponent(teks + ' (PDF terlampir, silakan unggah manual)'), '_blank');
     } catch (e) {
         alert('Gagal membuat PDF. Coba lagi.');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+const REDAKSI_TEXT = <?= json_encode(bangun_redaksi_teks($d)) ?>;
+const REDAKSI_FOTO = <?= json_encode(array_values(array_filter(array_map(function ($f) use ($d, $UPLOAD_LABEL) {
+    return empty($d[$f]) ? null : ['src' => $d[$f], 'label' => $UPLOAD_LABEL[$f]];
+}, $UPLOAD_FIELDS)))) ?>;
+const REDAKSI_UPLOAD_DIR = <?= json_encode($UPLOAD_DIR) ?>;
+
+async function ambilFotoUntukRedaksi() {
+    const files = [];
+    for (const f of REDAKSI_FOTO) {
+        try {
+            const resp = await fetch(REDAKSI_UPLOAD_DIR + f.src);
+            if (!resp.ok) continue;
+            const blob = await resp.blob();
+            const ext = (f.src.split('.').pop() || 'jpg').toLowerCase();
+            files.push(new File([blob], f.label + '.' + ext, { type: blob.type || 'image/jpeg' }));
+        } catch (e) { /* lewati foto yang gagal diambil */ }
+    }
+    return files;
+}
+
+async function cetakRedaksi(btn) {
+    if (btn) { btn.disabled = true; }
+    try {
+        const files = await ambilFotoUntukRedaksi();
+        if (files.length && navigator.canShare && navigator.canShare({ files })) {
+            try {
+                await navigator.share({ files, title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
+                return;
+            } catch (e) { if (e && e.name === 'AbortError') return; }
+        }
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
+                return;
+            } catch (e) { if (e && e.name === 'AbortError') return; }
+        }
+        window.open('https://wa.me/?text=' + encodeURIComponent(REDAKSI_TEXT), '_blank');
+        if (files.length) alert('Browser tidak mendukung kirim foto otomatis. Teks sudah dibuka di WA, silakan lampirkan foto secara manual.');
+    } catch (e) {
+        alert('Gagal menyiapkan redaksi. Coba lagi.');
     } finally {
         if (btn) btn.disabled = false;
     }
