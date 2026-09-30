@@ -604,58 +604,34 @@ async function ambilFotoUntukRedaksi() {
     return files;
 }
 
-async function kirimTeksRedaksi() {
-    if (navigator.share) {
-        try {
-            await navigator.share({ title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
-            return;
-        } catch (e) { if (e && e.name === 'AbortError') return; }
-    }
-    window.open('https://wa.me/?text=' + encodeURIComponent(REDAKSI_TEXT), '_blank');
-}
-
-function resetTombolRedaksi(btn) {
-    if (!btn) return;
-    delete btn.dataset.tahap;
-    btn.innerHTML = '<i class="bi bi-whatsapp me-1"></i> Cetak Redaksi';
-}
-
-// Web Share API cuma boleh dipanggil sekali per klik (memakai lalu menghabiskan
-// user-activation dari klik itu), jadi tidak bisa kirim foto+teks sebagai 2 share
-// beruntun dalam 1x klik. Supaya urutan yang diterima di WA pasti foto dulu baru
-// redaksi teks, prosesnya dipecah jadi 2 klik: klik pertama kirim foto lalu
-// tombol berubah jadi "Lanjut: Kirim Redaksi", klik kedua baru kirim teksnya.
+// Foto & teks redaksi dikirim dalam 1x share yang sama supaya keduanya
+// PASTI sampai ke WA (kirim terpisah 2 klik gagal di praktiknya -- begitu
+// share foto membuka WA, orang lupa balik ke browser buat klik kirim
+// teksnya). Foto tetap tampil duluan di bubble WA, teks jadi caption
+// di bawahnya, jadi urutan baca "foto dulu baru redaksi" tetap kejaga.
 async function cetakRedaksi(btn) {
     if (btn) { btn.disabled = true; }
     try {
-        if (btn && btn.dataset.tahap === 'teks') {
-            await kirimTeksRedaksi();
-            resetTombolRedaksi(btn);
-            return;
-        }
-
         const files = await ambilFotoUntukRedaksi();
-        if (!files.length) {
-            await kirimTeksRedaksi();
-            return;
-        }
-
-        if (navigator.canShare && navigator.canShare({ files })) {
+        if (files.length && navigator.canShare && navigator.canShare({ files })) {
             try {
-                await navigator.share({ files, title: 'Interview Calon Pengelola' });
+                await navigator.share({ files, title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
+                return;
             } catch (e) {
                 if (e && e.name === 'AbortError') return;
                 throw e;
             }
-            if (btn) {
-                btn.dataset.tahap = 'teks';
-                btn.innerHTML = '<i class="bi bi-whatsapp me-1"></i> Lanjut: Kirim Redaksi';
-            }
-            return;
+        }
+
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
+                return;
+            } catch (e) { if (e && e.name === 'AbortError') return; }
         }
 
         window.open('https://wa.me/?text=' + encodeURIComponent(REDAKSI_TEXT), '_blank');
-        alert('Browser tidak mendukung kirim foto otomatis. Teks sudah dibuka di WA, silakan lampirkan foto secara manual.');
+        if (files.length) alert('Browser tidak mendukung kirim foto otomatis. Teks sudah dibuka di WA, silakan lampirkan foto secara manual.');
     } catch (e) {
         alert('Gagal menyiapkan redaksi. Coba lagi.');
     } finally {
