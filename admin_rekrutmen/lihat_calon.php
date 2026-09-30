@@ -27,8 +27,9 @@ if (!$d) {
 }
 
 $UPLOAD_DIR = '../uploads/calon_pengelola/';
-$UPLOAD_FIELDS = ['foto_ktp', 'foto_kk', 'foto_buku_nikah', 'foto_masakan1', 'foto_masakan2', 'foto_masakan3'];
+$UPLOAD_FIELDS = ['foto_calon', 'foto_ktp', 'foto_kk', 'foto_buku_nikah', 'foto_masakan1', 'foto_masakan2', 'foto_masakan3'];
 $UPLOAD_LABEL = [
+    'foto_calon' => 'Foto Calon Pengelola',
     'foto_ktp' => 'KTP', 'foto_kk' => 'Kartu Keluarga', 'foto_buku_nikah' => 'Buku Nikah',
     'foto_masakan1' => 'Foto Masakan 1', 'foto_masakan2' => 'Foto Masakan 2', 'foto_masakan3' => 'Foto Masakan 3',
 ];
@@ -228,6 +229,10 @@ $nama_file_cetak = "$bagian_no_urut - $bagian_nama - $bagian_tanggal.pdf";
     .lv-doc:hover .lv-doc-frame { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(13, 148, 136, 0.18); border-color: #0d9488; }
     .lv-doc img { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; }
     .lv-doc .lv-doc-label { font-size: 12px; color: #0f766e; margin-top: 8px; font-weight: 700; }
+    .lv-doc.lv-doc-utama { grid-column: 1 / -1; }
+    .lv-doc.lv-doc-utama .lv-doc-frame { border-style: solid; border-width: 3px; padding: 10px; }
+    .lv-doc.lv-doc-utama img { height: 280px; }
+    .lv-doc.lv-doc-utama .lv-doc-label { font-size: 14px; }
     .lv-empty-note { color: #94a3b8; font-size: 13px; font-style: italic; }
 
     @media (max-width: 576px) {
@@ -332,8 +337,9 @@ $nama_file_cetak = "$bagian_no_urut - $bagian_nama - $bagian_tanggal.pdf";
             <?php foreach ($foto_ada as $f):
                 $src = $UPLOAD_DIR . $d[$f];
                 $label = $UPLOAD_LABEL[$f];
+                $kelas_utama = $f === 'foto_calon' ? ' lv-doc-utama' : '';
             ?>
-            <div class="lv-doc" data-src="<?= h($src) ?>" data-label="<?= h($label) ?>">
+            <div class="lv-doc<?= $kelas_utama ?>" data-src="<?= h($src) ?>" data-label="<?= h($label) ?>">
                 <div class="lv-doc-frame"><img src="<?= h($src) ?>" alt="<?= h($label) ?>"></div>
                 <div class="lv-doc-label"><?= h($label) ?></div>
             </div>

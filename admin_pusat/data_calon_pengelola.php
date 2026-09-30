@@ -183,6 +183,9 @@ $stmt->close();
     .dv-doc img { width: 100%; height: 110px; object-fit: cover; border-radius: 12px; border: 1px solid #eef2f9; transition: transform .15s ease, box-shadow .15s ease; }
     .dv-doc:hover img { transform: scale(1.04); box-shadow: 0 8px 20px rgba(67,24,255,.18); }
     .dv-doc .dv-doc-label { font-size: 12px; color: #707eae; margin-top: 6px; font-weight: 600; }
+    .dv-doc.dv-doc-utama { grid-column: 1 / -1; }
+    .dv-doc.dv-doc-utama img { height: 280px; border-width: 2px; }
+    .dv-doc.dv-doc-utama .dv-doc-label { font-size: 14px; }
     .dv-empty-note { color: #a3aed0; font-size: 13px; font-style: italic; }
 
     @media (max-width: 576px) {
@@ -413,7 +416,7 @@ function sectHead(icon, title) {
 }
 
 const UPLOAD_DIR = '../uploads/calon_pengelola/';
-const UPLOAD_LABEL = { foto_ktp: 'KTP', foto_kk: 'Kartu Keluarga', foto_buku_nikah: 'Buku Nikah', foto_masakan1: 'Foto Masakan 1', foto_masakan2: 'Foto Masakan 2', foto_masakan3: 'Foto Masakan 3' };
+const UPLOAD_LABEL = { foto_calon: 'Foto Calon Pengelola', foto_ktp: 'KTP', foto_kk: 'Kartu Keluarga', foto_buku_nikah: 'Buku Nikah', foto_masakan1: 'Foto Masakan 1', foto_masakan2: 'Foto Masakan 2', foto_masakan3: 'Foto Masakan 3' };
 
 function bukaFoto(src, label) {
     document.getElementById('fotoLightboxImg').src = src;
@@ -448,7 +451,8 @@ function lihatDetail(d) {
         if (!d[f]) return;
         const src = UPLOAD_DIR + d[f];
         const label = UPLOAD_LABEL[f];
-        dokumenHtml += '<div class="dv-doc" data-src="' + esc(src) + '" data-label="' + esc(label) + '">' +
+        const kelasUtama = f === 'foto_calon' ? ' dv-doc-utama' : '';
+        dokumenHtml += '<div class="dv-doc' + kelasUtama + '" data-src="' + esc(src) + '" data-label="' + esc(label) + '">' +
             '<img src="' + src + '" alt="' + esc(label) + '"><div class="dv-doc-label">' + esc(label) + '</div></div>';
     });
 

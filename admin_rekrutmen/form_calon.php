@@ -34,8 +34,9 @@ if ($id_calon) {
 }
 
 $UPLOAD_DIR = '../uploads/calon_pengelola/';
-$UPLOAD_FIELDS = ['foto_ktp', 'foto_kk', 'foto_buku_nikah', 'foto_masakan1', 'foto_masakan2', 'foto_masakan3'];
+$UPLOAD_FIELDS = ['foto_calon', 'foto_ktp', 'foto_kk', 'foto_buku_nikah', 'foto_masakan1', 'foto_masakan2', 'foto_masakan3'];
 $UPLOAD_LABEL = [
+    'foto_calon' => 'Foto Calon Pengelola',
     'foto_ktp' => 'KTP', 'foto_kk' => 'Kartu Keluarga', 'foto_buku_nikah' => 'Buku Nikah',
     'foto_masakan1' => 'Foto Masakan 1', 'foto_masakan2' => 'Foto Masakan 2', 'foto_masakan3' => 'Foto Masakan 3',
 ];

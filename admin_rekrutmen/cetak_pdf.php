@@ -24,8 +24,9 @@ if (!$d) {
 }
 
 $UPLOAD_DIR = __DIR__ . '/../uploads/calon_pengelola/';
-$UPLOAD_FIELDS = ['foto_ktp', 'foto_kk', 'foto_buku_nikah', 'foto_masakan1', 'foto_masakan2', 'foto_masakan3'];
+$UPLOAD_FIELDS = ['foto_calon', 'foto_ktp', 'foto_kk', 'foto_buku_nikah', 'foto_masakan1', 'foto_masakan2', 'foto_masakan3'];
 $UPLOAD_LABEL = [
+    'foto_calon' => 'Foto Calon Pengelola',
     'foto_ktp' => 'KTP', 'foto_kk' => 'Kartu Keluarga', 'foto_buku_nikah' => 'Buku Nikah',
     'foto_masakan1' => 'Foto Masakan 1', 'foto_masakan2' => 'Foto Masakan 2', 'foto_masakan3' => 'Foto Masakan 3',
 ];
@@ -143,6 +144,9 @@ ob_start();
 
     /* ===== Lampiran dokumen ===== */
     .lampiran-page { page-break-before: always; }
+    .dokumen-utama { text-align: center; font-size: 10px; padding: 12px; margin: 8px 0 12px; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; }
+    .dokumen-utama img { max-width: 75%; max-height: 105mm; border: 1px solid #99f6e4; border-radius: 6px; }
+    .dokumen-utama .lbl { margin-top: 7px; font-weight: bold; color: #0f766e; font-size: 11.5px; }
     table.dokumen-grid { width: 100%; margin-top: 8px; border-collapse: separate; border-spacing: 8px; }
     table.dokumen-grid tr { page-break-inside: avoid; }
     table.dokumen-grid td { width: 50%; text-align: center; font-size: 9.5px; padding: 8px; vertical-align: middle; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
@@ -251,13 +255,23 @@ ob_start();
 
     <?php
     $foto_ada = array_values(array_filter($UPLOAD_FIELDS, fn($f) => !empty($d[$f])));
+    $foto_lainnya = array_values(array_filter($foto_ada, fn($f) => $f !== 'foto_calon'));
     if ($foto_ada):
     ?>
     <div class="lampiran-page">
         <div class="sect">LAMPIRAN DOKUMEN</div>
+        <?php if (!empty($d['foto_calon'])):
+            $uri_calon = img_data_uri($UPLOAD_DIR . $d['foto_calon']);
+        ?>
+        <div class="dokumen-utama">
+            <?php if ($uri_calon): ?><img src="<?= $uri_calon ?>"><?php endif; ?>
+            <div class="lbl"><?= h($UPLOAD_LABEL['foto_calon']) ?></div>
+        </div>
+        <?php endif; ?>
+        <?php if ($foto_lainnya): ?>
         <table class="dokumen-grid">
             <tr>
-            <?php foreach ($foto_ada as $i => $f):
+            <?php foreach ($foto_lainnya as $i => $f):
                 if ($i > 0 && $i % 2 === 0) echo '</tr><tr>';
                 $uri = img_data_uri($UPLOAD_DIR . $d[$f]);
             ?>
@@ -268,6 +282,7 @@ ob_start();
             <?php endforeach; ?>
             </tr>
         </table>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 
