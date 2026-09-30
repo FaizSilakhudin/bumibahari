@@ -139,8 +139,22 @@ function bangun_redaksi_teks(array $d): string {
     $baris[] = "";
     $baris[] = "Catatan interviewer : " . redaksi_isi($d['b_catatan_interviewer']);
     $baris[] = $garis;
-    $baris[] = "*C. Kesiapan Ikuti Sistem*";
-    $baris[] = redaksi_isi($d['c_jawaban_kesiapan']);
+    $baris[] = "*C. Penjelasan Sistem & Karakter WBB*";
+    $baris[] = "WBB tidak hanya berorientasi membuka warung, tetapi membangun perusahaan dan jaringan usaha yang kuat & berkelanjutan. Lokasi outlet dipilih selektif berdasarkan potensi pasar, kepadatan konsumen, lingkungan, akses, dan peluang omzet — biaya sewa di lokasi tertentu bisa relatif tinggi namun keputusan lokasi tetap berdasar kelayakan usaha. Pengelola harus siap mengikuti sistem, SOP, evaluasi, dan arahan manajemen; keberhasilan outlet butuh kerja sama pengelola & manajemen.";
+    $baris[] = "";
+    $baris[] = "Kesiapan ikuti sistem & kebijakan WBB:";
+    $baris[] = "   " . redaksi_isi($d['c_jawaban_kesiapan']);
+    $baris[] = $garis;
+    $baris[] = "*D. Komitmen & Jenjang Karier Pengelola*";
+    $baris[] = "WBB memberi kesempatan berkembang berdasarkan kinerja, kemampuan, kedisiplinan, komunikasi, dan kepatuhan SOP/arahan manajemen. Aspek yang dievaluasi:";
+    $baris[] = "1) Komunikatif — mampu berkomunikasi baik dengan pelanggan/karyawan/sesama pengelola/manajemen.";
+    $baris[] = "2) Kemampuan memasak — kualitas masakan baik, konsisten, bersih, sesuai standar WBB.";
+    $baris[] = "3) Disiplin & dapat diarahkan — bersedia ikuti SOP/evaluasi/kebijakan/arahan manajemen secara profesional.";
+    $baris[] = "4) Kemampuan mengelola outlet — mampu atur bahan baku, kebersihan, pelayanan, karyawan, operasional, penjualan.";
+    $baris[] = "5) Integritas & tanggung jawab — jujur dalam laporan, bertanggung jawab, menjaga nama baik WBB.";
+    $baris[] = $garis;
+    $baris[] = "*E. Peluang Penempatan Outlet*";
+    $baris[] = "Pengelola berkinerja baik, komunikatif, masakan berkualitas, disiplin, mampu ikuti sistem manajemen, serta bisa mengembangkan penjualan akan mendapat kesempatan pengembangan karier. Berdasarkan evaluasi manajemen, pengelola dapat dipertimbangkan dipindahkan/dipercaya mengelola outlet berpotensi omzet lebih tinggi — penempatan bukan semata berdasar lama bergabung, tapi kinerja, kesiapan, kemampuan, dan kebutuhan operasional perusahaan.";
     $baris[] = $garis;
     $baris[] = "*F. Pertanyaan Komitmen Akhir*";
     $baris[] = "1. Siap ikuti SOP : " . redaksi_yt($d['f_siap_sop']);
@@ -424,7 +438,10 @@ async function cetakRedaksi(btn) {
         const files = await ambilFotoUntukRedaksi();
         if (files.length && navigator.canShare && navigator.canShare({ files })) {
             try {
-                await navigator.share({ files, title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
+                // "title" sengaja tidak diikutkan di sini -- kalau ikut dikirim,
+                // WA cenderung menaruh teks di atas foto. Tanpa title, foto tampil
+                // dulu di atas, redaksi jadi caption di bawahnya.
+                await navigator.share({ files, text: REDAKSI_TEXT });
                 return;
             } catch (e) {
                 if (e && e.name === 'AbortError') return;
