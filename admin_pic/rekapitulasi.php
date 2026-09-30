@@ -1195,6 +1195,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                             <select id="inv_kasbon_sumber" class="form-select border-2" style="max-width: 120px; border-radius: 0 8px 8px 0;" title="Sumber Kasbon — siapa yang menalangi kasbon ini" onchange="hitungCascade()">
                                 <option value="investor" selected>Dana Investor</option>
                                 <option value="pusat">Dana Pusat</option>
+                                <option value="warung">Dana Warung</option>
                             </select>
                         </div>
                     </div>

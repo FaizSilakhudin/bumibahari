@@ -394,7 +394,7 @@
                     ['Profit Investor (50%)', formatRupiahPDF(inv_profit)],
                     ['Sewa Ruko (Total)', formatRupiahPDF(inv_sewa)],
                     ['Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor")', formatRupiahPDF(inv_modal)],
-                    ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + (inv_kasbon_sumber === 'investor' ? 'Dana Investor' : 'Dana Pusat') + ')', formatRupiahPDF(kasbon_ke_investor)],
+                    ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + ({ investor: 'Dana Investor', pusat: 'Dana Pusat', warung: 'Dana Warung' }[inv_kasbon_sumber] || 'Dana Investor') + ')', formatRupiahPDF(kasbon_ke_investor)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahPDF(inv_total_val)],
                 ];
                 doc.autoTable({ head: [['Keterangan Komponen', 'Nilai']], body: dataInvestor, startY: y + 5, ...baseTableStyles });
@@ -603,7 +603,7 @@
                     ['Profit Investor (50%)', formatRupiahXLS(inv_profit)],
                     ['Sewa Ruko (Total)', formatRupiahXLS(inv_sewa)],
                     ['Pengembalian Dana Talangan (otomatis dari Klaim Bulanan "Dana Investor")', formatRupiahXLS(inv_modal)],
-                    ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + (inv_kasbon_sumber === 'investor' ? 'Dana Investor' : 'Dana Pusat') + ')', formatRupiahXLS(kasbon_ke_investor)],
+                    ['Penambahan/Pengembalian Kasbon Pengelola (sumber: ' + ({ investor: 'Dana Investor', pusat: 'Dana Pusat', warung: 'Dana Warung' }[inv_kasbon_sumber] || 'Dana Investor') + ')', formatRupiahXLS(kasbon_ke_investor)],
                     ['TOTAL BERSIH INVESTOR', formatRupiahXLS(inv_total_val)],
                 ];
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['5. Koreksi Dividen: Sisi Investor'], [], ...dataInvestorX]), 'Koreksi Investor');

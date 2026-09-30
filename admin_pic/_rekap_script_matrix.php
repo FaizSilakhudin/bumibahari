@@ -234,16 +234,21 @@
                 total += sewa;
 
                 // Kasbon Pengelola TETAP dipotong dari sisi Pengelola apapun
-                // sumbernya (lihat hitungPengelola()) — tapi PENGGANTIANNYA cuma
-                // masuk ke Investor kalau sumbernya "Dana Investor". Kalau
-                // "Dana Pusat", penggantian itu masuk ke Admin Management Pusat
-                // (RK_KASBON_DANA_PUSAT, dipakai updateFinalRekap()) — BUKAN ke
-                // Investor.
+                // sumbernya (lihat hitungPengelola()) — tapi PENGGANTIANNYA beda-beda
+                // tergantung sumbernya:
+                //   - "Dana Investor": penggantian masuk ke Total Bersih Investor.
+                //   - "Dana Pusat"   : penggantian masuk ke Admin Management Pusat
+                //                      (RK_KASBON_DANA_PUSAT, dipakai updateFinalRekap()).
+                //   - "Dana Warung"  : TIDAK ada penggantian ke siapa pun — kasbon
+                //                      dianggap sudah ditalangi dari kas warung sendiri,
+                //                      jadi cuma memotong sisi Pengelola, titik.
                 if (kasbonSumber === 'investor') {
                     total += kasbon;
                     RK_KASBON_DANA_PUSAT = 0;
-                } else {
+                } else if (kasbonSumber === 'pusat') {
                     RK_KASBON_DANA_PUSAT = kasbon;
+                } else {
+                    RK_KASBON_DANA_PUSAT = 0;
                 }
 
                 // Pengembalian Dana Talangan SELALU ditambahkan — sumbernya
