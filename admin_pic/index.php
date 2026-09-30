@@ -102,6 +102,12 @@ if (!empty($cabang_ids)) {
             <h5 class="fw-bold mb-0" style="color:#1b2559"><i class="bi bi-calendar3 me-2"></i><?= date('d F Y', strtotime($tanggal)) ?></h5>
             <a href="?tanggal=<?= $next_tgl ?>" class="btn btn-nav-tanggal">Berikutnya <i class="bi bi-chevron-right"></i></a>
         </div>
+        <div class="text-center mt-3 pt-3 border-top">
+            <form method="GET" class="d-inline-flex align-items-center gap-2">
+                <label for="pilihTanggalAntrian" class="text-muted small fw-semibold mb-0">Pilih Tanggal:</label>
+                <input type="date" id="pilihTanggalAntrian" name="tanggal" value="<?= h($tanggal) ?>" class="form-control form-control-sm" style="width: auto; border-radius: 8px; border: 1px solid #e0e7ff;" onchange="this.form.submit()">
+            </form>
+        </div>
     </div>
 
     <div class="row g-3 mb-4 row-cols-2 row-cols-md-5">
