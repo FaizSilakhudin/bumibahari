@@ -31,14 +31,21 @@ $UPLOAD_LABEL = [
 ];
 
 function cetak_yt($val) {
-    $ya = $val === 'ya';
-    $tidak = $val === 'tidak';
-    return '<span class="chk' . ($ya ? ' checked' : '') . '"></span> Ya&nbsp;&nbsp;&nbsp;'
-         . '<span class="chk' . ($tidak ? ' checked' : '') . '"></span> Tidak';
+    $ya_cls = $val === 'ya' ? ' pill-ya-aktif' : '';
+    $tidak_cls = $val === 'tidak' ? ' pill-tidak-aktif' : '';
+    return '<span class="pill' . $ya_cls . '">Ya</span><span class="pill' . $tidak_cls . '">Tidak</span>';
 }
 function cetak_isi($val) {
     $val = trim((string) $val);
-    return $val !== '' ? nl2br(h($val)) : '<span class="kosong">-</span>';
+    return $val !== '' ? nl2br(h($val)) : '<span class="kosong">Tidak diisi</span>';
+}
+function kesimpulan_badge_cls(string $k): string {
+    switch ($k) {
+        case 'direkomendasikan':       return 'badge-hijau';
+        case 'tes_memasak':            return 'badge-biru';
+        case 'belum_direkomendasikan': return 'badge-merah';
+        default:                       return 'badge-abu';
+    }
 }
 // Gambar disisipkan sebagai data URI (base64) langsung dari file di server --
 // Dompdf merender dari file lokal, tidak lewat HTTP/browser sama sekali, jadi
@@ -81,37 +88,69 @@ ob_start();
 <head>
 <meta charset="UTF-8">
 <style>
-    @page { margin: 12mm; }
-    body { font-family: 'Times New Roman', Times, serif; color: #111; font-size: 11px; line-height: 1.5; }
-    table.kop { width: 100%; border-bottom: 3px double #334155; padding-bottom: 8px; margin-bottom: 10px; border-collapse: collapse; }
-    table.kop td.logo { width: 50px; vertical-align: middle; }
+    @page { margin: 14mm 13mm; }
+    body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; font-size: 10.5px; line-height: 1.55; }
+
+    /* ===== Kop surat ===== */
+    table.kop { width: 100%; border-bottom: 2.5px solid #0d9488; padding-bottom: 10px; margin-bottom: 14px; border-collapse: collapse; }
+    table.kop td.logo { width: 52px; vertical-align: middle; }
     table.kop td.logo img { width: 46px; height: 46px; }
     table.kop td.nama { vertical-align: middle; }
-    table.kop .kop-title { font-size: 15px; font-weight: bold; color: #111; }
-    table.kop .kop-addr { font-size: 9px; color: #444; margin-top: 2px; line-height: 1.4; }
-    h1 { text-align: center; font-size: 14px; margin: 0 0 14px; letter-spacing: .5px; }
-    table.f-head { width: 100%; margin-bottom: 14px; border-collapse: collapse; }
-    table.f-head td { padding: 2px 8px 2px 0; vertical-align: top; }
-    table.f-head td.lbl { font-weight: bold; width: 140px; }
-    .sect { background: #e5e5e5; font-weight: bold; padding: 5px 8px; margin: 14px 0 8px; font-size: 12px; }
-    .q { margin-bottom: 8px; }
-    .q .no { font-weight: bold; }
-    .jawab { border-bottom: 1px dotted #999; padding: 2px 0 3px 4px; min-height: 14px; }
-    .kosong { color: #999; }
-    .desc { font-size: 10px; color: #333; text-align: justify; margin-bottom: 8px; }
-    .chk { display: inline-block; width: 10px; height: 10px; border: 1.4px solid #111; margin-right: 4px; }
-    .chk.checked { background: #111; }
-    .kesimpulan-item { margin-bottom: 4px; }
-    table.ttd { width: 100%; margin-top: 40px; text-align: center; border-collapse: collapse; }
-    table.ttd td { width: 45%; }
-    table.ttd .garis { margin-top: 50px; border-top: 1px solid #111; padding-top: 4px; }
+    table.kop .kop-title { font-size: 16px; font-weight: bold; color: #0f766e; letter-spacing: .3px; }
+    table.kop .kop-addr { font-size: 8.5px; color: #64748b; margin-top: 2px; line-height: 1.5; }
+    table.kop td.cetak-info { text-align: right; vertical-align: middle; font-size: 8px; color: #94a3b8; }
+
+    /* ===== Banner judul ===== */
+    .banner-judul { background: #0d9488; color: #fff; text-align: center; font-size: 13px; font-weight: bold; letter-spacing: .6px; padding: 9px 10px; border-radius: 7px; margin: 0 0 14px; }
+
+    /* ===== Kartu info identitas ===== */
+    table.info-card { width: 100%; border-collapse: collapse; background: #f0fdfa; border: 1px solid #99f6e4; margin-bottom: 16px; }
+    table.info-card td { padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #ccfbf1; }
+    table.info-card tr:last-child td { border-bottom: none; }
+    table.info-card td.lbl { font-weight: bold; color: #0f766e; width: 95px; }
+    table.info-card td.val { color: #1e293b; width: 165px; }
+
+    /* ===== Judul bagian (A, B, C, ...) ===== */
+    .sect { background: #0d9488; color: #fff; font-weight: bold; padding: 6px 12px; margin: 13px 0 8px; font-size: 11px; border-radius: 6px; letter-spacing: .3px; }
+
+    /* ===== Blok pertanyaan ===== */
+    .q { background: #f8fafc; border-left: 3px solid #0d9488; border-radius: 0 5px 5px 0; padding: 5px 10px; margin-bottom: 6px; }
+    .q .no { font-weight: bold; color: #0f172a; font-size: 10px; margin-bottom: 2px; }
+    .jawab { color: #334155; font-size: 10px; padding-top: 1px; }
+    .kosong { color: #94a3b8; font-style: italic; }
+    .desc { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 6px; font-size: 9px; color: #134e4a; text-align: justify; padding: 7px 10px; margin-bottom: 7px; font-style: italic; line-height: 1.45; }
+
+    /* ===== Pill Ya / Tidak ===== */
+    .pill { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 9px; font-weight: bold; border: 1px solid #cbd5e1; color: #94a3b8; background: #f1f5f9; margin-right: 6px; }
+    .pill-ya-aktif { background: #dcfce7; border-color: #86efac; color: #15803d; }
+    .pill-tidak-aktif { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+
+    /* ===== Kesimpulan interviewer ===== */
+    .badge-kesimpulan { display: inline-block; padding: 5px 14px; border-radius: 8px; font-size: 11px; font-weight: bold; }
+    .badge-hijau { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .badge-biru  { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+    .badge-merah { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .badge-abu   { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+    /* ===== Tanda tangan ===== */
+    .tutup-blok { page-break-inside: avoid; }
+    .ttd-tempat-tgl { text-align: right; font-size: 10px; color: #475569; margin: 14px 0 6px; }
+    table.ttd { width: 100%; margin-top: 6px; text-align: center; border-collapse: collapse; }
+    table.ttd td { width: 45%; vertical-align: top; }
+    table.ttd .ttd-line { height: 34px; border-bottom: 1px solid #334155; margin-bottom: 4px; }
+    table.ttd .ttd-nama { font-weight: bold; font-size: 10px; color: #0f172a; }
+    table.ttd .ttd-peran { font-size: 8.5px; color: #64748b; margin-top: 1px; }
+
+    /* ===== Lampiran dokumen ===== */
     .lampiran-page { page-break-before: always; }
-    table.dokumen-grid { width: 100%; margin-top: 8px; border-collapse: collapse; }
+    table.dokumen-grid { width: 100%; margin-top: 8px; border-collapse: separate; border-spacing: 8px; }
     table.dokumen-grid tr { page-break-inside: avoid; }
-    table.dokumen-grid td { width: 50%; text-align: center; font-size: 10px; padding: 5px; vertical-align: middle; }
-    table.dokumen-grid img { max-width: 100%; max-height: 62mm; border: 1px solid #ccc; }
-    table.dokumen-grid .lbl { margin-top: 3px; font-weight: bold; }
-    .footer-wm { text-align: center; font-size: 10px; color: #555; margin-top: 20px; letter-spacing: 1px; }
+    table.dokumen-grid td { width: 50%; text-align: center; font-size: 9.5px; padding: 8px; vertical-align: middle; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+    table.dokumen-grid img { max-width: 100%; max-height: 60mm; border: 1px solid #cbd5e1; border-radius: 4px; }
+    table.dokumen-grid .lbl { margin-top: 5px; font-weight: bold; color: #0f766e; }
+
+    /* ===== Footer ===== */
+    .footer-wm { text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 22px; letter-spacing: .8px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
 </style>
 </head>
 <body>
@@ -122,18 +161,27 @@ ob_start();
                 <div class="kop-title">WARTEG BUMI BAHARI</div>
                 <div class="kop-addr"><?= h($alamat_pusat) ?><br>Telp. <?= h($telp_pusat) ?></div>
             </td>
+            <td class="cetak-info">Dicetak: <?= date('d/m/Y H:i') ?></td>
         </tr>
     </table>
-    <h1>FORMULIR INTERVIEW CALON PENGELOLA</h1>
+    <div class="banner-judul">FORMULIR INTERVIEW CALON PENGELOLA</div>
 
-    <table class="f-head">
-        <tr><td class="lbl">No. Urut</td><td><?= cetak_isi($d['no_urut'] ?? '') ?></td></tr>
-        <tr><td class="lbl">Nama Calon Pengelola</td><td><?= h($d['nama_calon']) ?></td></tr>
-        <tr><td class="lbl">Usia</td><td><?= $d['usia'] ? (int) $d['usia'] . ' Tahun' : '-' ?></td></tr>
-        <tr><td class="lbl">Alamat</td><td><?= cetak_isi($d['alamat'] ?? '') ?></td></tr>
-        <tr><td class="lbl">No. HP</td><td><?= cetak_isi($d['no_hp'] ?? '') ?></td></tr>
-        <tr><td class="lbl">Tanggal Interview</td><td><?= date('d F Y', strtotime($d['tanggal_interview'])) ?></td></tr>
-        <tr><td class="lbl">Interviewer</td><td><?= cetak_isi($d['interviewer'] ?? '') ?></td></tr>
+    <table class="info-card">
+        <tr>
+            <td class="lbl">No. Urut</td><td class="val"><?= cetak_isi($d['no_urut'] ?? '') ?></td>
+            <td class="lbl">Tanggal Interview</td><td class="val"><?= date('d F Y', strtotime($d['tanggal_interview'])) ?></td>
+        </tr>
+        <tr>
+            <td class="lbl">Nama Calon</td><td class="val"><?= h($d['nama_calon']) ?></td>
+            <td class="lbl">Interviewer</td><td class="val"><?= cetak_isi($d['interviewer'] ?? '') ?></td>
+        </tr>
+        <tr>
+            <td class="lbl">Usia</td><td class="val"><?= $d['usia'] ? (int) $d['usia'] . ' Tahun' : '-' ?></td>
+            <td class="lbl">No. HP</td><td class="val"><?= cetak_isi($d['no_hp'] ?? '') ?></td>
+        </tr>
+        <tr>
+            <td class="lbl">Alamat</td><td class="val" colspan="3"><?= cetak_isi($d['alamat'] ?? '') ?></td>
+        </tr>
     </table>
 
     <div class="sect">A. IDENTITAS &amp; PENGALAMAN KERJA</div>
@@ -177,21 +225,29 @@ ob_start();
     <div class="q"><div class="no">5. Rencana tingkatkan penjualan (outlet omzet besar)</div><div class="jawab"><?= cetak_isi($d['f_rencana_tingkatkan_penjualan']) ?></div></div>
     <div class="q"><div class="no">6. Target bergabung dengan WBB</div><div class="jawab"><?= cetak_isi($d['f_target_bergabung']) ?></div></div>
 
-    <div class="sect">KESIMPULAN INTERVIEWER</div>
-    <?php foreach ($opsi_kesimpulan as $key => $label):
-        $checked = ($d['kesimpulan_interviewer'] ?? '') === $key;
-    ?>
-        <div class="kesimpulan-item"><span class="chk<?= $checked ? ' checked' : '' ?>"></span> <?= h($label) ?></div>
-    <?php endforeach; ?>
-    <div class="q" style="margin-top:8px;"><div class="no">Catatan</div><div class="jawab"><?= cetak_isi($d['catatan_kesimpulan']) ?></div></div>
+    <div class="tutup-blok">
+        <div class="sect">KESIMPULAN INTERVIEWER</div>
+        <?php $kk = $d['kesimpulan_interviewer'] ?? 'dipertimbangkan'; ?>
+        <div class="badge-kesimpulan <?= kesimpulan_badge_cls($kk) ?>"><?= h($opsi_kesimpulan[$kk] ?? $opsi_kesimpulan['dipertimbangkan']) ?></div>
+        <div class="q" style="margin-top:9px;"><div class="no">Catatan</div><div class="jawab"><?= cetak_isi($d['catatan_kesimpulan']) ?></div></div>
 
-    <table class="ttd">
-        <tr>
-            <td><div class="garis"><?= h($d['interviewer'] ?: '.....................') ?></div>Interviewer</td>
-            <td></td>
-            <td><div class="garis"><?= h($d['nama_calon']) ?></div>Calon Pengelola</td>
-        </tr>
-    </table>
+        <div class="ttd-tempat-tgl">Tangerang Selatan, <?= date('d F Y', strtotime($d['tanggal_interview'])) ?></div>
+        <table class="ttd">
+            <tr>
+                <td>
+                    <div class="ttd-line"></div>
+                    <div class="ttd-nama"><?= h($d['interviewer'] ?: '.....................') ?></div>
+                    <div class="ttd-peran">Interviewer</div>
+                </td>
+                <td></td>
+                <td>
+                    <div class="ttd-line"></div>
+                    <div class="ttd-nama"><?= h($d['nama_calon']) ?></div>
+                    <div class="ttd-peran">Calon Pengelola</div>
+                </td>
+            </tr>
+        </table>
+    </div>
 
     <?php
     $foto_ada = array_values(array_filter($UPLOAD_FIELDS, fn($f) => !empty($d[$f])));
@@ -223,9 +279,13 @@ $html = ob_get_clean();
 
 $options = new Options();
 $options->set('isRemoteEnabled', false);
-$options->set('defaultFont', 'Times New Roman');
+$options->set('defaultFont', 'Helvetica');
 $dompdf = new Dompdf($options);
 $dompdf->loadHtml($html);
 $dompdf->setPaper('A4', 'portrait');
 $dompdf->render();
+
+$canvas = $dompdf->getCanvas();
+$canvas->page_text($canvas->get_width() - 95, $canvas->get_height() - 20, "Halaman {PAGE_NUM} / {PAGE_COUNT}", null, 8, [0.58, 0.64, 0.72]);
+
 $dompdf->stream($nama_file_cetak, ['Attachment' => true]);
