@@ -194,11 +194,6 @@ function redaksi_isi($val) {
     $val = trim((string) $val);
     return $val !== '' ? $val : '-';
 }
-function redaksi_gab(array $parts, string $pemisah = ' — '): string {
-    $isi = array_map('redaksi_isi', $parts);
-    $ada_isi = array_filter($isi, fn($v) => $v !== '-');
-    return empty($ada_isi) ? '-' : implode($pemisah, $isi);
-}
 function bangun_redaksi_teks(array $d): string {
     $opsi_kesimpulan = [
         'direkomendasikan' => 'Direkomendasikan',
@@ -206,10 +201,11 @@ function bangun_redaksi_teks(array $d): string {
         'tes_memasak' => 'Tes Memasak',
         'belum_direkomendasikan' => 'Belum Direkomendasikan',
     ];
+    $garis = str_repeat('-', 30);
     $baris = [];
     $baris[] = "*FORMULIR INTERVIEW CALON PENGELOLA*";
     $baris[] = "*WARTEG BUMI BAHARI (WBB)*";
-    $baris[] = "";
+    $baris[] = $garis;
     $baris[] = "No. Urut : " . redaksi_isi($d['no_urut'] ?? '');
     $baris[] = "Nama : " . $d['nama_calon'];
     $baris[] = "Usia : " . ($d['usia'] ? (int) $d['usia'] . " Tahun" : '-');
@@ -217,36 +213,61 @@ function bangun_redaksi_teks(array $d): string {
     $baris[] = "No. HP : " . redaksi_isi($d['no_hp'] ?? '');
     $baris[] = "Tanggal Interview : " . date('d F Y', strtotime($d['tanggal_interview']));
     $baris[] = "Interviewer : " . redaksi_isi($d['interviewer'] ?? '');
-    $baris[] = "";
+    $baris[] = $garis;
     $baris[] = "*A. Identitas & Pengalaman Kerja*";
-    $baris[] = "1. Perkenalan & pengalaman kerja: " . redaksi_isi($d['a_perkenalan']);
-    $baris[] = "2. Tempat kerja sebelumnya: " . redaksi_gab([$d['a_nama_tempat_usaha'], $d['a_posisi_jabatan'], $d['a_lama_bekerja']]);
-    $baris[] = "3. Pernah kelola warteg: " . redaksi_yt($d['a_pernah_kelola_warteg']) . " (Lama: " . redaksi_isi($d['a_lama_kelola_warteg']) . ", Omzet rata-rata: " . redaksi_isi($d['a_omzet_rata_rata']) . ", Omzet tertinggi: " . redaksi_isi($d['a_omzet_tertinggi']) . ")";
-    $baris[] = "4. Alasan berhenti: " . redaksi_isi($d['a_alasan_berhenti']);
-    $baris[] = "Video hasil masakan: " . redaksi_yt($d['a_video_masakan']);
-    $baris[] = "Menu dikuasai: " . redaksi_isi($d['a_menu_dikuasai']);
-    $baris[] = "Catatan interviewer: " . redaksi_isi($d['a_catatan_interviewer']);
+    $baris[] = "1. Perkenalan & pengalaman kerja";
+    $baris[] = "   " . redaksi_isi($d['a_perkenalan']);
     $baris[] = "";
+    $baris[] = "2. Tempat kerja sebelumnya";
+    $baris[] = "   • Nama tempat/usaha : " . redaksi_isi($d['a_nama_tempat_usaha']);
+    $baris[] = "   • Posisi/jabatan : " . redaksi_isi($d['a_posisi_jabatan']);
+    $baris[] = "   • Lama bekerja : " . redaksi_isi($d['a_lama_bekerja']);
+    $baris[] = "";
+    $baris[] = "3. Pernah kelola warteg : " . redaksi_yt($d['a_pernah_kelola_warteg']);
+    $baris[] = "   • Lama kelola : " . redaksi_isi($d['a_lama_kelola_warteg']);
+    $baris[] = "   • Omzet rata-rata : " . redaksi_isi($d['a_omzet_rata_rata']);
+    $baris[] = "   • Omzet tertinggi : " . redaksi_isi($d['a_omzet_tertinggi']);
+    $baris[] = "";
+    $baris[] = "4. Alasan berhenti";
+    $baris[] = "   " . redaksi_isi($d['a_alasan_berhenti']);
+    $baris[] = "";
+    $baris[] = "Video hasil masakan : " . redaksi_yt($d['a_video_masakan']);
+    $baris[] = "Menu dikuasai : " . redaksi_isi($d['a_menu_dikuasai']);
+    $baris[] = "Catatan interviewer : " . redaksi_isi($d['a_catatan_interviewer']);
+    $baris[] = $garis;
     $baris[] = "*B. Pengetahuan tentang Warteg Bumi Bahari*";
-    $baris[] = "1. Tahu WBB dari mana: " . redaksi_isi($d['b_tahu_dari_mana']);
-    $baris[] = "2. Alasan tertarik bergabung: " . redaksi_isi($d['b_alasan_tertarik']);
-    $baris[] = "3. Pernah kunjungi outlet: " . redaksi_yt($d['b_pernah_kunjungi_outlet']) . " (Outlet: " . redaksi_isi($d['b_outlet_mana']) . ", Yang diperhatikan: " . redaksi_isi($d['b_yang_diperhatikan']) . ")";
-    $baris[] = "4. Pendapat agar penjualan baik: " . redaksi_isi($d['b_pendapat_penjualan_baik']);
-    $baris[] = "Catatan interviewer: " . redaksi_isi($d['b_catatan_interviewer']);
+    $baris[] = "1. Tahu WBB dari mana";
+    $baris[] = "   " . redaksi_isi($d['b_tahu_dari_mana']);
     $baris[] = "";
+    $baris[] = "2. Alasan tertarik bergabung";
+    $baris[] = "   " . redaksi_isi($d['b_alasan_tertarik']);
+    $baris[] = "";
+    $baris[] = "3. Pernah kunjungi outlet : " . redaksi_yt($d['b_pernah_kunjungi_outlet']);
+    $baris[] = "   • Outlet : " . redaksi_isi($d['b_outlet_mana']);
+    $baris[] = "   • Yang diperhatikan : " . redaksi_isi($d['b_yang_diperhatikan']);
+    $baris[] = "";
+    $baris[] = "4. Pendapat agar penjualan baik";
+    $baris[] = "   " . redaksi_isi($d['b_pendapat_penjualan_baik']);
+    $baris[] = "";
+    $baris[] = "Catatan interviewer : " . redaksi_isi($d['b_catatan_interviewer']);
+    $baris[] = $garis;
     $baris[] = "*C. Kesiapan Ikuti Sistem*";
     $baris[] = redaksi_isi($d['c_jawaban_kesiapan']);
-    $baris[] = "";
+    $baris[] = $garis;
     $baris[] = "*F. Pertanyaan Komitmen Akhir*";
-    $baris[] = "1. Siap ikuti SOP: " . redaksi_yt($d['f_siap_sop']);
-    $baris[] = "2. Siap dievaluasi berkala: " . redaksi_yt($d['f_siap_evaluasi']);
-    $baris[] = "3. Siap dipindah tugas: " . redaksi_yt($d['f_siap_dipindah']);
-    $baris[] = "4. Siap jaga kualitas: " . redaksi_yt($d['f_siap_jaga_kualitas']);
-    $baris[] = "5. Rencana tingkatkan penjualan: " . redaksi_isi($d['f_rencana_tingkatkan_penjualan']);
-    $baris[] = "6. Target bergabung dengan WBB: " . redaksi_isi($d['f_target_bergabung']);
+    $baris[] = "1. Siap ikuti SOP : " . redaksi_yt($d['f_siap_sop']);
+    $baris[] = "2. Siap dievaluasi berkala : " . redaksi_yt($d['f_siap_evaluasi']);
+    $baris[] = "3. Siap dipindah tugas : " . redaksi_yt($d['f_siap_dipindah']);
+    $baris[] = "4. Siap jaga kualitas : " . redaksi_yt($d['f_siap_jaga_kualitas']);
     $baris[] = "";
-    $baris[] = "*Kesimpulan Interviewer:* " . ($opsi_kesimpulan[$d['kesimpulan_interviewer']] ?? 'Dipertimbangkan / Tes Lanjutan');
-    $baris[] = "Catatan: " . redaksi_isi($d['catatan_kesimpulan']);
+    $baris[] = "5. Rencana tingkatkan penjualan";
+    $baris[] = "   " . redaksi_isi($d['f_rencana_tingkatkan_penjualan']);
+    $baris[] = "";
+    $baris[] = "6. Target bergabung dengan WBB";
+    $baris[] = "   " . redaksi_isi($d['f_target_bergabung']);
+    $baris[] = $garis;
+    $baris[] = "*Kesimpulan Interviewer* : " . ($opsi_kesimpulan[$d['kesimpulan_interviewer']] ?? 'Dipertimbangkan / Tes Lanjutan');
+    $baris[] = "Catatan : " . redaksi_isi($d['catatan_kesimpulan']);
     $baris[] = "";
     $baris[] = "_WARTEG BUMI BAHARI MANAGEMENT_";
     return implode("\n", $baris);
@@ -583,24 +604,58 @@ async function ambilFotoUntukRedaksi() {
     return files;
 }
 
+async function kirimTeksRedaksi() {
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
+            return;
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    window.open('https://wa.me/?text=' + encodeURIComponent(REDAKSI_TEXT), '_blank');
+}
+
+function resetTombolRedaksi(btn) {
+    if (!btn) return;
+    delete btn.dataset.tahap;
+    btn.innerHTML = '<i class="bi bi-whatsapp me-1"></i> Cetak Redaksi';
+}
+
+// Web Share API cuma boleh dipanggil sekali per klik (memakai lalu menghabiskan
+// user-activation dari klik itu), jadi tidak bisa kirim foto+teks sebagai 2 share
+// beruntun dalam 1x klik. Supaya urutan yang diterima di WA pasti foto dulu baru
+// redaksi teks, prosesnya dipecah jadi 2 klik: klik pertama kirim foto lalu
+// tombol berubah jadi "Lanjut: Kirim Redaksi", klik kedua baru kirim teksnya.
 async function cetakRedaksi(btn) {
     if (btn) { btn.disabled = true; }
     try {
+        if (btn && btn.dataset.tahap === 'teks') {
+            await kirimTeksRedaksi();
+            resetTombolRedaksi(btn);
+            return;
+        }
+
         const files = await ambilFotoUntukRedaksi();
-        if (files.length && navigator.canShare && navigator.canShare({ files })) {
-            try {
-                await navigator.share({ files, title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
-                return;
-            } catch (e) { if (e && e.name === 'AbortError') return; }
+        if (!files.length) {
+            await kirimTeksRedaksi();
+            return;
         }
-        if (navigator.share) {
+
+        if (navigator.canShare && navigator.canShare({ files })) {
             try {
-                await navigator.share({ title: 'Interview Calon Pengelola', text: REDAKSI_TEXT });
-                return;
-            } catch (e) { if (e && e.name === 'AbortError') return; }
+                await navigator.share({ files, title: 'Interview Calon Pengelola' });
+            } catch (e) {
+                if (e && e.name === 'AbortError') return;
+                throw e;
+            }
+            if (btn) {
+                btn.dataset.tahap = 'teks';
+                btn.innerHTML = '<i class="bi bi-whatsapp me-1"></i> Lanjut: Kirim Redaksi';
+            }
+            return;
         }
+
         window.open('https://wa.me/?text=' + encodeURIComponent(REDAKSI_TEXT), '_blank');
-        if (files.length) alert('Browser tidak mendukung kirim foto otomatis. Teks sudah dibuka di WA, silakan lampirkan foto secara manual.');
+        alert('Browser tidak mendukung kirim foto otomatis. Teks sudah dibuka di WA, silakan lampirkan foto secara manual.');
     } catch (e) {
         alert('Gagal menyiapkan redaksi. Coba lagi.');
     } finally {
