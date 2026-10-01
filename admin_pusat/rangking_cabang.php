@@ -188,10 +188,20 @@ $juara_satu   = $ranking_cabang[0]['nama_cabang'] ?? '-';
       background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
       align-items: center; gap: 6px;
   }
-  @media (max-width: 1279.98px) { .rk-scroll-hint { display: flex; } }
+  /* Hanya relevan di rentang tablet, di mana tabel masih literal (lebar,
+     perlu digeser) -- di mobile penuh (<768px) tabel sudah berubah jadi
+     kartu bertumpuk, jadi hint "geser ke samping" ini tidak berlaku lagi
+     di sana dan akan membingungkan kalau tetap tampil. */
+  @media (min-width: 768px) and (max-width: 1279.98px) { .rk-scroll-hint { display: flex; } }
 
   @media (max-width: 767.98px) {
-      .rk-table { min-width: 0; }
+      /* table-layout:fixed + <colgroup> (dipakai desktop supaya 8 kolom pas)
+         tetap MEMAKSA lebar kolom sempit itu walau tr/td di-display:flex --
+         colgroup cuma berlaku selama elemen <table>-nya sendiri masih
+         display:table. Harus dilepas total di sini supaya kartu mobile
+         benar-benar melebar penuh, bukan terjepit selebar kolom aslinya. */
+      .rk-table { min-width: 0; table-layout: auto; }
+      .rk-table, .rk-table tbody { display: block; width: 100%; }
       .rk-table thead { display: none; }
       .rk-table tbody tr { display: block; border: 1px solid #e2e8f0; border-radius: 12px; margin: 10px 0; padding: 12px; background: #fff; }
       .rk-table tbody td {

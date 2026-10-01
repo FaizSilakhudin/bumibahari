@@ -269,11 +269,22 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
       background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
       align-items: center; gap: 6px;
   }
-  @media (max-width: 1279.98px) { .rs-scroll-hint { display: flex; } }
+  /* Hanya relevan di rentang tablet, di mana tabel masih literal (lebar,
+     perlu digeser) -- di mobile penuh (<768px) tabel sudah berubah jadi
+     kartu bertumpuk, jadi hint "geser ke samping" ini tidak berlaku lagi
+     di sana dan akan membingungkan kalau tetap tampil. */
+  @media (min-width: 768px) and (max-width: 1279.98px) { .rs-scroll-hint { display: flex; } }
 
   /* Mobile: tumpuk jadi kartu */
   @media (max-width: 767.98px) {
-      .rs-table { min-width: 0; }
+      /* table-layout:fixed + <colgroup> (dipakai desktop supaya 8 kolom pas)
+         tetap MEMAKSA lebar kolom sempit itu walau tr/td di-display:flex --
+         colgroup cuma berlaku selama elemen <table>-nya sendiri masih
+         display:table. Harus dilepas total di sini supaya kartu mobile
+         benar-benar melebar penuh (ini sebab tombol Status kepotong jadi
+         2 baris sebelumnya -- lebarnya masih kejepit lebar kolom aslinya). */
+      .rs-table { min-width: 0; table-layout: auto; }
+      .rs-table, .rs-table tbody { display: block; width: 100%; }
       .rs-table thead { display: none; }
       .rs-table tbody tr { display: block; border: 1px solid #e2e8f0; border-radius: 12px; margin: 10px 0; padding: 12px; background: #fff; }
       .rs-table tbody td {
@@ -289,6 +300,13 @@ foreach ($baris as $b) $net_profit_total += $b['net_profit'];
       }
       .rs-table tbody td:last-child { border-bottom: none !important; }
       .rs-col-no, .rs-col-pgl, .rs-col-cbg, .rs-col-np, .rs-col-af, .rs-col-prs, .rs-col-sf, .rs-col-stt { width: auto; }
+
+      /* Tombol Status 3-pilihan cukup lebar di layar sempit kalau dipaksa
+         sebaris dengan label -- pindahkan ke bawah label & biarkan melebar
+         penuh supaya tiap tombol tidak terpotong jadi 2 baris ("Pendi ng"). */
+      .rs-table td[data-label="Status"] { flex-direction: column; align-items: stretch !important; gap: 6px; }
+      .rs-btn-group { flex-wrap: wrap; width: 100%; }
+      .rs-btn { flex: 1 1 auto; min-width: 72px; font-size: 11.5px; padding: 7px 8px; white-space: nowrap; }
   }
 </style>
 

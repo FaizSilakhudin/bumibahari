@@ -401,6 +401,12 @@ include 'sidebar_pusat.php';
         .table-saas td:last-child { border-bottom: none !important; }
         .table-saas td::before { content: attr(data-label); font-weight: 700; font-size: 12px; color: #8f9bba; text-transform: uppercase; text-align: left; padding-right: 15px; }
         .table-saas td[data-label="Aksi"] { justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; gap: 6px; }
+        /* Sel Sisa Kasbon punya 2 anak (nominal + progress bar) -- defaultnya
+           flex-row bikin progress bar-nya kejepit jadi garis tipis di
+           samping nominal. Ditumpuk vertikal khusus di sini saja. */
+        .table-saas td[data-label="Sisa Kasbon"] { flex-direction: column; align-items: flex-end; gap: 4px; }
+        .table-saas td[data-label="Sisa Kasbon"]::before { align-self: flex-start; }
+        .table-saas td[data-label="Sisa Kasbon"] .kb-progress { width: 100%; }
         .action-container { flex-direction: column; align-items: stretch !important; }
         .search-form { width: 100% !important; flex-direction: column; }
         .search-input-group { width: 100% !important; }
