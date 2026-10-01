@@ -348,6 +348,7 @@
                     ['Total Pengeluaran', formatRupiahPDF(pengeluaran_akumulasi), 'Belanja + Beban Operasional'],
                     ['Modal Awal', formatRupiahPDF(modal_awal), 'Diisi manual, mengurangi Net Profit awal'],
                     ['Laba Bersih (Net Profit efektif)', formatRupiahPDF(laba_akumulasi), 'Net Profit 100% - Modal Awal'],
+                    [`Admin Fee Management (${persen_admin.toString().replace('.', ',')}%)`, formatRupiahPDF(admin_fee_val), 'Potongan Admin Management Pusat dari Net Profit setelah Klaim Bulanan'],
                     ['Klaim Bulanan', formatRupiahPDF(total_klaim_bulanan), 'Lihat rincian "4. Klaim Bulanan" di bawah'],
                 ];
                 doc.autoTable({ head: [['Komponen Pokok', 'Jumlah', 'Catatan Ringkas']], body: dataMatriks, startY: y + 5, ...baseTableStyles });
