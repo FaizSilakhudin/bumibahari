@@ -229,7 +229,7 @@ const LABEL_ARSIP = {
     tunai: 'Tunai', qris: 'QRIS', grab_food: 'Grab Food', go_food: 'Go Food', pencairan_qris: 'Pencairan QRIS', total_omset: 'Total Omzet',
     belanja_pasar: 'Belanja Pasar', belanja_sembako: 'Belanja Sembako', belanja_beras: 'Belanja Beras', belanja_toko: 'Belanja Toko', total_rutin: 'Total Belanja Rutin',
     sewa: 'Sewa', gaji: 'Gaji', listrik: 'Listrik', air: 'Air', sampah: 'Sampah', keamanan: 'Keamanan', internet: 'Internet', gas: 'Gas',
-    mingguan_karyawan: 'Mingguan Karyawan', es_batu: 'Es Batu', bensin: 'Bensin', lain_lain: 'Lain-lain', total_operasional: 'Total Operasional',
+    mingguan_karyawan: 'Mingguan Karyawan', es_batu: 'Es Batu & Air Galon', bensin: 'Bensin', lain_lain: 'Lain-lain', total_operasional: 'Total Operasional',
     total_pengeluaran: 'Total Pengeluaran', sisa_tunai: 'Sisa Tunai', sisa_qris: 'Sisa QRIS', net_profit: 'Net Profit', persentase: 'Margin (%)',
     keterangan: 'Keterangan', status_laporan: 'Status Laporan',
 };

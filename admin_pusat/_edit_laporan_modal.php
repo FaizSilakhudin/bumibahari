@@ -95,11 +95,12 @@ $ed_rp = static fn ($v) => 'Rp ' . number_format((float) ($v ?? 0), 0, ',', '.')
               <section class="ed-sec">
                 <div class="ed-sec-h ed-h-amber"><i class="bi bi-receipt"></i> Beban Operasional</div>
                 <div class="row g-2">
+                  
                   <?php
                   foreach ([
                       'sewa' => 'Sewa', 'gaji' => 'Gaji', 'listrik' => 'Listrik', 'air' => 'Air',
                       'sampah' => 'Sampah', 'keamanan' => 'Keamanan', 'internet' => 'Internet', 'gas' => 'Gas',
-                      'mingguan_karyawan' => 'Mingguan Karyawan', 'es_batu' => 'Es Batu',
+                      'mingguan_karyawan' => 'Mingguan Karyawan', 'es_batu' => 'Es Batu & Air Galon',
                       'bensin' => 'Bensin', 'lain_lain' => 'Lain-lain',
                   ] as $fname => $flabel) {
                       $ed_field($flabel, $fname);

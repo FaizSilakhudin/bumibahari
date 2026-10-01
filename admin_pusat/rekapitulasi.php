@@ -801,7 +801,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                         7 => ['nama' => 'Wifi/Internet', 'field' => 'internet', 'harian' => false, 'tahunan' => false],
                         8 => ['nama' => 'Gas', 'field' => 'gas', 'harian' => false, 'tahunan' => false],
                         9 => ['nama' => 'Mingguan Karyawan', 'field' => 'mingguan_karyawan', 'harian' => false, 'tahunan' => false],
-                        10 => ['nama' => 'Es Batu', 'field' => 'es_batu', 'harian' => false, 'tahunan' => false],
+                        10 => ['nama' => 'Es Batu & Air Galon', 'field' => 'es_batu', 'harian' => false, 'tahunan' => false],
                         11 => ['nama' => 'Bensin', 'field' => 'bensin', 'harian' => false, 'tahunan' => false],
                         12 => ['nama' => 'Lain-lain', 'field' => 'lain_lain', 'harian' => false, 'tahunan' => false],
                     ];

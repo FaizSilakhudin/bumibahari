@@ -153,7 +153,7 @@ body { background-color: #f6f8ff !important; font-family: 'Plus Jakarta Sans', s
                         foreach ([
                             'sewa' => 'Sewa', 'gaji' => 'Gaji', 'listrik' => 'Listrik', 'air' => 'Air',
                             'sampah' => 'Sampah', 'keamanan' => 'Keamanan', 'internet' => 'Internet', 'gas' => 'Gas',
-                            'mingguan_karyawan' => 'Mingguan Karyawan', 'es_batu' => 'Es Batu',
+                            'mingguan_karyawan' => 'Mingguan Karyawan', 'es_batu' => 'Es Batu & Air Galon',
                             'bensin' => 'Bensin', 'lain_lain' => 'Lain-lain',
                         ] as $fname => $flabel) {
                             $sim_field($flabel, $fname);

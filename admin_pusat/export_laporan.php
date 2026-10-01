@@ -52,7 +52,7 @@ fputcsv($out, [
     'Tunai', 'QRIS', 'GrabFood', 'GoFood', 'Total Omset',
     'Belanja Pasar', 'Belanja Sembako', 'Belanja Beras', 'Belanja Toko', 'Total Belanja Rutin',
     'Sewa', 'Gaji', 'Listrik', 'Air', 'Sampah', 'Keamanan', 'Internet', 'Gas',
-    'Mingguan Karyawan', 'Es Batu', 'Bensin', 'Lain-lain', 'Total Operasional',
+    'Mingguan Karyawan', 'Es Batu & Air Galon', 'Bensin', 'Lain-lain', 'Total Operasional',
     'Total Pengeluaran', 'Sisa Tunai', 'Pencairan QRIS', 'Sisa QRIS', 'Net Profit', 'Margin (%)',
 ]);
 
