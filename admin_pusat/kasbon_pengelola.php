@@ -359,6 +359,33 @@ include 'sidebar_pusat.php';
     .kb-badge-auto { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; border-radius: 20px; padding: 2px 8px; margin-top: 3px; }
     .kb-progress { height: 6px; border-radius: 10px; background: #f1f5f9; overflow: hidden; margin-top: 6px; }
     .kb-progress-bar { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #4318ff, #7c3aed); transition: width .3s ease; }
+    .kb-progress-lg { height: 9px; margin-top: 0; }
+
+    /* ===== Modal Detail &amp; Riwayat Pengembalian ===== */
+    .kb-detail-modal { border-radius: 18px; overflow: hidden; border: none; }
+    .kb-detail-head { background: linear-gradient(135deg, #312e81 0%, #4318ff 60%, #7c3aed 100%); color: #fff; border-bottom: none; padding: 20px 24px; }
+    .kb-detail-head .modal-title { color: #fff; }
+    .kb-detail-head .text-muted { color: rgba(255,255,255,.75) !important; }
+    .kb-detail-head .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+    .kb-detail-avatar { width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; flex-shrink: 0; }
+
+    .kb-summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    @media (min-width: 576px) { .kb-summary-grid { grid-template-columns: repeat(4, 1fr); } }
+    .kb-summary-item { display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid #eef2f9; border-radius: 12px; padding: 10px 12px; }
+    .kb-summary-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #fff; flex-shrink: 0; }
+    .kb-summary-icon.tone-date { background: linear-gradient(135deg, #64748b, #475569); }
+    .kb-summary-icon.tone-total { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+    .kb-summary-icon.tone-kembali { background: linear-gradient(135deg, #16a34a, #15803d); }
+    .kb-summary-icon.tone-sisa { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+    .kb-summary-label { font-size: 10.5px; color: #8f9bba; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+    .kb-summary-value { font-size: 14px; font-weight: 700; color: #1b2559; }
+
+    .kb-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #1b2559; }
+
+    .kb-riwayat-table thead th { font-size: 10.5px; border-bottom: 2px solid #eef2f9; padding-bottom: 8px; }
+    .kb-riwayat-table tbody td { font-size: 13px; padding: 10px 8px; border-bottom: 1px solid #f4f7fe; }
+    .kb-riwayat-table tbody tr:last-child td { border-bottom: none; }
+    .kb-riwayat-table tbody tr.kb-row-auto { background: #faf9ff; }
 
     .table-saas { margin-bottom: 0; width: 100% !important; }
     .table-saas thead th { background-color: #f8f9fc !important; color: #8f9bba !important; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eef2f9 !important; padding: 16px 12px; border-top: none !important; }
@@ -619,66 +646,101 @@ include 'sidebar_pusat.php';
 ?>
 <div class="modal fade" id="modalDetail<?= $row['id'] ?>" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <h5 class="modal-title fw-bold" style="color: #1b2559;">Detail &amp; Riwayat Pengembalian</h5>
-                    <small class="text-muted"><?= h($row['nama_pengelola']) ?> &mdash; <?= h($row['nama_cabang'] ?? 'Tanpa Cabang') ?></small>
+        <div class="modal-content kb-detail-modal">
+            <div class="modal-header kb-detail-head">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="kb-detail-avatar"><?= h(mb_strtoupper(mb_substr($row['nama_pengelola'], 0, 1))) ?></div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0"><?= h($row['nama_pengelola']) ?></h5>
+                        <small class="text-muted"><i class="bi bi-shop me-1"></i><?= h($row['nama_cabang'] ?? 'Tanpa Cabang') ?></small>
+                    </div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="row g-3 mb-3">
-                    <div class="col-6 col-md-3">
-                        <div class="small text-muted">Tanggal Kasbon</div>
-                        <div class="fw-semibold"><?= date('d M Y', strtotime($row['tanggal_kasbon'])) ?></div>
+                <?php
+                $pct_modal = ((float) $row['jumlah_kasbon'] > 0) ? min(100, round((float) $row['jumlah_dikembalikan'] / (float) $row['jumlah_kasbon'] * 100)) : 0;
+                ?>
+                <div class="kb-summary-grid mb-3">
+                    <div class="kb-summary-item">
+                        <div class="kb-summary-icon tone-date"><i class="bi bi-calendar-event"></i></div>
+                        <div>
+                            <div class="kb-summary-label">Tanggal Kasbon</div>
+                            <div class="kb-summary-value"><?= date('d M Y', strtotime($row['tanggal_kasbon'])) ?></div>
+                        </div>
                     </div>
-                    <div class="col-6 col-md-3">
-                        <div class="small text-muted">Jumlah Kasbon</div>
-                        <div class="fw-semibold">Rp <?= number_format($row['jumlah_kasbon'], 0, ',', '.') ?></div>
+                    <div class="kb-summary-item">
+                        <div class="kb-summary-icon tone-total"><i class="bi bi-cash-stack"></i></div>
+                        <div>
+                            <div class="kb-summary-label">Jumlah Kasbon</div>
+                            <div class="kb-summary-value">Rp <?= number_format($row['jumlah_kasbon'], 0, ',', '.') ?></div>
+                        </div>
                     </div>
-                    <div class="col-6 col-md-3">
-                        <div class="small text-muted">Total Dikembalikan</div>
-                        <div class="fw-semibold text-success">Rp <?= number_format($row['jumlah_dikembalikan'], 0, ',', '.') ?></div>
+                    <div class="kb-summary-item">
+                        <div class="kb-summary-icon tone-kembali"><i class="bi bi-check2-circle"></i></div>
+                        <div>
+                            <div class="kb-summary-label">Sudah Dikembalikan</div>
+                            <div class="kb-summary-value text-success">Rp <?= number_format($row['jumlah_dikembalikan'], 0, ',', '.') ?></div>
+                        </div>
                     </div>
-                    <div class="col-6 col-md-3">
-                        <div class="small text-muted">Sisa Kasbon</div>
-                        <div class="fw-bold <?= $sisa > 0 ? 'text-danger' : 'text-muted' ?>">Rp <?= number_format($sisa, 0, ',', '.') ?></div>
+                    <div class="kb-summary-item">
+                        <div class="kb-summary-icon tone-sisa"><i class="bi bi-wallet2"></i></div>
+                        <div>
+                            <div class="kb-summary-label">Sisa Kasbon</div>
+                            <div class="kb-summary-value <?= $sisa > 0 ? 'text-danger' : 'text-muted' ?>">Rp <?= number_format($sisa, 0, ',', '.') ?></div>
+                        </div>
                     </div>
                 </div>
+                <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 11.5px;">
+                    <span class="text-muted fw-semibold">Progres Pengembalian</span>
+                    <span class="fw-bold" style="color: #4318ff;"><?= $pct_modal ?>%</span>
+                </div>
+                <div class="kb-progress kb-progress-lg mb-3"><div class="kb-progress-bar" style="width: <?= $pct_modal ?>%;"></div></div>
+
                 <?php if (!empty($row['keterangan'])): ?>
-                <div class="mb-3">
-                    <div class="small text-muted">Keterangan</div>
-                    <div><?= h($row['keterangan']) ?></div>
+                <div class="kb-note mb-3">
+                    <i class="bi bi-sticky text-muted me-1"></i>
+                    <span class="text-muted small">Keterangan:</span> <?= h($row['keterangan']) ?>
                 </div>
                 <?php endif; ?>
 
-                <hr>
-                <div class="fw-bold mb-2" style="color: #1b2559;"><i class="bi bi-clock-history me-1"></i> Riwayat Pengembalian</div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="fw-bold" style="color: #1b2559;"><i class="bi bi-clock-history me-1"></i> Riwayat Pengembalian</div>
+                    <?php if (!empty($riwayat_baris)): ?>
+                        <span class="badge rounded-pill bg-light text-muted border"><?= count($riwayat_baris) ?> transaksi</span>
+                    <?php endif; ?>
+                </div>
                 <?php if (empty($riwayat_baris)): ?>
-                    <div class="text-center text-muted py-4">
+                    <div class="text-center text-muted py-4 bg-light rounded-3">
                         <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i> Belum ada pengembalian yang tercatat
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle">
+                        <table class="table table-sm align-middle kb-riwayat-table mb-0">
                             <thead>
                                 <tr class="text-muted small text-uppercase">
                                     <th>Tanggal</th>
-                                    <th class="text-end">Jumlah</th>
+                                    <th class="text-end">Jumlah Bayar</th>
+                                    <th class="text-end">Sisa Setelahnya</th>
                                     <th>Keterangan</th>
                                     <th>Dicatat Oleh</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($riwayat_baris as $r): ?>
-                                <tr>
+                                <?php
+                                $sisa_berjalan = (float) $row['jumlah_kasbon'];
+                                foreach ($riwayat_baris as $r):
+                                    $sisa_berjalan = max(0, $sisa_berjalan - (float) $r['jumlah_bayar']);
+                                ?>
+                                <tr class="<?= !empty($r['asal_otomatis']) ? 'kb-row-auto' : '' ?>">
                                     <td><?= date('d M Y', strtotime($r['tanggal_bayar'])) ?></td>
-                                    <td class="text-end fw-semibold text-success">Rp <?= number_format($r['jumlah_bayar'], 0, ',', '.') ?></td>
+                                    <td class="text-end fw-semibold text-success">+Rp <?= number_format($r['jumlah_bayar'], 0, ',', '.') ?></td>
+                                    <td class="text-end text-muted">Rp <?= number_format($sisa_berjalan, 0, ',', '.') ?></td>
                                     <td>
-                                        <small><?= h($r['keterangan'] ?? '-') ?></small>
                                         <?php if (!empty($r['asal_otomatis'])): ?>
-                                            <div><span class="kb-badge-auto"><i class="bi bi-arrow-repeat"></i> Rekapitulasi</span></div>
+                                            <span class="kb-badge-auto" title="<?= h($r['keterangan'] ?? '') ?>"><i class="bi bi-arrow-repeat"></i> Rekapitulasi &mdash; <?= h(nama_bulan_id((int) $r['bulan_periode'])) ?> <?= (int) $r['tahun_periode'] ?></span>
+                                        <?php else: ?>
+                                            <small><?= h($r['keterangan'] ?? '-') ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td><small class="text-muted"><?= h($r['nama_pencatat'] ?? '-') ?></small></td>
