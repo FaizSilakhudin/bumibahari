@@ -228,6 +228,12 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
             </a>
         </li>
 
+        <li class="nav-item">
+            <a class="nav-link <?=($current_page=='kasbon_pengelola')?'active':''?>" href="kasbon_pengelola">
+                <i class="bi bi-cash-coin"></i> Kasbon Pengelola
+            </a>
+        </li>
+
         <div class="nav-section">Sistem</div>
         <li class="nav-item">
             <a class="nav-link <?=($current_page=='simulasi')?'active':''?>" href="simulasi">
