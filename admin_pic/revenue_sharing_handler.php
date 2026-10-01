@@ -42,6 +42,67 @@ if (!in_array($id_cabang, $cabang_ids_pic, true)) {
     exit;
 }
 
+// Sinkronisasi otomatis ke buku "Kasbon Pengelola" (menu admin_pusat) -- HANYA
+// kalau sumbernya "Dana Pusat" (itu benar-benar piutang pusat ke pengelola;
+// Dana Investor/Dana Warung tidak disinkron, bukan piutang pusat). Dicari
+// lewat kunci (asal_otomatis=1, id_cabang_periode, tahun_periode, bulan_periode)
+// supaya klik "Simpan Kasbon" berulang kali untuk cabang+periode yang sama
+// meng-UPDATE baris yang sama, bukan bikin duplikat. jumlah_dikembalikan
+// SENGAJA tidak disentuh di sini -- itu murni milik menu Kasbon Pengelola
+// (dicatat lewat tombol "Bayar" di sana oleh admin pusat).
+function sinkronkan_kasbon_dana_pusat(mysqli $conn, int $id_cabang, int $tahun, int $bulan, string $kasbon_sumber, float $kasbon_nominal, string $kasbon_keterangan, ?int $uid): void {
+    $periode_akhir = date('Y-m-t', strtotime("$tahun-$bulan-01"));
+    $pgl = $conn->prepare("SELECT id FROM pengelola WHERE id_cabang = ? AND tgl_mulai <= ? AND (tgl_selesai IS NULL OR tgl_selesai >= ?) ORDER BY tgl_mulai DESC LIMIT 1");
+    $pgl->bind_param('iss', $id_cabang, $periode_akhir, $periode_akhir);
+    $pgl->execute();
+    $id_pengelola_sync = $pgl->get_result()->fetch_assoc()['id'] ?? null;
+    $pgl->close();
+    if (!$id_pengelola_sync) {
+        return;
+    }
+    $id_pengelola_sync = (int) $id_pengelola_sync;
+
+    $cek = $conn->prepare("SELECT id, jumlah_dikembalikan FROM kasbon_pengelola WHERE asal_otomatis = 1 AND id_cabang_periode = ? AND tahun_periode = ? AND bulan_periode = ?");
+    $cek->bind_param('iii', $id_cabang, $tahun, $bulan);
+    $cek->execute();
+    $existing = $cek->get_result()->fetch_assoc();
+    $cek->close();
+
+    $tgl_kasbon = "$tahun-" . str_pad((string) $bulan, 2, '0', STR_PAD_LEFT) . "-01";
+    $ket = $kasbon_keterangan !== '' ? $kasbon_keterangan : 'Kasbon dari Rekapitulasi (Dana Pusat)';
+
+    if ($kasbon_sumber === 'pusat' && $kasbon_nominal > 0) {
+        if ($existing) {
+            $dikembalikan_lama = (float) $existing['jumlah_dikembalikan'];
+            $status_baru = $dikembalikan_lama >= $kasbon_nominal ? 'lunas' : 'berjalan';
+            $up = $conn->prepare("UPDATE kasbon_pengelola SET id_pengelola = ?, jumlah_kasbon = ?, tanggal_kasbon = ?, keterangan = ?, status = ? WHERE id = ?");
+            $up->bind_param('idsssi', $id_pengelola_sync, $kasbon_nominal, $tgl_kasbon, $ket, $status_baru, $existing['id']);
+            $up->execute();
+            $up->close();
+        } else {
+            $ins = $conn->prepare("INSERT INTO kasbon_pengelola (id_pengelola, jumlah_kasbon, tanggal_kasbon, keterangan, status, asal_otomatis, id_cabang_periode, tahun_periode, bulan_periode, created_by) VALUES (?, ?, ?, ?, 'berjalan', 1, ?, ?, ?, ?)");
+            $ins->bind_param('idssiiii', $id_pengelola_sync, $kasbon_nominal, $tgl_kasbon, $ket, $id_cabang, $tahun, $bulan, $uid);
+            $ins->execute();
+            $ins->close();
+        }
+        return;
+    }
+
+    if ($existing) {
+        if ((float) $existing['jumlah_dikembalikan'] <= 0) {
+            $del = $conn->prepare("DELETE FROM kasbon_pengelola WHERE id = ?");
+            $del->bind_param('i', $existing['id']);
+            $del->execute();
+            $del->close();
+        } else {
+            $up = $conn->prepare("UPDATE kasbon_pengelola SET jumlah_kasbon = jumlah_dikembalikan, status = 'lunas' WHERE id = ?");
+            $up->bind_param('i', $existing['id']);
+            $up->execute();
+            $up->close();
+        }
+    }
+}
+
 // ---- Aksi: simpan Kasbon Pengelola dari Koreksi Dividen: Sisi Investor ----
 if ($aksi === 'simpan_kasbon') {
     $urutan_pengelola  = (int) ($_POST['urutan_pengelola'] ?? 1);
@@ -85,6 +146,8 @@ if ($aksi === 'simpan_kasbon') {
     $stmt->bind_param('iiiidsdssi', $id_cabang, $tahun, $bulan, $urutan_pengelola, $persen_sekarang, $status_sekarang, $kasbon_nominal, $kasbon_sumber, $kasbon_keterangan, $uid);
     $stmt->execute();
     $stmt->close();
+
+    sinkronkan_kasbon_dana_pusat($conn, $id_cabang, $tahun, $bulan, $kasbon_sumber, $kasbon_nominal, $kasbon_keterangan, $uid);
 
     audit($conn, 'revenue_sharing_simpan_kasbon', 'revenue_sharing', $id_cabang, [
         'id_cabang'         => $id_cabang,
