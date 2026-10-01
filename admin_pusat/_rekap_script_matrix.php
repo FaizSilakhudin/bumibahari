@@ -298,6 +298,11 @@
                 setTxt('final_inv',   formatRupiah(finalInv));
                 setTxt('final_pgl',   formatRupiah(finalPgl));
                 setTxt('final_admin', formatRupiah(adminTot));
+
+                // Total Hasil Revenue Sharing = Total Net Diterima Investor +
+                // Pengelola + Admin Management (jumlah 3 baris Distribusi Payroll
+                // di atas) -- ditampilkan di kartu ringkasan di bawah tabel 8.
+                setTxt('total_revenue_sharing', formatRupiah(finalInv + finalPgl + adminTot));
             }
 
             document.addEventListener('DOMContentLoaded', hitungCascade);

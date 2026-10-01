@@ -431,11 +431,24 @@
                 if (document.getElementById('final_admin')) document.getElementById('final_admin').innerText = formatRupiahPDF(totalAdminGabungan);
 
                 doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('7. Rekapan Hasil Akhir Keuntungan (Distribusi Payroll)', margin, y);
-                let wrapperPayroll = document.querySelector('.card.border-0.mb-5'); 
+                let wrapperPayroll = document.querySelector('.card.border-0.mb-5');
                 let elTabel6 = wrapperPayroll?.querySelector('table');
                 if (elTabel6) {
                     doc.autoTable({ html: elTabel6, startY: y + 5, ...baseTableStyles, columnStyles: { 5: { halign: 'right' } } });
+                    y = doc.lastAutoTable.finalY + 10;
                 }
+
+                // Total Hasil Revenue Sharing = Total Net Diterima Investor + Pengelola + Admin Management
+                const totalRevenueSharing = inv_total_val + pgl_total_val + totalAdminGabungan;
+                doc.autoTable({
+                    body: [['TOTAL HASIL REVENUE SHARING', formatRupiahPDF(totalRevenueSharing)]],
+                    startY: y,
+                    theme: 'grid',
+                    styles: { fontSize: 10, cellPadding: 3, fontStyle: 'bold' },
+                    bodyStyles: { fillColor: [67, 24, 255], textColor: 255 },
+                    columnStyles: { 1: { halign: 'right' } },
+                });
+
                 const filenameFull = "<?= h($nama_file_export) ?>.pdf";
                 if (mode === 'share') {
                     await sharePdfToWA(doc, filenameFull);

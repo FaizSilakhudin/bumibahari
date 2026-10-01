@@ -1377,6 +1377,17 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
     </div>
 </div>
 
+<!-- Total Hasil Revenue Sharing = Total Net Diterima Investor + Pengelola + Admin Management -->
+<div class="card border-0 mb-5" style="overflow: hidden; border-radius: 14px;">
+    <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-3" style="background: linear-gradient(135deg, #4318ff 0%, #7c3aed 100%);">
+        <div>
+            <div class="fw-bold text-white" style="font-size: 0.95rem; letter-spacing: .3px;"><i class="bi bi-calculator-fill me-2"></i>Total Hasil Revenue Sharing</div>
+            <div style="font-size: 0.78rem; color: rgba(255,255,255,.75); margin-top: 2px;">Total Net Diterima Investor + Pengelola + Admin Management</div>
+        </div>
+        <h3 class="fw-bold mb-0 text-white" id="total_revenue_sharing">Rp 0</h3>
+    </div>
+</div>
+
 <!-- Tombol Export -->
 <?php if (($jumlah_hari_data ?? 0) > 0): ?>
     <div class="row g-3 mt-4 mb-5">
