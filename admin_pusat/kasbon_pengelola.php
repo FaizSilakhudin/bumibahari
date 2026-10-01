@@ -506,8 +506,14 @@ include 'sidebar_pusat.php';
                             <td data-label="Pengelola">
                                 <span class="fw-bold d-block" style="color: #1b2559;"><?= h($row['nama_pengelola']) ?></span>
                                 <small class="text-primary fw-semibold"><?= h($row['nama_cabang'] ?? 'Tanpa Cabang') ?></small>
-                                <?php if (!empty($row['asal_otomatis'])): ?>
-                                    <div><span class="kb-badge-auto" title="Otomatis mengikuti nominal di Rekapitulasi &mdash; Koreksi Dividen: Sisi Investor"><i class="bi bi-arrow-repeat"></i> Dana Pusat (Rekapitulasi)</span></div>
+                                <?php
+                                $ada_potongan_otomatis = false;
+                                foreach ($riwayat_per_kasbon[(int) $row['id']] ?? [] as $r_cek) {
+                                    if (!empty($r_cek['asal_otomatis'])) { $ada_potongan_otomatis = true; break; }
+                                }
+                                ?>
+                                <?php if ($ada_potongan_otomatis): ?>
+                                    <div><span class="kb-badge-auto" title="Pernah menerima potongan pembayaran otomatis dari Rekapitulasi &mdash; lihat Detail"><i class="bi bi-arrow-repeat"></i> Ada potongan dari Rekapitulasi</span></div>
                                 <?php endif; ?>
                             </td>
                             <td data-label="Tanggal Kasbon"><?= date('d M Y', strtotime($row['tanggal_kasbon'])) ?></td>
@@ -640,12 +646,6 @@ include 'sidebar_pusat.php';
                         <div class="fw-bold <?= $sisa > 0 ? 'text-danger' : 'text-muted' ?>">Rp <?= number_format($sisa, 0, ',', '.') ?></div>
                     </div>
                 </div>
-                <?php if (!empty($row['asal_otomatis'])): ?>
-                <div class="alert alert-light border d-flex align-items-center gap-2 mb-3" style="font-size: 13px;">
-                    <i class="bi bi-arrow-repeat text-primary"></i>
-                    Jumlah kasbon ini mengikuti nominal "Kasbon Pengelola" (sumber Dana Pusat) di menu Rekapitulasi periode <?= h(nama_bulan_id((int) $row['bulan_periode'])) ?> <?= (int) $row['tahun_periode'] ?> &mdash; akan menyesuaikan otomatis kalau nominalnya diubah di sana.
-                </div>
-                <?php endif; ?>
                 <?php if (!empty($row['keterangan'])): ?>
                 <div class="mb-3">
                     <div class="small text-muted">Keterangan</div>
@@ -675,7 +675,12 @@ include 'sidebar_pusat.php';
                                 <tr>
                                     <td><?= date('d M Y', strtotime($r['tanggal_bayar'])) ?></td>
                                     <td class="text-end fw-semibold text-success">Rp <?= number_format($r['jumlah_bayar'], 0, ',', '.') ?></td>
-                                    <td><small><?= h($r['keterangan'] ?? '-') ?></small></td>
+                                    <td>
+                                        <small><?= h($r['keterangan'] ?? '-') ?></small>
+                                        <?php if (!empty($r['asal_otomatis'])): ?>
+                                            <div><span class="kb-badge-auto"><i class="bi bi-arrow-repeat"></i> Rekapitulasi</span></div>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><small class="text-muted"><?= h($r['nama_pencatat'] ?? '-') ?></small></td>
                                 </tr>
                                 <?php endforeach; ?>

@@ -93,15 +93,17 @@ function ambil_nilai_sebelum(mysqli $conn, int $id_cabang, int $tahun, int $bula
 }
 
 // Sinkronisasi otomatis ke buku "Kasbon Pengelola" (menu admin_pusat) -- HANYA
-// kalau sumbernya "Dana Pusat" (itu benar-benar piutang pusat ke pengelola;
-// Dana Investor/Dana Warung tidak disinkron, bukan piutang pusat). Dicari
-// lewat kunci (asal_otomatis=1, id_cabang_periode, tahun_periode, bulan_periode)
-// supaya klik "Simpan Kasbon" berulang kali untuk cabang+periode yang sama
-// meng-UPDATE baris yang sama, bukan bikin duplikat. jumlah_dikembalikan
-// SENGAJA tidak disentuh di sini -- itu murni milik menu Kasbon Pengelola
-// (dicatat lewat tombol "Bayar" di sana), supaya riwayat pembayaran yang
-// sudah ada tidak pernah hilang hanya karena nominal kasbon di Rekapitulasi
-// diedit lagi.
+// kalau sumbernya "Dana Pusat". PENTING: nominal ini BUKAN kasbon baru --
+// ini adalah POTONGAN PEMBAYARAN/PENGEMBALIAN dari kasbon yang SUDAH ADA
+// (persis seperti efek tombol "Bayar" di menu Kasbon Pengelola), diterapkan
+// ke kasbon 'berjalan' pengelola tsb yang paling lama diambil (FIFO). Dana
+// Investor/Dana Warung tidak disinkron (bukan transaksi lewat pusat).
+//
+// Dicari lewat kunci (asal_otomatis=1, id_cabang_periode, tahun_periode,
+// bulan_periode) di kasbon_pengelola_riwayat supaya klik "Simpan Kasbon"
+// berulang utk cabang+periode yang sama meng-UPDATE baris riwayat yang sama
+// (menerapkan ULANG nominal barunya ke kasbon terkait), bukan menambah
+// pembayaran baru tiap kali disimpan.
 function sinkronkan_kasbon_dana_pusat(mysqli $conn, int $id_cabang, int $tahun, int $bulan, string $kasbon_sumber, float $kasbon_nominal, string $kasbon_keterangan, ?int $uid): void {
     $periode_akhir = date('Y-m-t', strtotime("$tahun-$bulan-01"));
     $pgl = $conn->prepare("SELECT id FROM pengelola WHERE id_cabang = ? AND tgl_mulai <= ? AND (tgl_selesai IS NULL OR tgl_selesai >= ?) ORDER BY tgl_mulai DESC LIMIT 1");
@@ -114,52 +116,91 @@ function sinkronkan_kasbon_dana_pusat(mysqli $conn, int $id_cabang, int $tahun, 
     }
     $id_pengelola_sync = (int) $id_pengelola_sync;
 
-    $cek = $conn->prepare("SELECT id, jumlah_dikembalikan FROM kasbon_pengelola WHERE asal_otomatis = 1 AND id_cabang_periode = ? AND tahun_periode = ? AND bulan_periode = ?");
+    $tgl_bayar = $periode_akhir;
+    $nama_periode = nama_bulan_id($bulan) . ' ' . $tahun;
+    $ket = ($kasbon_keterangan !== '' ? $kasbon_keterangan . ' — ' : '') . "Potongan kasbon dari Rekapitulasi (Dana Pusat) periode $nama_periode";
+
+    // Riwayat pembayaran otomatis yang sudah pernah dibuat untuk cabang+periode ini.
+    $cek = $conn->prepare("SELECT id, id_kasbon, jumlah_bayar FROM kasbon_pengelola_riwayat
+        WHERE asal_otomatis = 1 AND id_cabang_periode = ? AND tahun_periode = ? AND bulan_periode = ?");
     $cek->bind_param('iii', $id_cabang, $tahun, $bulan);
     $cek->execute();
     $existing = $cek->get_result()->fetch_assoc();
     $cek->close();
 
-    $tgl_kasbon = "$tahun-" . str_pad((string) $bulan, 2, '0', STR_PAD_LEFT) . "-01";
-    $ket = $kasbon_keterangan !== '' ? $kasbon_keterangan : 'Kasbon dari Rekapitulasi (Dana Pusat)';
+    if ($existing) {
+        // Lepas dulu kontribusi LAMA dari kasbon terkait, supaya tidak dobel
+        // dihitung saat nominal baru diterapkan ulang di bawah.
+        $kb = $conn->prepare("SELECT jumlah_kasbon, jumlah_dikembalikan FROM kasbon_pengelola WHERE id = ?");
+        $kb->bind_param('i', $existing['id_kasbon']);
+        $kb->execute();
+        $kasbon_terkait = $kb->get_result()->fetch_assoc();
+        $kb->close();
+        $dikembalikan_tanpa_lama = $kasbon_terkait ? max(0, (float) $kasbon_terkait['jumlah_dikembalikan'] - (float) $existing['jumlah_bayar']) : null;
 
-    if ($kasbon_sumber === 'pusat' && $kasbon_nominal > 0) {
-        if ($existing) {
-            $dikembalikan_lama = (float) $existing['jumlah_dikembalikan'];
-            $status_baru = $dikembalikan_lama >= $kasbon_nominal ? 'lunas' : 'berjalan';
-            $up = $conn->prepare("UPDATE kasbon_pengelola SET id_pengelola = ?, jumlah_kasbon = ?, tanggal_kasbon = ?, keterangan = ?, status = ? WHERE id = ?");
-            $up->bind_param('idsssi', $id_pengelola_sync, $kasbon_nominal, $tgl_kasbon, $ket, $status_baru, $existing['id']);
+        if ($kasbon_sumber !== 'pusat' || $kasbon_nominal <= 0) {
+            // Sumbernya diganti dari "Dana Pusat" (atau nominal dikosongkan) --
+            // batalkan potongan otomatis ini: kembalikan saldo kasbon seperti
+            // sebelum potongan ini ada, lalu hapus baris riwayatnya.
+            if ($kasbon_terkait) {
+                $status_balik = $dikembalikan_tanpa_lama >= (float) $kasbon_terkait['jumlah_kasbon'] ? 'lunas' : 'berjalan';
+                $up = $conn->prepare("UPDATE kasbon_pengelola SET jumlah_dikembalikan = ?, status = ? WHERE id = ?");
+                $up->bind_param('dsi', $dikembalikan_tanpa_lama, $status_balik, $existing['id_kasbon']);
+                $up->execute();
+                $up->close();
+            }
+            $del = $conn->prepare("DELETE FROM kasbon_pengelola_riwayat WHERE id = ?");
+            $del->bind_param('i', $existing['id']);
+            $del->execute();
+            $del->close();
+            return;
+        }
+
+        // Masih "Dana Pusat" -- terapkan ULANG nominal (yang mungkin sudah
+        // diubah) ke kasbon yang sama.
+        if ($kasbon_terkait) {
+            $dikembalikan_baru = min((float) $kasbon_terkait['jumlah_kasbon'], $dikembalikan_tanpa_lama + $kasbon_nominal);
+            $status_baru = $dikembalikan_baru >= (float) $kasbon_terkait['jumlah_kasbon'] ? 'lunas' : 'berjalan';
+            $up = $conn->prepare("UPDATE kasbon_pengelola SET jumlah_dikembalikan = ?, tanggal_pengembalian = ?, status = ? WHERE id = ?");
+            $up->bind_param('dssi', $dikembalikan_baru, $tgl_bayar, $status_baru, $existing['id_kasbon']);
             $up->execute();
             $up->close();
-        } else {
-            $ins = $conn->prepare("INSERT INTO kasbon_pengelola (id_pengelola, jumlah_kasbon, tanggal_kasbon, keterangan, status, asal_otomatis, id_cabang_periode, tahun_periode, bulan_periode, created_by) VALUES (?, ?, ?, ?, 'berjalan', 1, ?, ?, ?, ?)");
-            $ins->bind_param('idssiiii', $id_pengelola_sync, $kasbon_nominal, $tgl_kasbon, $ket, $id_cabang, $tahun, $bulan, $uid);
-            $ins->execute();
-            $ins->close();
+
+            $upr = $conn->prepare("UPDATE kasbon_pengelola_riwayat SET jumlah_bayar = ?, tanggal_bayar = ?, keterangan = ? WHERE id = ?");
+            $upr->bind_param('dssi', $kasbon_nominal, $tgl_bayar, $ket, $existing['id']);
+            $upr->execute();
+            $upr->close();
         }
         return;
     }
 
-    // Sumbernya bukan (lagi) "Dana Pusat", atau nominalnya 0 -- bersihkan
-    // sinkronisasi lama. Kalau belum pernah ada pembayaran tercatat, baris
-    // auto-sync-nya langsung dihapus. Kalau sudah ada pembayaran, JANGAN
-    // dihapus (riwayat bayar penting) -- cukup kunci jumlah_kasbon-nya ke
-    // jumlah yang sudah dikembalikan supaya otomatis berstatus Lunas & tidak
-    // terus-terusan dianggap "masih berjalan" untuk kasbon yang sudah tidak
-    // relevan lagi dari sisi Rekapitulasi.
-    if ($existing) {
-        if ((float) $existing['jumlah_dikembalikan'] <= 0) {
-            $del = $conn->prepare("DELETE FROM kasbon_pengelola WHERE id = ?");
-            $del->bind_param('i', $existing['id']);
-            $del->execute();
-            $del->close();
-        } else {
-            $up = $conn->prepare("UPDATE kasbon_pengelola SET jumlah_kasbon = jumlah_dikembalikan, status = 'lunas' WHERE id = ?");
-            $up->bind_param('i', $existing['id']);
-            $up->execute();
-            $up->close();
-        }
+    // Belum ada potongan otomatis sebelumnya untuk periode ini.
+    if ($kasbon_sumber !== 'pusat' || $kasbon_nominal <= 0) {
+        return; // Tidak ada apa pun untuk disinkron.
     }
+
+    // Kasbon 'berjalan' milik pengelola ini yang paling lama diambil (FIFO) --
+    // itu yang dianggap sedang dibayar lewat potongan dari Rekapitulasi ini.
+    $kb = $conn->prepare("SELECT id, jumlah_kasbon, jumlah_dikembalikan FROM kasbon_pengelola WHERE id_pengelola = ? AND status = 'berjalan' ORDER BY tanggal_kasbon ASC, id ASC LIMIT 1");
+    $kb->bind_param('i', $id_pengelola_sync);
+    $kb->execute();
+    $kasbon_aktif = $kb->get_result()->fetch_assoc();
+    $kb->close();
+    if (!$kasbon_aktif) {
+        return; // Pengelola ini tidak punya kasbon berjalan -- tidak ada yang bisa dibayar.
+    }
+
+    $dikembalikan_baru = min((float) $kasbon_aktif['jumlah_kasbon'], (float) $kasbon_aktif['jumlah_dikembalikan'] + $kasbon_nominal);
+    $status_baru = $dikembalikan_baru >= (float) $kasbon_aktif['jumlah_kasbon'] ? 'lunas' : 'berjalan';
+    $up = $conn->prepare("UPDATE kasbon_pengelola SET jumlah_dikembalikan = ?, tanggal_pengembalian = ?, status = ? WHERE id = ?");
+    $up->bind_param('dssi', $dikembalikan_baru, $tgl_bayar, $status_baru, $kasbon_aktif['id']);
+    $up->execute();
+    $up->close();
+
+    $ins = $conn->prepare("INSERT INTO kasbon_pengelola_riwayat (id_kasbon, jumlah_bayar, tanggal_bayar, keterangan, asal_otomatis, id_cabang_periode, tahun_periode, bulan_periode, created_by) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)");
+    $ins->bind_param('idssiiii', $kasbon_aktif['id'], $kasbon_nominal, $tgl_bayar, $ket, $id_cabang, $tahun, $bulan, $uid);
+    $ins->execute();
+    $ins->close();
 }
 
 // ---- Aksi: simpan admin_fee + persen/nominal_service_fee dari Rekapitulasi ----
