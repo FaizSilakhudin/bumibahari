@@ -8,10 +8,40 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: SSH deploy (fast-forward git pull only)
+      - name: Setup SSH key dari GitHub Secret
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.WBB_DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          # Secret WBB_DEPLOY_SSH_KEY harus berisi PRIVATE key (OpenSSH format).
+          # Kalau secret kosong / tidak diset -> step berikutnya akan menolak
+          # jalan dgn pesan jelas (bukan "Permission denied" samar seperti dulu).
+          printf '%s\n' "${{ secrets.WBB_DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           echo "103.67.244.132 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOU2PtU9qCflUZNuLX8N6gwv0GGzhyDC4Us/qd7RY0Sq" > ~/.ssh/known_hosts
-          ssh -i ~/.ssh/deploy_key -o UserKnownHostsFile=~/.ssh/known_hosts root@103.67.244.132 "deploy"
+
+      - name: Validasi SSH key tidak kosong & format benar
+        run: |
+          if [ ! -s ~/.ssh/deploy_key ]; then
+            echo "::error::GitHub Secret 'WBB_DEPLOY_SSH_KEY' kosong atau belum diset."
+            echo "::error::Setup: Settings -> Secrets and variables -> Actions -> New repository secret"
+            echo "::error::Name: WBB_DEPLOY_SSH_KEY, Value: isi PRIVATE key (BEGIN OPENSSH PRIVATE KEY ... END OPENSSH PRIVATE KEY)"
+            exit 1
+          fi
+          if ! head -1 ~/.ssh/deploy_key | grep -q 'BEGIN .* PRIVATE KEY'; then
+            echo "::error::Isi secret WBB_DEPLOY_SSH_KEY tidak terlihat seperti PRIVATE key (header BEGIN ... PRIVATE KEY tidak ketemu)."
+            echo "::error::Pastikan yang disalin ke secret adalah PRIVATE key utuh (termasuk baris BEGIN/END), bukan PUBLIC key (.pub)."
+            exit 1
+          fi
+          echo "SSH key OK ($(wc -l < ~/.ssh/deploy_key) baris)."
+
+      - name: SSH deploy (fast-forward git pull only)
+        run: |
+          # -v: verbose log supaya kalau gagal, errornya kelihatan jelas di log Actions
+          #     (misal: "Permission denied (publickey)" -> public key belum di-authorized_keys server)
+          # -o ConnectTimeout=20: fail cepat kalau server tidak reachable, bukan hang
+          # -o BatchMode=yes: tolak prompt interaktif (password), hanya key auth
+          ssh -v \
+              -i ~/.ssh/deploy_key \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o ConnectTimeout=20 \
+              -o BatchMode=yes \
+              root@103.67.244.132 "deploy"
