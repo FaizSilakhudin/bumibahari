@@ -204,6 +204,13 @@
                     return yLine + 11;
                 }
 
+                // Opsi dari dropdown "Opsi Cetak PDF Harian" di atas (sebelah input
+                // Rentang Tanggal Custom). '1' = sertakan halaman "Bulan Kemarin"
+                // (default/perilaku lama); '0' = lewati halaman itu & geser nomor
+                // halaman Beban Operasional dari "3." ke "2.".
+                const sertakanBulanLalu =
+                    (document.getElementById('opsiCetakBulanLalu')?.value ?? '1') === '1';
+
                 // Hal. 1 — Rekap harian bulan berjalan
                 // PDF Harian sengaja RINGKAS: 3 kolom QRIS (Asli/Pencairan/Sisa) di layar
                 // digabung balik jadi 1 kolom "QRIS (Sisa)" saja lewat klon tabel.
@@ -213,17 +220,22 @@
                     doc.autoTable({ html: klonHarianIni, startY: ty, ...baseStyles, didParseCell: function (d) { rekapHarianDidParseCell(d, 0); } });
                 }
 
-                // Hal. 2 — Rekap harian bulan sebelumnya
-                doc.addPage('a4', 'landscape');
-                ty = kop('2. Rekapitulasi Pendapatan & Pengeluaran Harian - ' + blnLalu, blnLalu);
-                const klonHarianLalu = buatKloneTabelHarianRingkas('tabelRekapHarianPrev');
-                if (klonHarianLalu) {
-                    doc.autoTable({ html: klonHarianLalu, startY: ty, ...baseStyles, didParseCell: function (d) { rekapHarianDidParseCell(d, 0); } });
+                let nomorHalBO = 2;
+                if (sertakanBulanLalu) {
+                    // Hal. 2 — Rekap harian bulan sebelumnya
+                    doc.addPage('a4', 'landscape');
+                    ty = kop('2. Rekapitulasi Pendapatan & Pengeluaran Harian - ' + blnLalu, blnLalu);
+                    const klonHarianLalu = buatKloneTabelHarianRingkas('tabelRekapHarianPrev');
+                    if (klonHarianLalu) {
+                        doc.autoTable({ html: klonHarianLalu, startY: ty, ...baseStyles, didParseCell: function (d) { rekapHarianDidParseCell(d, 0); } });
+                    }
+                    nomorHalBO = 3;
                 }
 
-                // Hal. 3 — Rincian Beban Operasional bulan berjalan
+                // Hal. 2/3 — Rincian Beban Operasional bulan berjalan (nomor menyesuaikan
+                // apakah halaman bulan kemarin disertakan atau tidak).
                 doc.addPage('a4', 'landscape');
-                ty = kop('3. Rincian Beban Operasional - ' + blnIni, blnIni);
+                ty = kop(nomorHalBO + '. Rincian Beban Operasional - ' + blnIni, blnIni);
                 const t2 = document.querySelector('.table-clean-input');
                 const el2 = t2 && (t2.tagName === 'TABLE' ? t2 : t2.querySelector('table'));
                 if (el2) {

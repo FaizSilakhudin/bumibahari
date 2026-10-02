@@ -596,6 +596,17 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
             <div class="col-xl-2 col-md-6">
                 <input type="date" name="tgl_selesai" class="form-control form-control-premium" value="<?= $override_tanggal ? h($tgl_selesai_efektif) : '' ?>">
             </div>
+            <!-- Opsi untuk tombol "Export PDF Harian" di bawah: default sertakan halaman
+                 "Bulan Kemarin" (perilaku lama). Dibaca dari JS saat tombol diklik -
+                 TIDAK diberi atribut name supaya tidak ikut tersubmit ke URL (ini hanya
+                 pengaruh output cetak PDF Harian, bukan filter data di layar). -->
+            <div class="col-xl-2 col-md-6">
+                <select id="opsiCetakBulanLalu" class="form-select form-control-premium"
+                        title="Opsi untuk tombol Export PDF Harian di bawah">
+                    <option value="1" selected>Cetak Bulan Kemarin</option>
+                    <option value="0">Tidak Cetak Bulan Kemarin</option>
+                </select>
+            </div>
             <?php if ($override_tanggal): ?>
             <div class="col-xl-2 col-md-6 d-grid">
                 <a href="?id_cabang=<?= h($id_cabang) ?>&periode=bulanan&tahun=<?= h($tahun) ?>&bulan=<?= h($bulan) ?>" class="btn btn-outline-secondary btn-sm fw-semibold">
