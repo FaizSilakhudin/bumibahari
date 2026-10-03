@@ -78,8 +78,20 @@
 
                 clone.querySelectorAll('tbody tr, tfoot tr').forEach(function (tr) {
                     if (tr.children.length >= 6) {
-                        tr.children[4].remove();
-                        tr.children[3].remove();
+                        // Cari DOM index yg menunjuk kolom visual ke-3 (QRIS Asli) —
+                        // TIDAK selalu children[3] karena baris tfoot "JUMLAH" punya
+                        // cell pertama colspan=2 (No+Tanggal), jadi offset-nya geser.
+                        // Dulu asal hapus children[3]+[4] -> di tfoot malah QRIS Sisa
+                        // yang terhapus, QRIS Asli yg tersisa -> total QRIS di PDF salah.
+                        let acc = 0, idxAsli = -1;
+                        for (let i = 0; i < tr.children.length; i++) {
+                            if (acc === 3) { idxAsli = i; break; }
+                            acc += parseInt(tr.children[i].getAttribute('colspan') || '1', 10);
+                        }
+                        if (idxAsli !== -1 && idxAsli + 1 < tr.children.length) {
+                            tr.children[idxAsli + 1].remove(); // Pencairan QRIS
+                            tr.children[idxAsli].remove();     // QRIS Asli — sisakan QRIS Sisa
+                        }
                     } else {
                         Array.from(tr.children).forEach(function (cell) {
                             const cs = parseInt(cell.getAttribute('colspan') || '1', 10);
