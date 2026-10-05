@@ -44,6 +44,26 @@ $ed_field = static function (string $label, string $name) use ($row) {
 };
 
 $ed_rp = static fn ($v) => 'Rp ' . number_format((float) ($v ?? 0), 0, ',', '.');
+
+// Navigasi maju/mundur tanggal untuk cabang yang sama — reload laporan.php
+// dengan filter 1 hari + flag `buka_koreksi=1` supaya modal auto-terbuka.
+$ed_tgl_prev = date('Y-m-d', strtotime($row['tanggal'] . ' -1 day'));
+$ed_tgl_next = date('Y-m-d', strtotime($row['tanggal'] . ' +1 day'));
+$ed_hari_ini = date('Y-m-d');
+$ed_next_disabled = ($ed_tgl_next > $ed_hari_ini);
+$ed_id_cabang = (int) ($row['id_cabang'] ?? 0);
+$ed_url_prev = 'laporan.php?' . http_build_query([
+    'id_cabang'     => $ed_id_cabang,
+    'tgl_awal'      => $ed_tgl_prev,
+    'tgl_akhir'     => $ed_tgl_prev,
+    'buka_koreksi'  => 1,
+]);
+$ed_url_next = 'laporan.php?' . http_build_query([
+    'id_cabang'     => $ed_id_cabang,
+    'tgl_awal'      => $ed_tgl_next,
+    'tgl_akhir'     => $ed_tgl_next,
+    'buka_koreksi'  => 1,
+]);
 ?>
 <div class="modal fade ed-modal" id="detailModal<?= $ed_id ?>" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable modal-fullscreen-lg-down">
@@ -53,13 +73,29 @@ $ed_rp = static fn ($v) => 'Rp ' . number_format((float) ($v ?? 0), 0, ',', '.')
       <input type="hidden" name="update_laporan" value="1">
 
       <div class="modal-header ed-head">
-        <div class="pe-2">
+        <div class="pe-2 flex-grow-1">
           <h5 class="modal-title fw-bold mb-1">Koreksi Laporan Harian</h5>
           <div class="ed-head-sub">
             <span><i class="bi bi-shop me-1"></i><?= h($row['nama_cabang'] ?? '-') ?></span>
             <span><i class="bi bi-person me-1"></i><?= h($row['nama_pengelola'] ?? '-') ?></span>
             <span><i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($row['tanggal'])) ?></span>
           </div>
+        </div>
+        <div class="d-flex align-items-center gap-1 me-2 ed-nav-tanggal">
+          <a href="<?= h($ed_url_prev) ?>" class="btn btn-sm btn-light fw-semibold"
+             title="Tanggal Sebelumnya (<?= date('d M Y', strtotime($ed_tgl_prev)) ?>)">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+          <?php if ($ed_next_disabled): ?>
+            <button type="button" class="btn btn-sm btn-light fw-semibold" disabled title="Tidak bisa ke masa depan">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          <?php else: ?>
+            <a href="<?= h($ed_url_next) ?>" class="btn btn-sm btn-light fw-semibold"
+               title="Tanggal Berikutnya (<?= date('d M Y', strtotime($ed_tgl_next)) ?>)">
+              <i class="bi bi-chevron-right"></i>
+            </a>
+          <?php endif; ?>
         </div>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
       </div>

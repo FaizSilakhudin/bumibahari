@@ -176,6 +176,14 @@ input.form-control-custom { text-align: right; }
 
 <div class="container-fluid py-3 px-md-4">
 
+<?php
+    // Navigasi maju/mundur tanggal (batas atas: hari ini — tidak boleh ke masa depan).
+    $tgl_prev = date('Y-m-d', strtotime($tanggal . ' -1 day'));
+    $tgl_next = date('Y-m-d', strtotime($tanggal . ' +1 day'));
+    $hari_ini = date('Y-m-d');
+    $nav_next_disabled = ($tgl_next > $hari_ini);
+    ?>
+
     <div class="d-flex align-items-center justify-content-between mb-4">
         <h3 class="mb-0 fw-bold text-dark"><i class="bi bi-clipboard-plus text-primary me-2"></i> Input Laporan Harian</h3>
         <a href="index?tanggal=<?= h($tanggal) ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Kembali</a>
@@ -185,9 +193,25 @@ input.form-control-custom { text-align: right; }
         <div class="bg-light text-dark rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;">
             <i class="bi bi-shop fs-4 text-dark"></i>
         </div>
-        <div>
+        <div class="flex-grow-1">
             <h5 class="mb-0 fw-bold"><?= h($nama_cabang) ?></h5>
             <small class="opacity-75">Pengelola: <strong><?= h($nama_pengelola) ?></strong> &middot; Tanggal: <strong><?= date('d M Y', strtotime($tanggal)) ?></strong></small>
+        </div>
+        <div class="ms-3 d-flex align-items-center gap-2 nav-tanggal">
+            <a href="input_laporan.php?id_cabang=<?= (int)$id_cabang ?>&tanggal=<?= h($tgl_prev) ?>"
+               class="btn btn-light btn-sm fw-semibold" title="Tanggal Sebelumnya (<?= date('d M Y', strtotime($tgl_prev)) ?>)">
+                <i class="bi bi-chevron-left"></i> <span class="d-none d-md-inline">Mundur</span>
+            </a>
+            <?php if ($nav_next_disabled): ?>
+                <button type="button" class="btn btn-light btn-sm fw-semibold" disabled title="Tidak bisa ke masa depan">
+                    <span class="d-none d-md-inline">Maju</span> <i class="bi bi-chevron-right"></i>
+                </button>
+            <?php else: ?>
+                <a href="input_laporan.php?id_cabang=<?= (int)$id_cabang ?>&tanggal=<?= h($tgl_next) ?>"
+                   class="btn btn-light btn-sm fw-semibold" title="Tanggal Berikutnya (<?= date('d M Y', strtotime($tgl_next)) ?>)">
+                    <span class="d-none d-md-inline">Maju</span> <i class="bi bi-chevron-right"></i>
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 

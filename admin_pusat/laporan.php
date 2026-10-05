@@ -968,5 +968,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     });
 
+    // Auto-buka modal Koreksi pertama kalau user datang dari tombol maju/mundur
+    // tanggal di modal lain (`buka_koreksi=1`). Kalau tanggalnya belum ada
+    // laporannya, tampilkan info ringan supaya user tahu kenapa kosong.
+    const _params = new URLSearchParams(window.location.search);
+    if (_params.get('buka_koreksi') === '1') {
+        const firstModal = document.querySelector('[id^="detailModal"]');
+        if (firstModal && typeof bootstrap !== 'undefined') {
+            bootstrap.Modal.getOrCreateInstance(firstModal).show();
+        } else {
+            const kosong = document.createElement('div');
+            kosong.className = 'alert alert-warning rounded-3 mt-3';
+            kosong.innerHTML = '<i class="bi bi-info-circle me-1"></i> Belum ada laporan untuk tanggal ini pada cabang terpilih.';
+            const container = document.querySelector('.container-fluid') || document.body;
+            container.insertBefore(kosong, container.firstChild);
+        }
+    }
+
 });
 </script>
