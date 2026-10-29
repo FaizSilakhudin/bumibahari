@@ -1447,3 +1447,35 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         <?php if (!empty($id_cabang) && ($jumlah_hari_data ?? 0) > 0): ?>
         <?php include __DIR__ . '/_rekap_script_export.php'; ?>
         <?php endif; ?>
+
+<script>
+// Auto-trigger share PDF kalau halaman dibuka dari menu Share WA Group.
+(function autoShareHook(){
+    const p = new URLSearchParams(window.location.search);
+    const mode = p.get('auto_share');
+    if (!mode) return;
+    const grupNama = p.get('wa_nama') || '';
+
+    if (grupNama) {
+        const bar = document.createElement('div');
+        bar.className = 'alert alert-success m-3 shadow-sm d-flex align-items-center gap-2';
+        bar.innerHTML = '<i class="bi bi-whatsapp fs-5"></i><div>Mode share otomatis — tujuan: <strong>' + grupNama.replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])) + '</strong>. PDF akan dibuat & picker share muncul dalam ~2 detik.</div>';
+        document.body.insertBefore(bar, document.body.firstChild);
+    }
+
+    setTimeout(function(){
+        try {
+            if (mode === 'harian' && typeof exportPdfHarian === 'function') {
+                exportPdfHarian('share');
+            } else if ((mode === 'bulanan' || mode === 'rekap') && typeof exportPDF === 'function') {
+                exportPDF('share');
+            } else {
+                alert('Belum ada data laporan untuk periode ini — PDF tidak bisa dibuat.');
+            }
+        } catch(e) {
+            console.error('auto_share error', e);
+            alert('Gagal auto-share. Coba klik manual tombol Share di halaman ini.');
+        }
+    }, 1800);
+})();
+</script>

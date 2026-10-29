@@ -143,6 +143,11 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
                 <span>Rekapitulasi</span>
             </a>
 
+            <a class="nav-link-custom <?=($current_page=='share_wa_grup')?'active':''?>" href="share_wa_grup">
+                <i class="bi bi-whatsapp fs-5"></i>
+                <span>Share WA Group</span>
+            </a>
+
             <a class="nav-link-custom <?=($current_page=='backup_laporan')?'active':''?>" href="backup_laporan">
                 <i class="bi bi-life-preserver fs-5"></i>
                 <span>Backup Laporan</span>

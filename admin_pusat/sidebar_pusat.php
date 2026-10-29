@@ -205,6 +205,12 @@ $current_page = basename($_SERVER['PHP_SELF'], ".php");
         </li>
 
         <li class="nav-item">
+            <a class="nav-link <?=($current_page=='share_wa_grup' || $current_page=='data_wa_grup')?'active':''?>" href="share_wa_grup">
+                <i class="bi bi-whatsapp"></i> Share WA Group
+            </a>
+        </li>
+
+        <li class="nav-item">
             <a class="nav-link <?=($current_page=='revenue_sharing')?'active':''?>" href="revenue_sharing">
                 <i class="bi bi-cash-stack"></i> Revenue Sharing
             </a>

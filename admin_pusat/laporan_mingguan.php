@@ -524,4 +524,21 @@ function bagikanWA(btn) {
         alert('Gagal membuat PDF. Coba lagi.');
     });
 }
+
+// Auto-trigger share PDF kalau halaman dibuka dari menu Share WA Group.
+(function autoShareHookMingguan(){
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('auto_share') !== '1') return;
+    const grupNama = p.get('wa_nama') || '';
+    if (grupNama) {
+        const bar = document.createElement('div');
+        bar.className = 'alert alert-success m-3 shadow-sm d-flex align-items-center gap-2';
+        bar.innerHTML = '<i class="bi bi-whatsapp fs-5"></i><div>Mode share otomatis — tujuan: <strong>' + grupNama.replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])) + '</strong>. Picker share muncul dalam ~2 detik.</div>';
+        document.body.insertBefore(bar, document.body.firstChild);
+    }
+    setTimeout(function(){
+        try { if (typeof bagikanWA === 'function') bagikanWA(null); }
+        catch(e) { console.error('auto_share mingguan error', e); }
+    }, 1500);
+})();
 </script>
