@@ -36,6 +36,9 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
 .sg-cabang-item{border-bottom:1px solid #f1f5f9;padding:10px 0}
 .sg-cabang-item:last-child{border-bottom:none}
 .sg-done{opacity:.5;text-decoration:line-through}
+/* z-index override: pastikan modal di atas sidebar (1000) & notifikasi bell (1060) */
+.modal{z-index:1070!important}
+.modal-backdrop{z-index:1065!important}
 </style>
 
 <div class="container-fluid py-4">

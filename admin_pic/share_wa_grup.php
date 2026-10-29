@@ -39,6 +39,8 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
 .sg-filter-card{background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1px solid #bbf7d0;border-radius:12px;padding:14px 18px}
 .sg-cabang-item{border-bottom:1px solid #f1f5f9;padding:10px 0}
 .sg-cabang-item:last-child{border-bottom:none}
+.modal{z-index:1070!important}
+.modal-backdrop{z-index:1065!important}
 </style>
 
 <div class="container-fluid py-4">

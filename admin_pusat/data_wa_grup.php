@@ -146,10 +146,17 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
 .wg-badge-count{background:#e0e7ff;color:#4338ca;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:999px}
 .wg-badge-empty{background:#fef3c7;color:#b45309;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:999px}
 .wg-chip-cabang{display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;font-size:.78rem;padding:3px 10px;border-radius:999px;margin:2px}
-.wg-chip-cabang.diluar{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
-.wg-form-check{padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:4px;transition:background .15s}
+.wg-form-check{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;transition:background .15s;cursor:pointer;width:100%}
 .wg-form-check:hover{background:#f8fafc}
 .wg-form-check.taken{background:#fef3c7}
+.wg-form-check input{flex-shrink:0;margin:0}
+.wg-form-check .wg-nama{flex-grow:1;min-width:0;font-size:.85rem;font-weight:600;color:#0f172a}
+.wg-form-check .wg-sub{display:block;font-size:.68rem;color:#64748b;font-weight:500}
+/* z-index override: pastikan modal di atas sidebar (sidebar z-index 1000) */
+.modal{z-index:1070!important}
+.modal-backdrop{z-index:1065!important}
+.wg-anggota-grid{display:grid;grid-template-columns:1fr;gap:0}
+@media(min-width:768px){.wg-anggota-grid{grid-template-columns:1fr 1fr;gap:0 10px}}
 </style>
 
 <div class="container-fluid py-4">
@@ -264,18 +271,18 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
                                 Centang cabang yang masuk ke grup ini. Cabang dengan tanda <span class="wg-badge-empty">kuning</span> saat ini di grup lain — kalau dipindah ke sini, otomatis lepas dari grup lama.
                             </div>
                             <input type="text" id="search-anggota-<?= (int)$g['id'] ?>" class="form-control mb-3" placeholder="Cari nama cabang..." oninput="filterAnggota(this, <?= (int)$g['id'] ?>)">
-                            <div class="row g-1" id="daftar-anggota-<?= (int)$g['id'] ?>">
+                            <div class="wg-anggota-grid" id="daftar-anggota-<?= (int)$g['id'] ?>">
                                 <?php foreach ($all_cabang as $c):
                                     $tercentang = ((int)$c['id_wa_grup']) === (int)$g['id'];
                                     $milik_grup_lain = ($c['id_wa_grup'] && !$tercentang);
                                 ?>
-                                <div class="col-md-6 cabang-item" data-nama="<?= h(strtolower($c['nama_cabang'])) ?>">
-                                    <label class="wg-form-check d-flex align-items-center gap-2 <?= $milik_grup_lain ? 'taken' : '' ?>">
-                                        <input class="form-check-input m-0" type="checkbox" name="anggota[]" value="<?= (int)$c['id_cabang'] ?>" <?= $tercentang ? 'checked' : '' ?>>
-                                        <span class="flex-grow-1">
-                                            <span class="small fw-semibold"><?= h($c['nama_cabang']) ?></span>
+                                <div class="cabang-item" data-nama="<?= h(strtolower($c['nama_cabang'])) ?>">
+                                    <label class="wg-form-check <?= $milik_grup_lain ? 'taken' : '' ?>">
+                                        <input class="form-check-input" type="checkbox" name="anggota[]" value="<?= (int)$c['id_cabang'] ?>" <?= $tercentang ? 'checked' : '' ?>>
+                                        <span class="wg-nama">
+                                            <?= h($c['nama_cabang']) ?>
                                             <?php if ($milik_grup_lain): ?>
-                                                <span class="d-block text-muted" style="font-size:.68rem">saat ini: <?= h($c['nama_grup']) ?></span>
+                                                <span class="wg-sub">saat ini: <?= h($c['nama_grup']) ?></span>
                                             <?php endif; ?>
                                         </span>
                                     </label>
