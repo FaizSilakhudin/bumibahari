@@ -193,9 +193,7 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($list_grup as $i => $g):
-                    $anggota = wa_grup_cabang($conn, (int)$g['id']);
-                ?>
+                <?php foreach ($list_grup as $i => $g): ?>
                     <tr>
                         <td class="text-muted"><?= $i + 1 ?></td>
                         <td class="fw-semibold"><?= h($g['nama_grup']) ?>
@@ -229,80 +227,87 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
                             </form>
                         </td>
                     </tr>
-
-                    <!-- Modal Edit -->
-                    <div class="modal fade" id="modalEdit<?= (int)$g['id'] ?>" tabindex="-1" aria-hidden="true">
-                      <div class="modal-dialog modal-dialog-centered">
-                        <form class="modal-content" method="POST">
-                          <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
-                          <input type="hidden" name="id" value="<?= (int)$g['id'] ?>">
-                          <div class="modal-header">
-                            <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Edit Grup WA</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                          </div>
-                          <div class="modal-body">
-                            <div class="mb-3"><label class="form-label small fw-semibold">Nama Grup</label>
-                                <input type="text" name="nama_grup" class="form-control" value="<?= h($g['nama_grup']) ?>" required></div>
-                            <div class="mb-3"><label class="form-label small fw-semibold">Link Invite WA (opsional)</label>
-                                <input type="url" name="link_invite" class="form-control" placeholder="https://chat.whatsapp.com/XXXX" value="<?= h($g['link_invite'] ?? '') ?>"></div>
-                            <div class="mb-0"><label class="form-label small fw-semibold">Keterangan (opsional)</label>
-                                <input type="text" name="keterangan" class="form-control" value="<?= h($g['keterangan'] ?? '') ?>"></div>
-                          </div>
-                          <div class="modal-footer">
-                            <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Batal</button>
-                            <button type="submit" name="edit" class="btn btn-primary">Simpan</button>
-                          </div>
-                        </form>
-                      </div>
-                    </div>
-
-                    <!-- Modal Kelola Anggota -->
-                    <div class="modal fade" id="modalAnggota<?= (int)$g['id'] ?>" tabindex="-1" aria-hidden="true">
-                      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-                        <form class="modal-content" method="POST">
-                          <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
-                          <input type="hidden" name="id" value="<?= (int)$g['id'] ?>">
-                          <div class="modal-header">
-                            <h5 class="modal-title fw-bold"><i class="bi bi-shop me-2"></i>Kelola Anggota — <?= h($g['nama_grup']) ?></h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                          </div>
-                          <div class="modal-body">
-                            <div class="alert alert-info small"><i class="bi bi-info-circle me-1"></i>
-                                Centang cabang yang masuk ke grup ini. Cabang dengan tanda <span class="wg-badge-empty">kuning</span> saat ini di grup lain — kalau dipindah ke sini, otomatis lepas dari grup lama.
-                            </div>
-                            <input type="text" id="search-anggota-<?= (int)$g['id'] ?>" class="form-control mb-3" placeholder="Cari nama cabang..." oninput="filterAnggota(this, <?= (int)$g['id'] ?>)">
-                            <div class="wg-anggota-grid" id="daftar-anggota-<?= (int)$g['id'] ?>">
-                                <?php foreach ($all_cabang as $c):
-                                    $tercentang = ((int)$c['id_wa_grup']) === (int)$g['id'];
-                                    $milik_grup_lain = ($c['id_wa_grup'] && !$tercentang);
-                                ?>
-                                <div class="cabang-item" data-nama="<?= h(strtolower($c['nama_cabang'])) ?>">
-                                    <label class="wg-form-check <?= $milik_grup_lain ? 'taken' : '' ?>">
-                                        <input class="form-check-input" type="checkbox" name="anggota[]" value="<?= (int)$c['id_cabang'] ?>" <?= $tercentang ? 'checked' : '' ?>>
-                                        <span class="wg-nama">
-                                            <?= h($c['nama_cabang']) ?>
-                                            <?php if ($milik_grup_lain): ?>
-                                                <span class="wg-sub">saat ini: <?= h($c['nama_grup']) ?></span>
-                                            <?php endif; ?>
-                                        </span>
-                                    </label>
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                          </div>
-                          <div class="modal-footer">
-                            <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Batal</button>
-                            <button type="submit" name="set_anggota" class="btn btn-primary"><i class="bi bi-save me-1"></i>Simpan Anggota</button>
-                          </div>
-                        </form>
-                      </div>
-                    </div>
                 <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
         <?php endif; ?>
     </div>
+
+    <!-- =========================================================
+         Semua modal (Edit + Kelola Anggota) di LUAR table.
+         Dulu di dalam <tbody> → browser auto-move keluar, bikin
+         layout kacau.
+         ========================================================= -->
+    <?php if ($list_grup): foreach ($list_grup as $g): ?>
+        <!-- Modal Edit -->
+        <div class="modal fade" id="modalEdit<?= (int)$g['id'] ?>" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="POST">
+              <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+              <input type="hidden" name="id" value="<?= (int)$g['id'] ?>">
+              <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Edit Grup WA</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3"><label class="form-label small fw-semibold">Nama Grup</label>
+                    <input type="text" name="nama_grup" class="form-control" value="<?= h($g['nama_grup']) ?>" required></div>
+                <div class="mb-3"><label class="form-label small fw-semibold">Link Invite WA (opsional)</label>
+                    <input type="url" name="link_invite" class="form-control" placeholder="https://chat.whatsapp.com/XXXX" value="<?= h($g['link_invite'] ?? '') ?>"></div>
+                <div class="mb-0"><label class="form-label small fw-semibold">Keterangan (opsional)</label>
+                    <input type="text" name="keterangan" class="form-control" value="<?= h($g['keterangan'] ?? '') ?>"></div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" name="edit" class="btn btn-primary">Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Kelola Anggota -->
+        <div class="modal fade" id="modalAnggota<?= (int)$g['id'] ?>" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <form class="modal-content" method="POST">
+              <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
+              <input type="hidden" name="id" value="<?= (int)$g['id'] ?>">
+              <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shop me-2"></i>Kelola Anggota — <?= h($g['nama_grup']) ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="alert alert-info small"><i class="bi bi-info-circle me-1"></i>
+                    Centang cabang yang masuk ke grup ini. Cabang dengan tanda <span class="wg-badge-empty">kuning</span> saat ini di grup lain — kalau dipindah ke sini, otomatis lepas dari grup lama.
+                </div>
+                <input type="text" id="search-anggota-<?= (int)$g['id'] ?>" class="form-control mb-3" placeholder="Cari nama cabang..." oninput="filterAnggota(this, <?= (int)$g['id'] ?>)">
+                <div class="wg-anggota-grid" id="daftar-anggota-<?= (int)$g['id'] ?>">
+                    <?php foreach ($all_cabang as $c):
+                        $tercentang = ((int)$c['id_wa_grup']) === (int)$g['id'];
+                        $milik_grup_lain = ($c['id_wa_grup'] && !$tercentang);
+                    ?>
+                    <div class="cabang-item" data-nama="<?= h(strtolower($c['nama_cabang'])) ?>">
+                        <label class="wg-form-check <?= $milik_grup_lain ? 'taken' : '' ?>">
+                            <input class="form-check-input" type="checkbox" name="anggota[]" value="<?= (int)$c['id_cabang'] ?>" <?= $tercentang ? 'checked' : '' ?>>
+                            <span class="wg-nama">
+                                <?= h($c['nama_cabang']) ?>
+                                <?php if ($milik_grup_lain): ?>
+                                    <span class="wg-sub">saat ini: <?= h($c['nama_grup']) ?></span>
+                                <?php endif; ?>
+                            </span>
+                        </label>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" name="set_anggota" class="btn btn-primary"><i class="bi bi-save me-1"></i>Simpan Anggota</button>
+              </div>
+            </form>
+          </div>
+        </div>
+    <?php endforeach; endif; ?>
 
     <!-- Modal Tambah -->
     <div class="modal fade" id="modalTambah" tabindex="-1" aria-hidden="true">
