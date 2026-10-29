@@ -281,6 +281,7 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
     <?php endif; ?>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function statusShareKey(gid, tipe) {
     return 'sg_share_' + gid + '_' + tipe + '_' + '<?= h($tgl_harian) ?>_<?= h($minggu_ini) ?>_<?= h($bulan_rekap) ?>';
