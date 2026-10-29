@@ -1437,28 +1437,53 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
 <script>
 // Auto-trigger share PDF kalau halaman dibuka dari menu Share WA Group
 // (URL mengandung ?auto_share=harian|bulanan|rekap).
+//
+// Mobile (navigator share support files): panggil fungsi 'share' existing →
+//   share picker OS muncul → user pilih grup WA → kirim.
+// Desktop: panggil fungsi 'save' (download PDF saja) → buka LINK INVITE grup
+//   WA (bukan wa.me kosong) → user masuk ke grup → drag PDF ke chat → kirim.
 (function autoShareHook(){
     const p = new URLSearchParams(window.location.search);
     const mode = p.get('auto_share');
     if (!mode) return;
     const grupNama = p.get('wa_nama') || '';
+    const waLink   = p.get('wa_link') || '';
+    const esc = s => s.replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 
-    // Banner info di atas halaman supaya user tahu tab ini untuk share grup.
+    // Deteksi device yang bisa share file (mobile Android/iOS).
+    const canShareFiles = (() => {
+        if (!navigator.canShare) return false;
+        try {
+            const t = new File([new Blob(['x'])], 't.txt', { type: 'text/plain' });
+            return navigator.canShare({ files: [t] });
+        } catch (e) { return false; }
+    })();
+
+    // Banner info di atas halaman.
     if (grupNama) {
         const bar = document.createElement('div');
-        bar.className = 'alert alert-success m-3 shadow-sm d-flex align-items-center gap-2';
-        bar.innerHTML = '<i class="bi bi-whatsapp fs-5"></i><div>Mode share otomatis — tujuan: <strong>' + grupNama.replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])) + '</strong>. PDF akan dibuat & picker share muncul dalam ~2 detik.</div>';
+        bar.className = 'alert alert-success m-3 shadow-sm';
+        bar.innerHTML = '<div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-whatsapp fs-5"></i><strong>Mode Share WA Group</strong> — tujuan: <strong>' + esc(grupNama) + '</strong></div>' +
+            '<div class="small mb-0">' + (canShareFiles
+                ? 'Picker share HP akan muncul ~2 detik lagi. Pilih grup <strong>' + esc(grupNama) + '</strong> → kirim.'
+                : 'PDF akan ter-download otomatis + tab grup WA akan terbuka. Drag file PDF yang baru ter-download ke chat grup → kirim.') + '</div>';
         document.body.insertBefore(bar, document.body.firstChild);
     }
 
     setTimeout(function(){
         try {
             if (mode === 'harian' && typeof exportPdfHarian === 'function') {
-                exportPdfHarian('share');
+                exportPdfHarian(canShareFiles ? 'share' : 'save');
             } else if ((mode === 'bulanan' || mode === 'rekap') && typeof exportPDF === 'function') {
-                exportPDF('share');
+                exportPDF(canShareFiles ? 'share' : 'save');
             } else {
                 alert('Belum ada data laporan untuk periode ini — PDF tidak bisa dibuat.');
+                return;
+            }
+            // Desktop: setelah download tersiapkan, buka link grup WA langsung
+            // (bukan wa.me kosong). User tinggal drag PDF ke chat.
+            if (!canShareFiles && waLink) {
+                setTimeout(() => window.open(waLink, '_blank', 'noopener'), 1200);
             }
         } catch(e) {
             console.error('auto_share error', e);

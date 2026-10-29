@@ -526,19 +526,43 @@ function bagikanWA(btn) {
 }
 
 // Auto-trigger share PDF kalau halaman dibuka dari menu Share WA Group.
+// Mobile: share picker; Desktop: download PDF (cetakPDF) + buka link invite grup.
 (function autoShareHookMingguan(){
     const p = new URLSearchParams(window.location.search);
     if (p.get('auto_share') !== '1') return;
     const grupNama = p.get('wa_nama') || '';
+    const waLink   = p.get('wa_link') || '';
+    const esc = s => s.replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+    const canShareFiles = (() => {
+        if (!navigator.canShare) return false;
+        try {
+            const t = new File([new Blob(['x'])], 't.txt', { type: 'text/plain' });
+            return navigator.canShare({ files: [t] });
+        } catch (e) { return false; }
+    })();
+
     if (grupNama) {
         const bar = document.createElement('div');
-        bar.className = 'alert alert-success m-3 shadow-sm d-flex align-items-center gap-2';
-        bar.innerHTML = '<i class="bi bi-whatsapp fs-5"></i><div>Mode share otomatis — tujuan: <strong>' + grupNama.replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])) + '</strong>. Picker share muncul dalam ~2 detik.</div>';
+        bar.className = 'alert alert-success m-3 shadow-sm';
+        bar.innerHTML = '<div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-whatsapp fs-5"></i><strong>Mode Share WA Group</strong> — tujuan: <strong>' + esc(grupNama) + '</strong></div>' +
+            '<div class="small mb-0">' + (canShareFiles
+                ? 'Picker share HP akan muncul ~2 detik lagi.'
+                : 'PDF akan ter-download otomatis + tab grup WA akan terbuka. Drag PDF ke chat → kirim.') + '</div>';
         document.body.insertBefore(bar, document.body.firstChild);
     }
+
     setTimeout(function(){
-        try { if (typeof bagikanWA === 'function') bagikanWA(null); }
-        catch(e) { console.error('auto_share mingguan error', e); }
+        try {
+            if (canShareFiles && typeof bagikanWA === 'function') {
+                bagikanWA(null);
+            } else if (typeof cetakPDF === 'function') {
+                cetakPDF(null);
+            }
+            if (!canShareFiles && waLink) {
+                setTimeout(() => window.open(waLink, '_blank', 'noopener'), 1200);
+            }
+        } catch(e) { console.error('auto_share mingguan error', e); }
     }, 1500);
 })();
 </script>

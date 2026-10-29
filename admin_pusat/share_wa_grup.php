@@ -188,11 +188,12 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
 
         <?php
         // Siapkan 4 modal share (harian/mingguan/bulanan/rekap) untuk grup ini
+        $wa_link = $g['link_invite'] ?? '';
         $share_tipe = [
             'Harian' => [
                 'label'        => 'Harian',
                 'periode_text' => date('d M Y', strtotime($tgl_harian)),
-                'url_builder'  => function($id_cabang) use ($tgl_harian, $gid, $g) {
+                'url_builder'  => function($id_cabang) use ($tgl_harian, $gid, $g, $wa_link) {
                     return 'rekapitulasi.php?' . http_build_query([
                         'periode'   => 'bulanan',
                         'bulan'     => substr($tgl_harian, 0, 7),
@@ -201,26 +202,28 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                         'auto_tgl'  => $tgl_harian,
                         'wa_grup'   => $gid,
                         'wa_nama'   => $g['nama_grup'],
+                        'wa_link'   => $wa_link,
                     ]);
                 },
             ],
             'Mingguan' => [
                 'label'        => 'Mingguan',
                 'periode_text' => $minggu_ini,
-                'url_builder'  => function($id_cabang) use ($minggu_ini, $gid, $g) {
+                'url_builder'  => function($id_cabang) use ($minggu_ini, $gid, $g, $wa_link) {
                     return 'laporan_mingguan.php?' . http_build_query([
                         'id_cabang' => $id_cabang,
                         'minggu'    => $minggu_ini,
                         'auto_share'=> '1',
                         'wa_grup'   => $gid,
                         'wa_nama'   => $g['nama_grup'],
+                        'wa_link'   => $wa_link,
                     ]);
                 },
             ],
             'Bulanan' => [
                 'label'        => 'Bulanan',
                 'periode_text' => date('F Y', strtotime($bulan_rekap . '-01')),
-                'url_builder'  => function($id_cabang) use ($bulan_rekap, $gid, $g) {
+                'url_builder'  => function($id_cabang) use ($bulan_rekap, $gid, $g, $wa_link) {
                     return 'rekapitulasi.php?' . http_build_query([
                         'periode'   => 'bulanan',
                         'bulan'     => $bulan_rekap,
@@ -228,13 +231,14 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                         'auto_share'=> 'bulanan',
                         'wa_grup'   => $gid,
                         'wa_nama'   => $g['nama_grup'],
+                        'wa_link'   => $wa_link,
                     ]);
                 },
             ],
             'Rekap' => [
                 'label'        => 'Rekapitulasi',
                 'periode_text' => date('F Y', strtotime($bulan_rekap . '-01')),
-                'url_builder'  => function($id_cabang) use ($bulan_rekap, $gid, $g) {
+                'url_builder'  => function($id_cabang) use ($bulan_rekap, $gid, $g, $wa_link) {
                     return 'rekapitulasi.php?' . http_build_query([
                         'periode'   => 'bulanan',
                         'bulan'     => $bulan_rekap,
@@ -242,6 +246,7 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                         'auto_share'=> 'rekap',
                         'wa_grup'   => $gid,
                         'wa_nama'   => $g['nama_grup'],
+                        'wa_link'   => $wa_link,
                     ]);
                 },
             ],
