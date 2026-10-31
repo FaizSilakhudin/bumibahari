@@ -189,71 +189,91 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
         <?php
         // Siapkan 4 modal share (harian/mingguan/bulanan/rekap) untuk grup ini
         $wa_link = $g['link_invite'] ?? '';
+        // Setiap tipe menyediakan 2 URL builder:
+        //  - url_builder   : untuk tombol "Share WA" per cabang (buka tab + auto_share)
+        //  - prepare_url   : untuk IFRAME batch (prepare_pdf_blob=1, kirim blob ke parent)
         $share_tipe = [
             'Harian' => [
                 'label'        => 'Harian',
+                'tipe_kode'    => 'harian',
+                'target_page'  => 'rekapitulasi.php',
                 'periode_text' => date('d M Y', strtotime($tgl_harian)),
                 'url_builder'  => function($id_cabang) use ($tgl_harian, $gid, $g, $wa_link) {
                     return 'rekapitulasi.php?' . http_build_query([
-                        'periode'   => 'bulanan',
-                        'bulan'     => substr($tgl_harian, 0, 7),
+                        'periode' => 'bulanan', 'bulan' => substr($tgl_harian, 0, 7),
+                        'id_cabang' => $id_cabang, 'auto_share' => 'harian', 'auto_tgl' => $tgl_harian,
+                        'wa_grup' => $gid, 'wa_nama' => $g['nama_grup'], 'wa_link' => $wa_link,
+                    ]);
+                },
+                'prepare_url'  => function($id_cabang, $req_id) use ($tgl_harian) {
+                    return 'rekapitulasi.php?' . http_build_query([
+                        'periode' => 'bulanan', 'bulan' => substr($tgl_harian, 0, 7),
                         'id_cabang' => $id_cabang,
-                        'auto_share'=> 'harian',
-                        'auto_tgl'  => $tgl_harian,
-                        'wa_grup'   => $gid,
-                        'wa_nama'   => $g['nama_grup'],
-                        'wa_link'   => $wa_link,
+                        'prepare_pdf_blob' => '1', 'tipe' => 'harian', 'request_id' => $req_id,
                     ]);
                 },
             ],
             'Mingguan' => [
                 'label'        => 'Mingguan',
+                'tipe_kode'    => 'mingguan',
+                'target_page'  => 'laporan_mingguan.php',
                 'periode_text' => $minggu_ini,
                 'url_builder'  => function($id_cabang) use ($minggu_ini, $gid, $g, $wa_link) {
                     return 'laporan_mingguan.php?' . http_build_query([
-                        'id_cabang' => $id_cabang,
-                        'minggu'    => $minggu_ini,
-                        'auto_share'=> '1',
-                        'wa_grup'   => $gid,
-                        'wa_nama'   => $g['nama_grup'],
-                        'wa_link'   => $wa_link,
+                        'id_cabang' => $id_cabang, 'minggu' => $minggu_ini, 'auto_share' => '1',
+                        'wa_grup' => $gid, 'wa_nama' => $g['nama_grup'], 'wa_link' => $wa_link,
+                    ]);
+                },
+                'prepare_url'  => function($id_cabang, $req_id) use ($minggu_ini) {
+                    return 'laporan_mingguan.php?' . http_build_query([
+                        'id_cabang' => $id_cabang, 'minggu' => $minggu_ini,
+                        'prepare_pdf_blob' => '1', 'request_id' => $req_id,
                     ]);
                 },
             ],
             'Bulanan' => [
                 'label'        => 'Bulanan',
+                'tipe_kode'    => 'bulanan',
+                'target_page'  => 'rekapitulasi.php',
                 'periode_text' => date('F Y', strtotime($bulan_rekap . '-01')),
                 'url_builder'  => function($id_cabang) use ($bulan_rekap, $gid, $g, $wa_link) {
                     return 'rekapitulasi.php?' . http_build_query([
-                        'periode'   => 'bulanan',
-                        'bulan'     => $bulan_rekap,
-                        'id_cabang' => $id_cabang,
-                        'auto_share'=> 'bulanan',
-                        'wa_grup'   => $gid,
-                        'wa_nama'   => $g['nama_grup'],
-                        'wa_link'   => $wa_link,
+                        'periode' => 'bulanan', 'bulan' => $bulan_rekap, 'id_cabang' => $id_cabang,
+                        'auto_share' => 'bulanan', 'wa_grup' => $gid, 'wa_nama' => $g['nama_grup'], 'wa_link' => $wa_link,
+                    ]);
+                },
+                'prepare_url'  => function($id_cabang, $req_id) use ($bulan_rekap) {
+                    return 'rekapitulasi.php?' . http_build_query([
+                        'periode' => 'bulanan', 'bulan' => $bulan_rekap, 'id_cabang' => $id_cabang,
+                        'prepare_pdf_blob' => '1', 'tipe' => 'bulanan', 'request_id' => $req_id,
                     ]);
                 },
             ],
             'Rekap' => [
                 'label'        => 'Rekapitulasi',
+                'tipe_kode'    => 'rekap',
+                'target_page'  => 'rekapitulasi.php',
                 'periode_text' => date('F Y', strtotime($bulan_rekap . '-01')),
                 'url_builder'  => function($id_cabang) use ($bulan_rekap, $gid, $g, $wa_link) {
                     return 'rekapitulasi.php?' . http_build_query([
-                        'periode'   => 'bulanan',
-                        'bulan'     => $bulan_rekap,
-                        'id_cabang' => $id_cabang,
-                        'auto_share'=> 'rekap',
-                        'wa_grup'   => $gid,
-                        'wa_nama'   => $g['nama_grup'],
-                        'wa_link'   => $wa_link,
+                        'periode' => 'bulanan', 'bulan' => $bulan_rekap, 'id_cabang' => $id_cabang,
+                        'auto_share' => 'rekap', 'wa_grup' => $gid, 'wa_nama' => $g['nama_grup'], 'wa_link' => $wa_link,
+                    ]);
+                },
+                'prepare_url'  => function($id_cabang, $req_id) use ($bulan_rekap) {
+                    return 'rekapitulasi.php?' . http_build_query([
+                        'periode' => 'bulanan', 'bulan' => $bulan_rekap, 'id_cabang' => $id_cabang,
+                        'prepare_pdf_blob' => '1', 'tipe' => 'rekap', 'request_id' => $req_id,
                     ]);
                 },
             ],
         ];
         foreach ($share_tipe as $tipe_key => $tipe):
         ?>
-        <div class="modal fade" id="modalShare<?= $gid ?><?= $tipe_key ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal fade sg-modal-share" id="modalShare<?= $gid ?><?= $tipe_key ?>" tabindex="-1" aria-hidden="true"
+             data-grup-id="<?= $gid ?>" data-grup-nama="<?= h($g['nama_grup']) ?>"
+             data-tipe-kode="<?= h($tipe['tipe_kode']) ?>" data-tipe-label="<?= h($tipe['label']) ?>"
+             data-periode-text="<?= h($tipe['periode_text']) ?>" data-wa-link="<?= h($wa_link) ?>">
           <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content">
               <div class="modal-header bg-light">
@@ -273,15 +293,40 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                 </div>
                 <?php endif; ?>
 
+                <!-- ======== TOMBOL BATCH: Share Semua Cabang (1 Tap) — HP only ======== -->
+                <div class="sg-batch-section mb-3 p-3 rounded-3" style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1px solid #bbf7d0">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-phone-fill text-success fs-5"></i>
+                        <strong class="small">Share Semua Sekaligus (HP)</strong>
+                    </div>
+                    <div class="small text-muted mb-2">
+                        Satu tap → siapkan <?= $jml ?> PDF cabang → pilih grup WA → kirim semua bareng.
+                        <span class="d-block text-danger sg-batch-only-mobile" style="display:none!important">Fitur ini hanya di HP. Di laptop pakai tombol per-cabang di bawah.</span>
+                    </div>
+                    <button type="button" class="btn btn-success w-100 fw-bold py-2 sg-batch-btn"
+                        data-grup-id="<?= $gid ?>" data-tipe-key="<?= $tipe_key ?>">
+                        <i class="bi bi-send-fill me-1"></i> Share Semua <?= $jml ?> Cabang (1 Tap)
+                    </button>
+
+                    <!-- Progress area (hidden awal) -->
+                    <div class="sg-batch-progress mt-3" style="display:none">
+                        <div class="progress mb-2" style="height:20px"><div class="progress-bar bg-success sg-progress-bar" style="width:0%">0 / <?= $jml ?></div></div>
+                        <div class="small text-muted sg-progress-detail">Menyiapkan PDF cabang 1 dari <?= $jml ?>...</div>
+                    </div>
+                </div>
+
                 <div class="alert alert-light border small mb-3">
                     <i class="bi bi-lightbulb-fill text-warning me-1"></i>
-                    Klik tombol "Share WA" per cabang di bawah. Tab baru akan terbuka — di HP akan muncul share picker (pilih grup <?= h($g['nama_grup']) ?>); di laptop PDF akan ter-download otomatis + WA Web terbuka, tinggal attach PDF-nya.
+                    <strong>Atau share per cabang:</strong> klik tombol di bawah. HP → share picker; laptop → download PDF + buka grup WA.
                 </div>
 
                 <?php foreach ($anggota as $i => $c):
                     $url = $tipe['url_builder']((int)$c['id_cabang']);
                 ?>
-                <div class="sg-cabang-item d-flex align-items-center gap-3" data-cabang-id="<?= (int)$c['id_cabang'] ?>">
+                <div class="sg-cabang-item d-flex align-items-center gap-3"
+                     data-cabang-id="<?= (int)$c['id_cabang'] ?>"
+                     data-cabang-nama="<?= h($c['nama_cabang']) ?>"
+                     data-prepare-url-template="<?= h($tipe['prepare_url']((int)$c['id_cabang'], 'REQID')) ?>">
                     <div class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:.8rem;font-weight:600"><?= $i + 1 ?></div>
                     <div class="flex-grow-1">
                         <div class="fw-semibold small"><?= h($c['nama_cabang']) ?></div>
@@ -317,6 +362,189 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// =============================================================
+// BATCH SHARE: 1 tap kirim semua PDF cabang ke 1 grup WA (HP only).
+//
+// Cara kerja:
+//   1. User tap tombol "Share Semua N Cabang"
+//   2. Buat N <iframe> hidden, masing-masing load halaman PDF cabang
+//      dgn param ?prepare_pdf_blob=1 (modenya ada di rekapitulasi.php
+//      & laporan_mingguan.php — generate PDF, kirim blob via postMessage).
+//   3. Kumpulkan N blob -> navigator.share({files: [...], text: redaksi})
+//   4. OS share picker muncul -> user pilih grup WA -> SEMUA PDF kirim.
+//
+// Fallback: kalau browser tidak support share files (desktop), tombol
+// disable + instruksi pakai mode per-cabang di bawah.
+// =============================================================
+
+// Deteksi apakah device bisa share file (mobile Android/iOS).
+const SG_CAN_SHARE_FILES = (() => {
+    if (!navigator.canShare) return false;
+    try {
+        const t = new File([new Blob(['x'])], 't.txt', { type: 'text/plain' });
+        return navigator.canShare({ files: [t] });
+    } catch (e) { return false; }
+})();
+
+// Disable tombol batch di desktop; tampilkan peringatan.
+document.querySelectorAll('.sg-modal-share').forEach(function(modal) {
+    const btn = modal.querySelector('.sg-batch-btn');
+    const warn = modal.querySelector('.sg-batch-only-mobile');
+    if (!SG_CAN_SHARE_FILES) {
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-secondary');
+            btn.innerHTML = '<i class="bi bi-x-circle me-1"></i> Fitur Batch Hanya di HP';
+        }
+        if (warn) warn.style.setProperty('display', 'inline', 'important');
+    }
+});
+
+// Helper: build URL dari template dgn placeholder REQID
+function sgBuildPrepareUrl(template, reqId) {
+    return template.replace(/REQID/g, encodeURIComponent(reqId));
+}
+
+// Helper: build teks redaksi WA
+function sgBuildRedaksi(grupNama, tipeLabel, periodeText, cabangList) {
+    let txt = 'Laporan ' + tipeLabel + ' — ' + grupNama + '\n';
+    txt += 'Periode: ' + periodeText + '\n';
+    txt += cabangList.length + ' cabang:\n';
+    cabangList.forEach(function(c, i) { txt += (i+1) + '. ' + c.nama + '\n'; });
+    return txt;
+}
+
+// Core: orkestrasi batch share
+async function sgBatchShare(modal) {
+    const grupId    = modal.dataset.grupId;
+    const grupNama  = modal.dataset.grupNama;
+    const tipeKode  = modal.dataset.tipeKode;
+    const tipeLabel = modal.dataset.tipeLabel;
+    const periode   = modal.dataset.periodeText;
+    const waLink    = modal.dataset.waLink;
+
+    const items = Array.from(modal.querySelectorAll('.sg-cabang-item'));
+    if (items.length === 0) { alert('Tidak ada cabang di grup ini.'); return; }
+
+    const progressBox   = modal.querySelector('.sg-batch-progress');
+    const progressBar   = modal.querySelector('.sg-progress-bar');
+    const progressDetail= modal.querySelector('.sg-progress-detail');
+    const batchBtn      = modal.querySelector('.sg-batch-btn');
+
+    const total = items.length;
+    progressBox.style.display = 'block';
+    batchBtn.disabled = true;
+    batchBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Menyiapkan ' + total + ' PDF...';
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0 / ' + total;
+
+    const files = [];
+    const errors = [];
+    const cabangList = items.map(it => ({ id: it.dataset.cabangId, nama: it.dataset.cabangNama }));
+
+    // Container iframe hidden
+    const iframeContainer = document.createElement('div');
+    iframeContainer.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1200px;height:800px;overflow:hidden;';
+    document.body.appendChild(iframeContainer);
+
+    // Promise per cabang: load iframe, tunggu postMessage, resolve blob
+    async function processCabang(item, idx) {
+        return new Promise((resolve) => {
+            const reqId = 'sg_' + grupId + '_' + tipeKode + '_' + idx + '_' + Date.now();
+            const url = sgBuildPrepareUrl(item.dataset.prepareUrlTemplate, reqId);
+
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'width:1200px;height:800px;border:0;';
+            iframe.src = url;
+
+            let settled = false;
+            function finish(result) {
+                if (settled) return;
+                settled = true;
+                window.removeEventListener('message', msgHandler);
+                clearTimeout(timeoutId);
+                try { iframe.remove(); } catch(e){}
+                resolve(result);
+            }
+
+            function msgHandler(ev) {
+                const d = ev.data || {};
+                if (d.request_id !== reqId) return;
+                if (d.type === 'pdf-ready' && d.buffer) {
+                    const file = new File([d.buffer], d.filename || 'laporan.pdf', { type: 'application/pdf' });
+                    finish({ ok: true, file: file, nama: item.dataset.cabangNama });
+                } else if (d.type === 'pdf-error') {
+                    finish({ ok: false, nama: item.dataset.cabangNama, reason: d.reason || 'unknown' });
+                }
+            }
+            window.addEventListener('message', msgHandler);
+            // Timeout per iframe 20 detik
+            const timeoutId = setTimeout(() => finish({ ok: false, nama: item.dataset.cabangNama, reason: 'timeout' }), 20000);
+            iframeContainer.appendChild(iframe);
+        });
+    }
+
+    // Proses iframe SEKUENSIAL supaya tidak overload HP
+    for (let i = 0; i < items.length; i++) {
+        progressDetail.textContent = 'Menyiapkan PDF ' + (i+1) + ' dari ' + total + ': ' + items[i].dataset.cabangNama + '...';
+        const result = await processCabang(items[i], i);
+        if (result.ok) {
+            files.push(result.file);
+        } else {
+            errors.push(result.nama + ' (' + result.reason + ')');
+        }
+        const pct = Math.round(((i+1) / total) * 100);
+        progressBar.style.width = pct + '%';
+        progressBar.textContent = (i+1) + ' / ' + total;
+    }
+
+    // Cleanup iframe container
+    try { iframeContainer.remove(); } catch(e){}
+
+    if (files.length === 0) {
+        batchBtn.disabled = false;
+        batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Share Semua ' + total + ' Cabang (1 Tap)';
+        progressDetail.innerHTML = '<span class="text-danger">Semua PDF gagal dibuat. Mungkin belum ada data untuk periode ini.</span>';
+        return;
+    }
+
+    progressDetail.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> ' + files.length + ' PDF siap. Membuka share picker...';
+
+    // Panggil navigator.share dengan SEMUA file sekaligus
+    const redaksi = sgBuildRedaksi(grupNama, tipeLabel, periode, cabangList);
+    try {
+        await navigator.share({
+            files: files,
+            text: redaksi,
+            title: 'Laporan ' + tipeLabel + ' ' + grupNama
+        });
+        progressDetail.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Terkirim ke ' + grupNama + ' — ' + files.length + ' PDF.';
+        batchBtn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Selesai dikirim';
+    } catch(e) {
+        if (e.name === 'AbortError') {
+            progressDetail.textContent = 'Share dibatalkan.';
+            batchBtn.disabled = false;
+            batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Share Semua ' + total + ' Cabang (1 Tap)';
+        } else {
+            progressDetail.innerHTML = '<span class="text-danger">Gagal share: ' + e.message + '</span>';
+            batchBtn.disabled = false;
+            batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Coba Lagi';
+        }
+    }
+
+    if (errors.length > 0) {
+        progressDetail.innerHTML += '<br><small class="text-warning">Cabang tanpa data (dilewati): ' + errors.join(', ') + '</small>';
+    }
+}
+
+document.querySelectorAll('.sg-batch-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const modal = btn.closest('.sg-modal-share');
+        if (modal) sgBatchShare(modal);
+    });
+});
+
 // Tandai "sudah dikirim" setelah user klik "Share WA" — status disimpan di
 // localStorage per browser (per periode), supaya PIC/pusat tahu cabang mana
 // yang sudah dishare dalam sesi ini.

@@ -1449,9 +1449,51 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         <?php endif; ?>
 
 <script>
+// Mode BATCH IFRAME untuk fitur "Share Semua Cabang" di Share WA Group.
+// Lihat admin_pusat/rekapitulasi.php untuk penjelasan lengkap.
+(function preparePdfBlobHook(){
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('prepare_pdf_blob') !== '1') return;
+    const tipe = p.get('tipe') || 'bulanan';
+    const requestId = p.get('request_id') || '';
+
+    function postToParent(payload) {
+        try { window.parent.postMessage(payload, '*'); } catch(e) { console.error(e); }
+    }
+
+    setTimeout(function(){
+        if (typeof sharePdfToWA !== 'function') {
+            postToParent({ type: 'pdf-error', request_id: requestId, reason: 'belum ada data' });
+            return;
+        }
+        window.sharePdfToWA = async function(doc, filename) {
+            try {
+                const blob = doc.output('blob');
+                const buf  = await blob.arrayBuffer();
+                postToParent({ type: 'pdf-ready', request_id: requestId, filename: filename, buffer: buf });
+            } catch(e) {
+                postToParent({ type: 'pdf-error', request_id: requestId, reason: e.message });
+            }
+        };
+        try {
+            if (tipe === 'harian' && typeof exportPdfHarian === 'function') {
+                exportPdfHarian('share');
+            } else if ((tipe === 'bulanan' || tipe === 'rekap') && typeof exportPDF === 'function') {
+                exportPDF('share');
+            } else {
+                postToParent({ type: 'pdf-error', request_id: requestId, reason: 'fungsi PDF tidak ada' });
+            }
+        } catch(e) {
+            postToParent({ type: 'pdf-error', request_id: requestId, reason: e.message });
+        }
+    }, 1800);
+})();
+
 // Auto-trigger share PDF kalau halaman dibuka dari menu Share WA Group.
 // Mobile: share picker; Desktop: download PDF + buka link invite grup.
 (function autoShareHook(){
+    const _p0 = new URLSearchParams(window.location.search);
+    if (_p0.get('prepare_pdf_blob') === '1') return;
     const p = new URLSearchParams(window.location.search);
     const mode = p.get('auto_share');
     if (!mode) return;

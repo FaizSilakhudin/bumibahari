@@ -525,9 +525,47 @@ function bagikanWA(btn) {
     });
 }
 
+// Mode BATCH IFRAME untuk fitur "Share Semua Cabang" di Share WA Group.
+// Halaman ini dimuat di iframe hidden; generate blob dari html2pdf lalu
+// kirim ke parent via postMessage. Hanya aktif kalau prepare_pdf_blob=1.
+(function preparePdfBlobHookMingguan(){
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('prepare_pdf_blob') !== '1') return;
+    const requestId = p.get('request_id') || '';
+    function postToParent(payload) {
+        try { window.parent.postMessage(payload, '*'); } catch(e) { console.error(e); }
+    }
+    setTimeout(function(){
+        try {
+            const area = document.getElementById('area-laporan');
+            if (!area || typeof html2pdf !== 'function' || typeof lmPdfOpt !== 'function') {
+                postToParent({ type: 'pdf-error', request_id: requestId, reason: 'belum ada data' });
+                return;
+            }
+            area.classList.add('lm-print');
+            html2pdf().set(lmPdfOpt()).from(area).outputPdf('blob').then(async function (blob) {
+                area.classList.remove('lm-print');
+                try {
+                    const buf = await blob.arrayBuffer();
+                    postToParent({ type: 'pdf-ready', request_id: requestId, filename: LM_PDF_FILENAME, buffer: buf });
+                } catch(e) {
+                    postToParent({ type: 'pdf-error', request_id: requestId, reason: e.message });
+                }
+            }).catch(function(e) {
+                area.classList.remove('lm-print');
+                postToParent({ type: 'pdf-error', request_id: requestId, reason: e.message || 'gagal html2pdf' });
+            });
+        } catch(e) {
+            postToParent({ type: 'pdf-error', request_id: requestId, reason: e.message });
+        }
+    }, 1500);
+})();
+
 // Auto-trigger share PDF kalau halaman dibuka dari menu Share WA Group.
 // Mobile: share picker; Desktop: download PDF (cetakPDF) + buka link invite grup.
 (function autoShareHookMingguan(){
+    const _p0 = new URLSearchParams(window.location.search);
+    if (_p0.get('prepare_pdf_blob') === '1') return;
     const p = new URLSearchParams(window.location.search);
     if (p.get('auto_share') !== '1') return;
     const grupNama = p.get('wa_nama') || '';
