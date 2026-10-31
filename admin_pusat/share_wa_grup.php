@@ -416,13 +416,16 @@ function sgBuildRedaksi(grupNama, tipeLabel, periodeText, cabangList) {
 }
 
 // Core: orkestrasi batch share
-async function sgBatchShare(modal) {
+// Prepare PDF dari N cabang via iframe batch. Isi modal._sgPendingShare dgn
+// { files, redaksi, title }. TIDAK panggil navigator.share — itu harus dari
+// tap kedua user supaya "user gesture" valid (browser menolak share tanpa
+// gesture langsung).
+async function sgPreparePdfs(modal) {
     const grupId    = modal.dataset.grupId;
     const grupNama  = modal.dataset.grupNama;
     const tipeKode  = modal.dataset.tipeKode;
     const tipeLabel = modal.dataset.tipeLabel;
     const periode   = modal.dataset.periodeText;
-    const waLink    = modal.dataset.waLink;
 
     const items = Array.from(modal.querySelectorAll('.sg-cabang-item'));
     if (items.length === 0) { alert('Tidak ada cabang di grup ini.'); return; }
@@ -435,6 +438,8 @@ async function sgBatchShare(modal) {
     const total = items.length;
     progressBox.style.display = 'block';
     batchBtn.disabled = true;
+    batchBtn.classList.remove('btn-success', 'btn-warning');
+    batchBtn.classList.add('btn-secondary');
     batchBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Menyiapkan ' + total + ' PDF...';
     progressBar.style.width = '0%';
     progressBar.textContent = '0 / ' + total;
@@ -443,21 +448,17 @@ async function sgBatchShare(modal) {
     const errors = [];
     const cabangList = items.map(it => ({ id: it.dataset.cabangId, nama: it.dataset.cabangNama }));
 
-    // Container iframe hidden
     const iframeContainer = document.createElement('div');
     iframeContainer.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1200px;height:800px;overflow:hidden;';
     document.body.appendChild(iframeContainer);
 
-    // Promise per cabang: load iframe, tunggu postMessage, resolve blob
     async function processCabang(item, idx) {
         return new Promise((resolve) => {
             const reqId = 'sg_' + grupId + '_' + tipeKode + '_' + idx + '_' + Date.now();
             const url = sgBuildPrepareUrl(item.dataset.prepareUrlTemplate, reqId);
-
             const iframe = document.createElement('iframe');
             iframe.style.cssText = 'width:1200px;height:800px;border:0;';
             iframe.src = url;
-
             let settled = false;
             function finish(result) {
                 if (settled) return;
@@ -467,7 +468,6 @@ async function sgBatchShare(modal) {
                 try { iframe.remove(); } catch(e){}
                 resolve(result);
             }
-
             function msgHandler(ev) {
                 const d = ev.data || {};
                 if (d.request_id !== reqId) return;
@@ -479,69 +479,101 @@ async function sgBatchShare(modal) {
                 }
             }
             window.addEventListener('message', msgHandler);
-            // Timeout per iframe 20 detik
-            const timeoutId = setTimeout(() => finish({ ok: false, nama: item.dataset.cabangNama, reason: 'timeout' }), 20000);
+            const timeoutId = setTimeout(() => finish({ ok: false, nama: item.dataset.cabangNama, reason: 'timeout' }), 25000);
             iframeContainer.appendChild(iframe);
         });
     }
 
-    // Proses iframe SEKUENSIAL supaya tidak overload HP
     for (let i = 0; i < items.length; i++) {
         progressDetail.textContent = 'Menyiapkan PDF ' + (i+1) + ' dari ' + total + ': ' + items[i].dataset.cabangNama + '...';
         const result = await processCabang(items[i], i);
-        if (result.ok) {
-            files.push(result.file);
-        } else {
-            errors.push(result.nama + ' (' + result.reason + ')');
-        }
+        if (result.ok) files.push(result.file);
+        else errors.push(result.nama + ' (' + result.reason + ')');
         const pct = Math.round(((i+1) / total) * 100);
         progressBar.style.width = pct + '%';
         progressBar.textContent = (i+1) + ' / ' + total;
     }
 
-    // Cleanup iframe container
     try { iframeContainer.remove(); } catch(e){}
 
     if (files.length === 0) {
         batchBtn.disabled = false;
+        batchBtn.classList.remove('btn-secondary', 'btn-warning');
+        batchBtn.classList.add('btn-success');
         batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Share Semua ' + total + ' Cabang (1 Tap)';
         progressDetail.innerHTML = '<span class="text-danger">Semua PDF gagal dibuat. Mungkin belum ada data untuk periode ini.</span>';
+        modal._sgPendingShare = null;
         return;
     }
 
-    progressDetail.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> ' + files.length + ' PDF siap. Membuka share picker...';
-
-    // Panggil navigator.share dengan SEMUA file sekaligus
+    // SIMPAN pending share — tap kedua yang akan trigger navigator.share
     const redaksi = sgBuildRedaksi(grupNama, tipeLabel, periode, cabangList);
+    modal._sgPendingShare = {
+        files: files,
+        text:  redaksi,
+        title: 'Laporan ' + tipeLabel + ' ' + grupNama,
+    };
+
+    batchBtn.disabled = false;
+    batchBtn.classList.remove('btn-secondary', 'btn-success');
+    batchBtn.classList.add('btn-warning');
+    batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> TAP SEKARANG → BUKA WA PICKER (' + files.length + ' PDF)';
+    progressDetail.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> <strong>' + files.length + ' PDF siap!</strong> Tap tombol oranye di atas untuk buka share picker WA.';
+    if (errors.length > 0) {
+        progressDetail.innerHTML += '<br><small class="text-warning">Dilewati (tanpa data): ' + errors.join(', ') + '</small>';
+    }
+}
+
+// Dipanggil langsung dari click handler → user gesture valid utk navigator.share
+async function sgDoShare(modal, batchBtn, progressDetail) {
+    const pending = modal._sgPendingShare;
+    if (!pending || !pending.files || pending.files.length === 0) return;
     try {
-        await navigator.share({
-            files: files,
-            text: redaksi,
-            title: 'Laporan ' + tipeLabel + ' ' + grupNama
-        });
-        progressDetail.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Terkirim ke ' + grupNama + ' — ' + files.length + ' PDF.';
-        batchBtn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Selesai dikirim';
+        await navigator.share(pending);
+        progressDetail.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Picker share muncul — pilih grup & kirim di WA.';
+        batchBtn.classList.remove('btn-warning');
+        batchBtn.classList.add('btn-success');
+        batchBtn.disabled = true;
+        batchBtn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Share dimulai';
     } catch(e) {
         if (e.name === 'AbortError') {
-            progressDetail.textContent = 'Share dibatalkan.';
-            batchBtn.disabled = false;
-            batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Share Semua ' + total + ' Cabang (1 Tap)';
+            progressDetail.textContent = 'Share dibatalkan — tap tombol oranye lagi untuk coba lagi.';
         } else {
             progressDetail.innerHTML = '<span class="text-danger">Gagal share: ' + e.message + '</span>';
-            batchBtn.disabled = false;
-            batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Coba Lagi';
         }
-    }
-
-    if (errors.length > 0) {
-        progressDetail.innerHTML += '<br><small class="text-warning">Cabang tanpa data (dilewati): ' + errors.join(', ') + '</small>';
     }
 }
 
 document.querySelectorAll('.sg-batch-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', function(ev) {
         const modal = btn.closest('.sg-modal-share');
-        if (modal) sgBatchShare(modal);
+        if (!modal) return;
+        // Kalau sudah ada PDF siap (status "warning"), tap ini = share langsung
+        if (modal._sgPendingShare && modal._sgPendingShare.files && modal._sgPendingShare.files.length > 0) {
+            const progressDetail = modal.querySelector('.sg-progress-detail');
+            sgDoShare(modal, btn, progressDetail);
+            return;
+        }
+        // Kalau belum, mulai generate PDF
+        sgPreparePdfs(modal);
+    });
+});
+
+// Reset state saat modal ditutup supaya buka lagi fresh
+document.querySelectorAll('.sg-modal-share').forEach(function(modal) {
+    modal.addEventListener('hidden.bs.modal', function() {
+        modal._sgPendingShare = null;
+        const batchBtn = modal.querySelector('.sg-batch-btn');
+        const progressBox = modal.querySelector('.sg-batch-progress');
+        if (batchBtn && SG_CAN_SHARE_FILES) {
+            batchBtn.disabled = false;
+            batchBtn.classList.remove('btn-warning', 'btn-secondary');
+            batchBtn.classList.add('btn-success');
+            // kembalikan label asli berdasarkan jumlah cabang
+            const total = modal.querySelectorAll('.sg-cabang-item').length;
+            batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Share Semua ' + total + ' Cabang (1 Tap)';
+        }
+        if (progressBox) progressBox.style.display = 'none';
     });
 });
 
