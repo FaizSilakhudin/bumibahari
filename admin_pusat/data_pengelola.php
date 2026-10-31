@@ -33,11 +33,13 @@ if (!function_exists('csrf_check')) {
 $open_modal_auto = isset($_GET['open_modal']) && $_GET['open_modal'] == '1';
 $selected_id_cabang = isset($_GET['id_cabang']) ? (int)$_GET['id_cabang'] : 0;
 
-// 2. FILTER SEARCH + STATUS
-$search = trim($_GET['search'] ?? '');
-$filter = $_GET['filter'] ?? 'semua';
-$filter_opsi_valid = ['semua', 'aktif', 'nonaktif', 'baru'];
-if (!in_array($filter, $filter_opsi_valid, true)) $filter = 'semua';
+// 2. FILTER SEARCH + CABANG + PENGELOLA (2 dropdown independen)
+$search          = trim($_GET['search'] ?? '');
+$filter_cabang   = $_GET['filter_cabang']    ?? 'semua';
+$filter_pengelola= $_GET['filter_pengelola'] ?? 'semua';
+$valid_fc = ['semua', 'aktif', 'nonaktif'];
+if (!in_array($filter_cabang,    $valid_fc, true)) $filter_cabang    = 'semua';
+if (!in_array($filter_pengelola, $valid_fc, true)) $filter_pengelola = 'semua';
 
 $where_sql = "WHERE 1=1";
 $params = [];
@@ -50,21 +52,35 @@ if ($search !== '') {
     $types = "sss";
 }
 
-if ($filter === 'aktif') {
-    $where_sql .= " AND p.status='aktif'";
-} elseif ($filter === 'nonaktif') {
-    $where_sql .= " AND p.status='nonaktif'";
-} elseif ($filter === 'baru') {
-    // Pengelola baru masuk = tgl_mulai dalam 30 hari terakhir.
-    $where_sql .= " AND p.tgl_mulai >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+// --- FILTER CABANG ---
+// Cabang Aktif  = cabang punya minimal 1 pengelola yg masih berlaku saat ini
+//                (status='aktif' DAN (tgl_selesai NULL atau tgl_selesai >= today))
+// Cabang Non-Aktif = kebalikannya (tidak punya pengelola aktif saat ini)
+if ($filter_cabang === 'aktif') {
+    $where_sql .= " AND c.id_cabang IN (
+        SELECT DISTINCT id_cabang FROM pengelola
+        WHERE status='aktif' AND (tgl_selesai IS NULL OR tgl_selesai >= CURDATE())
+    )";
+} elseif ($filter_cabang === 'nonaktif') {
+    $where_sql .= " AND c.id_cabang NOT IN (
+        SELECT DISTINCT id_cabang FROM pengelola
+        WHERE status='aktif' AND (tgl_selesai IS NULL OR tgl_selesai >= CURDATE())
+    )";
 }
 
-$filter_label = [
-    'semua'    => 'Semua Pengelola',
-    'aktif'    => 'Pengelola Aktif',
-    'nonaktif' => 'Pengelola Non-Aktif',
-    'baru'     => 'Pengelola Baru Masuk (30 Hari)',
-][$filter];
+// --- FILTER PENGELOLA (per baris, bukan cabang) ---
+// Pengelola Aktif = baris pengelola yg masih berlaku (status='aktif' DAN
+//                   (tgl_selesai NULL atau tgl_selesai >= today))
+// Pengelola Non-Aktif = sudah tidak berlaku (status='nonaktif' atau tgl_selesai < today)
+if ($filter_pengelola === 'aktif') {
+    $where_sql .= " AND p.status='aktif' AND (p.tgl_selesai IS NULL OR p.tgl_selesai >= CURDATE())";
+} elseif ($filter_pengelola === 'nonaktif') {
+    $where_sql .= " AND (p.status='nonaktif' OR (p.tgl_selesai IS NOT NULL AND p.tgl_selesai < CURDATE()))";
+}
+
+$label_fc = ['semua' => 'Semua Cabang',    'aktif' => 'Cabang Aktif',    'nonaktif' => 'Cabang Non-Aktif'][$filter_cabang];
+$label_fp = ['semua' => 'Semua Pengelola', 'aktif' => 'Pengelola Aktif', 'nonaktif' => 'Pengelola Non-Aktif'][$filter_pengelola];
+$filter_label = $label_fc . ' + ' . $label_fp;
 
 // Total Pengelola Overall
 $total_pengelola_all = 0;
@@ -397,11 +413,15 @@ include 'sidebar_pusat.php';
         </div>
 
         <form method="GET" class="d-flex flex-wrap gap-2 search-form">
-            <select name="filter" class="form-select form-control-premium" style="max-width:220px" onchange="this.form.submit()">
-                <option value="semua"    <?= $filter==='semua'?'selected':'' ?>>Semua Pengelola</option>
-                <option value="aktif"    <?= $filter==='aktif'?'selected':'' ?>>Hanya Aktif</option>
-                <option value="nonaktif" <?= $filter==='nonaktif'?'selected':'' ?>>Hanya Non-Aktif</option>
-                <option value="baru"     <?= $filter==='baru'?'selected':'' ?>>Baru Masuk (30 Hari)</option>
+            <select name="filter_cabang" class="form-select form-control-premium" style="max-width:200px" onchange="this.form.submit()" title="Filter berdasarkan status cabang">
+                <option value="semua"    <?= $filter_cabang==='semua'?'selected':'' ?>>Semua Cabang</option>
+                <option value="aktif"    <?= $filter_cabang==='aktif'?'selected':'' ?>>Cabang Aktif</option>
+                <option value="nonaktif" <?= $filter_cabang==='nonaktif'?'selected':'' ?>>Cabang Non-Aktif</option>
+            </select>
+            <select name="filter_pengelola" class="form-select form-control-premium" style="max-width:220px" onchange="this.form.submit()" title="Filter berdasarkan status pengelola">
+                <option value="semua"    <?= $filter_pengelola==='semua'?'selected':'' ?>>Semua Pengelola</option>
+                <option value="aktif"    <?= $filter_pengelola==='aktif'?'selected':'' ?>>Pengelola Aktif</option>
+                <option value="nonaktif" <?= $filter_pengelola==='nonaktif'?'selected':'' ?>>Pengelola Non-Aktif</option>
             </select>
             <div class="search-input-group flex-grow-1">
                 <input type="text" name="search" class="form-control form-control-premium w-100" placeholder="Cari nama, cabang, no rek..." value="<?= h($search) ?>">
@@ -410,7 +430,7 @@ include 'sidebar_pusat.php';
                 <button type="submit" class="btn btn-premium-outline d-flex align-items-center gap-2 justify-content-center flex-grow-1">
                     <i class="bi bi-search"></i> Cari
                 </button>
-                <?php if ($search !== '' || $filter !== 'semua'): ?>
+                <?php if ($search !== '' || $filter_cabang !== 'semua' || $filter_pengelola !== 'semua'): ?>
                     <a href="data_pengelola" class="btn btn-premium-outline bg-white text-secondary d-flex align-items-center justify-content-center" title="Reset Filter & Search">
                         <i class="bi bi-arrow-clockwise"></i>
                     </a>
@@ -420,9 +440,11 @@ include 'sidebar_pusat.php';
     </div>
 
     <div class="small text-muted mb-2">
-        <i class="bi bi-funnel-fill me-1"></i> Filter aktif: <strong><?= h($filter_label) ?></strong>
+        <i class="bi bi-funnel-fill me-1"></i> Filter aktif:
+        <span class="badge bg-primary bg-opacity-10 text-primary"><?= h($label_fc) ?></span>
+        <span class="badge bg-primary bg-opacity-10 text-primary"><?= h($label_fp) ?></span>
         &middot; Ketemu: <strong><?= number_format($total_data) ?></strong> pengelola
-        &middot; <span class="text-success">Cetak PDF/Excel akan menyertakan seluruh <?= count($rows_cetak) ?> baris sesuai filter.</span>
+        &middot; <span class="text-success">Cetak PDF/Excel akan menyertakan seluruh <?= count($rows_cetak) ?> baris sesuai filter ini.</span>
     </div>
 
     <div class="card saas-card p-0 p-md-3 border-0 bg-transparent bg-md-white shadow-none shadow-md">
