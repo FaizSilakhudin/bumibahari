@@ -14,18 +14,19 @@ $flash = null;
 if (isset($_POST['tambah'])) {
     if (!csrf_check($_POST['csrf'] ?? '')) die("<script>alert('Token tidak valid!'); history.back();</script>");
 
-    $nama       = trim($_POST['nama_grup'] ?? '');
-    $link       = trim($_POST['link_invite'] ?? '');
-    $keterangan = trim($_POST['keterangan'] ?? '');
+    $nama        = trim($_POST['nama_grup'] ?? '');
+    $link        = trim($_POST['link_invite'] ?? '');
+    $keterangan  = trim($_POST['keterangan'] ?? '');
+    $id_investor = !empty($_POST['id_investor']) ? (int) $_POST['id_investor'] : null;
 
     if ($nama === '') {
         $flash = ['danger', 'Nama grup wajib diisi.'];
     } else {
         try {
-            $stmt = $conn->prepare("INSERT INTO wa_grup (nama_grup, link_invite, keterangan) VALUES (?,?,?)");
-            $stmt->bind_param('sss', $nama, $link, $keterangan);
+            $stmt = $conn->prepare("INSERT INTO wa_grup (nama_grup, link_invite, keterangan, id_investor) VALUES (?,?,?,?)");
+            $stmt->bind_param('sssi', $nama, $link, $keterangan, $id_investor);
             $stmt->execute();
-            audit($conn, 'wa_grup_tambah', 'wa_grup', $stmt->insert_id, ['nama_grup' => $nama]);
+            audit($conn, 'wa_grup_tambah', 'wa_grup', $stmt->insert_id, ['nama_grup' => $nama, 'id_investor' => $id_investor]);
             $stmt->close();
             header('Location: data_wa_grup.php?ok=tambah');
             exit;
@@ -44,17 +45,18 @@ if (isset($_POST['tambah'])) {
 if (isset($_POST['edit'])) {
     if (!csrf_check($_POST['csrf'] ?? '')) die("<script>alert('Token tidak valid!'); history.back();</script>");
 
-    $id         = (int) ($_POST['id'] ?? 0);
-    $nama       = trim($_POST['nama_grup'] ?? '');
-    $link       = trim($_POST['link_invite'] ?? '');
-    $keterangan = trim($_POST['keterangan'] ?? '');
+    $id          = (int) ($_POST['id'] ?? 0);
+    $nama        = trim($_POST['nama_grup'] ?? '');
+    $link        = trim($_POST['link_invite'] ?? '');
+    $keterangan  = trim($_POST['keterangan'] ?? '');
+    $id_investor = !empty($_POST['id_investor']) ? (int) $_POST['id_investor'] : null;
 
     if ($id > 0 && $nama !== '') {
         try {
-            $stmt = $conn->prepare("UPDATE wa_grup SET nama_grup=?, link_invite=?, keterangan=? WHERE id=?");
-            $stmt->bind_param('sssi', $nama, $link, $keterangan, $id);
+            $stmt = $conn->prepare("UPDATE wa_grup SET nama_grup=?, link_invite=?, keterangan=?, id_investor=? WHERE id=?");
+            $stmt->bind_param('sssii', $nama, $link, $keterangan, $id_investor, $id);
             $stmt->execute();
-            audit($conn, 'wa_grup_edit', 'wa_grup', $id, ['nama_grup' => $nama]);
+            audit($conn, 'wa_grup_edit', 'wa_grup', $id, ['nama_grup' => $nama, 'id_investor' => $id_investor]);
             $stmt->close();
             header('Location: data_wa_grup.php?ok=edit');
             exit;
@@ -146,7 +148,8 @@ include 'sidebar_pusat.php';
 // ============================================================
 // DATA UNTUK TAMPILAN
 // ============================================================
-$list_grup = wa_grup_list($conn);
+$list_grup     = wa_grup_list($conn);
+$list_investor = investor_list_aktif($conn);
 
 // Semua cabang (untuk modal "Kelola Anggota") + info grup saat ini
 $all_cabang_res = $conn->query("
@@ -210,13 +213,15 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
                     <tr>
                         <th style="width:40px">#</th>
                         <th>Nama Grup</th>
-                        <th>Keterangan</th>
+                        <th>Investor Terkait</th>
                         <th class="text-center">Cabang</th>
-                        <th style="width:280px" class="text-end">Aksi</th>
+                        <th style="width:300px" class="text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($list_grup as $i => $g): ?>
+                <?php foreach ($list_grup as $i => $g):
+                    $pakai_investor = !empty($g['id_investor']);
+                ?>
                     <tr>
                         <td class="text-muted"><?= $i + 1 ?></td>
                         <td class="fw-semibold"><?= h($g['nama_grup']) ?>
@@ -225,8 +230,18 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
                                     <i class="bi bi-box-arrow-up-right"></i>
                                 </a>
                             <?php endif; ?>
+                            <?php if (!empty($g['keterangan'])): ?>
+                                <div class="small text-muted mt-1" style="font-weight:400"><?= h($g['keterangan']) ?></div>
+                            <?php endif; ?>
                         </td>
-                        <td class="small text-muted"><?= h($g['keterangan'] ?: '—') ?></td>
+                        <td>
+                            <?php if ($pakai_investor): ?>
+                                <span class="badge bg-primary bg-opacity-10 text-primary"><i class="bi bi-person-check me-1"></i><?= h($g['nama_investor']) ?></span>
+                                <div class="small text-muted mt-1">Cabang otomatis dari data investor</div>
+                            <?php else: ?>
+                                <span class="small text-muted"><i class="bi bi-dash-circle"></i> Manual (tanpa investor)</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-center">
                             <?php if ((int)$g['jml_cabang'] > 0): ?>
                                 <span class="wg-badge-count"><?= (int)$g['jml_cabang'] ?> cabang</span>
@@ -235,9 +250,15 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
                             <?php endif; ?>
                         </td>
                         <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAnggota<?= (int)$g['id'] ?>" title="Kelola Cabang Anggota">
-                                <i class="bi bi-shop"></i> Kelola Cabang
-                            </button>
+                            <?php if ($pakai_investor): ?>
+                                <button class="btn btn-sm btn-outline-secondary" disabled title="Tidak perlu — cabang otomatis dari investor terkait">
+                                    <i class="bi bi-magic"></i> Otomatis
+                                </button>
+                            <?php else: ?>
+                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAnggota<?= (int)$g['id'] ?>" title="Kelola Cabang Anggota">
+                                    <i class="bi bi-shop"></i> Kelola Cabang
+                                </button>
+                            <?php endif; ?>
                             <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEdit<?= (int)$g['id'] ?>" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </button>
@@ -276,6 +297,17 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
               <div class="modal-body">
                 <div class="mb-3"><label class="form-label small fw-semibold">Nama Grup</label>
                     <input type="text" name="nama_grup" class="form-control" value="<?= h($g['nama_grup']) ?>" required></div>
+                <div class="mb-3"><label class="form-label small fw-semibold">Investor Terkait <span class="text-muted">(opsional)</span></label>
+                    <select name="id_investor" class="form-select">
+                        <option value="">— Tidak terkait investor (manual mapping cabang) —</option>
+                        <?php foreach ($list_investor as $inv): ?>
+                            <option value="<?= (int)$inv['id_investor'] ?>" <?= ((int)($g['id_investor'] ?? 0) === (int)$inv['id_investor']) ? 'selected' : '' ?>>
+                                <?= h($inv['nama_investor']) ?> (<?= (int)$inv['jml_cabang'] ?> cabang)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small class="text-muted">Kalau diisi: anggota cabang <strong>otomatis</strong> dari data investor (cabang_investor yg masih aktif).</small>
+                </div>
                 <div class="mb-3"><label class="form-label small fw-semibold">Link Invite WA (opsional)</label>
                     <input type="url" name="link_invite" class="form-control" placeholder="https://chat.whatsapp.com/XXXX" value="<?= h($g['link_invite'] ?? '') ?>"></div>
                 <div class="mb-0"><label class="form-label small fw-semibold">Keterangan (opsional)</label>
@@ -343,7 +375,18 @@ if ($ok === 'anggota') $flash = ['success', 'Anggota grup berhasil disimpan.'];
           </div>
           <div class="modal-body">
             <div class="mb-3"><label class="form-label small fw-semibold">Nama Grup <span class="text-danger">*</span></label>
-                <input type="text" name="nama_grup" class="form-control" required placeholder="mis. Grup Area Jakarta Timur"></div>
+                <input type="text" name="nama_grup" class="form-control" required placeholder="mis. Grup Investor Aden Subagio"></div>
+            <div class="mb-3"><label class="form-label small fw-semibold">Investor Terkait <span class="text-muted">(opsional)</span></label>
+                <select name="id_investor" class="form-select">
+                    <option value="">— Tidak terkait investor (manual mapping cabang) —</option>
+                    <?php foreach ($list_investor as $inv): ?>
+                        <option value="<?= (int)$inv['id_investor'] ?>">
+                            <?= h($inv['nama_investor']) ?> (<?= (int)$inv['jml_cabang'] ?> cabang)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <small class="text-muted">Kalau diisi: anggota cabang <strong>otomatis</strong> dari data investor — tidak perlu mapping manual.</small>
+            </div>
             <div class="mb-3"><label class="form-label small fw-semibold">Link Invite WA (opsional)</label>
                 <input type="url" name="link_invite" class="form-control" placeholder="https://chat.whatsapp.com/XXXX">
                 <small class="text-muted">Supaya tombol "Buka Grup" langsung ngarah ke grup yang tepat.</small></div>

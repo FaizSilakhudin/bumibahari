@@ -154,6 +154,9 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                     <?php else: ?>
                         <span class="sg-badge sg-badge-empty">kosong</span>
                     <?php endif; ?>
+                    <?php if (!empty($g['nama_investor'])): ?>
+                        <span class="badge bg-primary bg-opacity-10 text-primary ms-1" title="Cabang otomatis dari data investor"><i class="bi bi-person-check me-1"></i><?= h($g['nama_investor']) ?></span>
+                    <?php endif; ?>
                     <?php if (!empty($g['link_invite'])): ?>
                         <a href="<?= h($g['link_invite']) ?>" target="_blank" rel="noopener" class="small ms-2 text-success"><i class="bi bi-box-arrow-up-right"></i> Buka Grup WA</a>
                     <?php endif; ?>

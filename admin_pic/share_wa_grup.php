@@ -129,6 +129,9 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                 <div class="flex-grow-1">
                     <span class="sg-grup-title"><?= h($g['nama_grup']) ?></span>
                     <span class="sg-badge"><?= $jml ?> cabang Anda</span>
+                    <?php if (!empty($g['nama_investor'])): ?>
+                        <span class="badge bg-primary bg-opacity-10 text-primary ms-1"><i class="bi bi-person-check me-1"></i><?= h($g['nama_investor']) ?></span>
+                    <?php endif; ?>
                     <?php if (!empty($g['link_invite'])): ?>
                         <a href="<?= h($g['link_invite']) ?>" target="_blank" rel="noopener" class="small ms-2 text-success"><i class="bi bi-box-arrow-up-right"></i> Buka Grup WA</a>
                     <?php endif; ?>
