@@ -6,16 +6,23 @@ include 'sidebar_pusat.php';
 require_role('pusat');
 
 // ============================================================
-// FILTER PERIODE (default bulan berjalan untuk bulanan/rekap,
-// kemarin untuk harian, minggu berjalan untuk mingguan)
+// FILTER PERIODE:
+//  - Harian: 1 tanggal (default: kemarin)
+//  - Mingguan: rentang tanggal mulai–selesai (default: 7 hari terakhir)
+//    laporan_mingguan.php memang menerima tgl_mulai & tgl_selesai bebas,
+//    bukan minggu ISO — jadi user bisa pilih rentang berapa pun.
+//  - Bulanan & Rekap: 1 bulan (default: bulan berjalan)
 // ============================================================
-$tgl_harian   = $_GET['tgl_harian']   ?? date('Y-m-d', strtotime('-1 day'));
-$minggu_ini   = $_GET['minggu']       ?? date('Y-\WW');
-$bulan_rekap  = $_GET['bulan']        ?? date('Y-m');
+$tgl_harian  = $_GET['tgl_harian']  ?? date('Y-m-d', strtotime('-1 day'));
+$mg_mulai    = $_GET['mg_mulai']    ?? date('Y-m-d', strtotime('-7 day'));
+$mg_selesai  = $_GET['mg_selesai']  ?? date('Y-m-d', strtotime('-1 day'));
+$bulan_rekap = $_GET['bulan']       ?? date('Y-m');
 
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $tgl_harian))      $tgl_harian  = date('Y-m-d', strtotime('-1 day'));
-if (!preg_match('/^\d{4}-W\d{2}$/i',      $minggu_ini))     $minggu_ini  = date('Y-\WW');
-if (!preg_match('/^\d{4}-\d{2}$/',        $bulan_rekap))    $bulan_rekap = date('Y-m');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $tgl_harian))  $tgl_harian  = date('Y-m-d', strtotime('-1 day'));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $mg_mulai))    $mg_mulai    = date('Y-m-d', strtotime('-7 day'));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $mg_selesai))  $mg_selesai  = date('Y-m-d', strtotime('-1 day'));
+if ($mg_selesai < $mg_mulai) { [$mg_mulai, $mg_selesai] = [$mg_selesai, $mg_mulai]; }
+if (!preg_match('/^\d{4}-\d{2}$/',       $bulan_rekap)) $bulan_rekap = date('Y-m');
 
 $list_grup   = wa_grup_list($conn);
 $total_grup  = count($list_grup);
@@ -91,20 +98,24 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
 
     <div class="sg-filter-card mb-4">
         <form method="GET" class="row g-2 align-items-end">
-            <div class="col-md-3 col-6">
+            <div class="col-md-2 col-6">
                 <label class="form-label small fw-semibold text-success">Tanggal (Harian)</label>
                 <input type="date" name="tgl_harian" value="<?= h($tgl_harian) ?>" class="form-control form-control-sm">
             </div>
             <div class="col-md-3 col-6">
-                <label class="form-label small fw-semibold text-success">Minggu</label>
-                <input type="week" name="minggu" value="<?= h($minggu_ini) ?>" class="form-control form-control-sm">
+                <label class="form-label small fw-semibold text-success">Mingguan — Mulai</label>
+                <input type="date" name="mg_mulai" value="<?= h($mg_mulai) ?>" class="form-control form-control-sm">
             </div>
             <div class="col-md-3 col-6">
+                <label class="form-label small fw-semibold text-success">Mingguan — Selesai</label>
+                <input type="date" name="mg_selesai" value="<?= h($mg_selesai) ?>" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2 col-6">
                 <label class="form-label small fw-semibold text-success">Bulan (Bulanan & Rekap)</label>
                 <input type="month" name="bulan" value="<?= h($bulan_rekap) ?>" class="form-control form-control-sm">
             </div>
-            <div class="col-md-3 col-6 d-grid">
-                <button type="submit" class="btn btn-success btn-sm fw-semibold"><i class="bi bi-funnel me-1"></i>Pakai Periode Ini</button>
+            <div class="col-md-2 col-12 d-grid">
+                <button type="submit" class="btn btn-success btn-sm fw-semibold"><i class="bi bi-funnel me-1"></i>Pakai Periode</button>
             </div>
         </form>
     </div>
@@ -217,16 +228,17 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                 'label'        => 'Mingguan',
                 'tipe_kode'    => 'mingguan',
                 'target_page'  => 'laporan_mingguan.php',
-                'periode_text' => $minggu_ini,
-                'url_builder'  => function($id_cabang) use ($minggu_ini, $gid, $g, $wa_link) {
+                'periode_text' => date('d M Y', strtotime($mg_mulai)) . ' – ' . date('d M Y', strtotime($mg_selesai)),
+                'url_builder'  => function($id_cabang) use ($mg_mulai, $mg_selesai, $gid, $g, $wa_link) {
                     return 'laporan_mingguan.php?' . http_build_query([
-                        'id_cabang' => $id_cabang, 'minggu' => $minggu_ini, 'auto_share' => '1',
+                        'id_cabang' => $id_cabang, 'tgl_mulai' => $mg_mulai, 'tgl_selesai' => $mg_selesai,
+                        'auto_share' => '1',
                         'wa_grup' => $gid, 'wa_nama' => $g['nama_grup'], 'wa_link' => $wa_link,
                     ]);
                 },
-                'prepare_url'  => function($id_cabang, $req_id) use ($minggu_ini) {
+                'prepare_url'  => function($id_cabang, $req_id) use ($mg_mulai, $mg_selesai) {
                     return 'laporan_mingguan.php?' . http_build_query([
-                        'id_cabang' => $id_cabang, 'minggu' => $minggu_ini,
+                        'id_cabang' => $id_cabang, 'tgl_mulai' => $mg_mulai, 'tgl_selesai' => $mg_selesai,
                         'prepare_pdf_blob' => '1', 'request_id' => $req_id,
                     ]);
                 },
@@ -315,9 +327,18 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                     </div>
                 </div>
 
-                <div class="alert alert-light border small mb-3">
-                    <i class="bi bi-lightbulb-fill text-warning me-1"></i>
-                    <strong>Atau share per cabang:</strong> klik tombol di bawah. HP → share picker; laptop → download PDF + buka grup WA.
+                <div class="alert alert-light border small mb-2">
+                    <i class="bi bi-check2-square text-primary me-1"></i>
+                    <strong>Pilih cabang:</strong> centang cabang yang mau dikirim lewat tombol batch di atas.
+                    Boleh juga tetap pakai tombol "Share WA" per baris (tanpa harus dicentang).
+                </div>
+
+                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom">
+                    <label class="d-flex align-items-center gap-2 small fw-semibold mb-0" style="cursor:pointer">
+                        <input type="checkbox" class="form-check-input m-0 sg-master-check" checked>
+                        Centang / Lepas Semua
+                    </label>
+                    <span class="ms-auto small text-muted">Terpilih: <strong class="sg-selected-count"><?= $jml ?></strong> / <?= $jml ?> cabang</span>
                 </div>
 
                 <?php foreach ($anggota as $i => $c):
@@ -327,8 +348,9 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                      data-cabang-id="<?= (int)$c['id_cabang'] ?>"
                      data-cabang-nama="<?= h($c['nama_cabang']) ?>"
                      data-prepare-url-template="<?= h($tipe['prepare_url']((int)$c['id_cabang'], 'REQID')) ?>">
-                    <div class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:.8rem;font-weight:600"><?= $i + 1 ?></div>
-                    <div class="flex-grow-1">
+                    <input type="checkbox" class="form-check-input m-0 sg-cabang-check" checked style="flex-shrink:0">
+                    <div class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center" style="width:28px;height:28px;font-size:.75rem;font-weight:600;flex-shrink:0"><?= $i + 1 ?></div>
+                    <div class="flex-grow-1 min-w-0">
                         <div class="fw-semibold small"><?= h($c['nama_cabang']) ?></div>
                         <div class="text-muted" style="font-size:.72rem">
                             <span class="text-success status-share" data-cabang-id="<?= (int)$c['id_cabang'] ?>" data-tipe="<?= $tipe_key ?>" data-grup="<?= $gid ?>" style="display:none">
@@ -416,7 +438,56 @@ function sgBuildRedaksi(grupNama, tipeLabel, periodeText, cabangList) {
 }
 
 // Core: orkestrasi batch share
-// Prepare PDF dari N cabang via iframe batch. Isi modal._sgPendingShare dgn
+// ---- Checkbox cabang: master toggle + counter + sinkronisasi label tombol
+function sgUpdateSelection(modal) {
+    const items = modal.querySelectorAll('.sg-cabang-item');
+    const checks = modal.querySelectorAll('.sg-cabang-check');
+    const total = items.length;
+    const selected = Array.from(checks).filter(c => c.checked).length;
+    const master = modal.querySelector('.sg-master-check');
+    const counter = modal.querySelector('.sg-selected-count');
+    const btn = modal.querySelector('.sg-batch-btn');
+
+    if (counter) counter.textContent = selected;
+    if (master) {
+        master.checked = selected === total && total > 0;
+        master.indeterminate = selected > 0 && selected < total;
+    }
+    // Hanya update label tombol kalau TIDAK dalam state "siap kirim" (biar user gesture tidak reset).
+    if (btn && !modal._sgPendingShare && SG_CAN_SHARE_FILES) {
+        if (selected === 0) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-x-circle me-1"></i> Pilih dulu minimal 1 cabang';
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('btn-secondary', 'btn-warning');
+            btn.classList.add('btn-success');
+            btn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Share ' + selected + ' Cabang Terpilih (1 Tap)';
+        }
+    }
+}
+
+document.querySelectorAll('.sg-modal-share').forEach(function(modal) {
+    const master = modal.querySelector('.sg-master-check');
+    if (master) {
+        master.addEventListener('change', function() {
+            modal.querySelectorAll('.sg-cabang-check').forEach(c => { c.checked = master.checked; });
+            sgUpdateSelection(modal);
+        });
+    }
+    modal.querySelectorAll('.sg-cabang-check').forEach(function(c) {
+        c.addEventListener('change', function() {
+            // Setiap perubahan centang di tengah = reset pending share supaya
+            // user harus prepare ulang dengan pilihan baru.
+            modal._sgPendingShare = null;
+            sgUpdateSelection(modal);
+        });
+    });
+    // Init label pertama kali
+    sgUpdateSelection(modal);
+});
+
+// Prepare PDF HANYA utk cabang yang DICENTANG. Isi modal._sgPendingShare dgn
 // { files, redaksi, title }. TIDAK panggil navigator.share — itu harus dari
 // tap kedua user supaya "user gesture" valid (browser menolak share tanpa
 // gesture langsung).
@@ -427,8 +498,12 @@ async function sgPreparePdfs(modal) {
     const tipeLabel = modal.dataset.tipeLabel;
     const periode   = modal.dataset.periodeText;
 
-    const items = Array.from(modal.querySelectorAll('.sg-cabang-item'));
-    if (items.length === 0) { alert('Tidak ada cabang di grup ini.'); return; }
+    // Hanya cabang yang di-check
+    const items = Array.from(modal.querySelectorAll('.sg-cabang-item')).filter(it => {
+        const chk = it.querySelector('.sg-cabang-check');
+        return chk && chk.checked;
+    });
+    if (items.length === 0) { alert('Pilih dulu minimal 1 cabang.'); return; }
 
     const progressBox   = modal.querySelector('.sg-batch-progress');
     const progressBar   = modal.querySelector('.sg-progress-bar');
@@ -559,21 +634,14 @@ document.querySelectorAll('.sg-batch-btn').forEach(function(btn) {
     });
 });
 
-// Reset state saat modal ditutup supaya buka lagi fresh
+// Reset state saat modal ditutup supaya buka lagi fresh (centang semua + label asli).
 document.querySelectorAll('.sg-modal-share').forEach(function(modal) {
     modal.addEventListener('hidden.bs.modal', function() {
         modal._sgPendingShare = null;
-        const batchBtn = modal.querySelector('.sg-batch-btn');
         const progressBox = modal.querySelector('.sg-batch-progress');
-        if (batchBtn && SG_CAN_SHARE_FILES) {
-            batchBtn.disabled = false;
-            batchBtn.classList.remove('btn-warning', 'btn-secondary');
-            batchBtn.classList.add('btn-success');
-            // kembalikan label asli berdasarkan jumlah cabang
-            const total = modal.querySelectorAll('.sg-cabang-item').length;
-            batchBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Share Semua ' + total + ' Cabang (1 Tap)';
-        }
+        modal.querySelectorAll('.sg-cabang-check').forEach(c => { c.checked = true; });
         if (progressBox) progressBox.style.display = 'none';
+        sgUpdateSelection(modal);
     });
 });
 
