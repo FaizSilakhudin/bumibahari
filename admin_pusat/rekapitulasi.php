@@ -1447,6 +1447,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
     if (p.get('prepare_pdf_blob') !== '1') return;
     const tipe = p.get('tipe') || 'bulanan';
     const requestId = p.get('request_id') || '';
+    const opsiBulanLalu = p.get('opsi_bulan_lalu'); // '0' | '1' | null
 
     function postToParent(payload) {
         try { window.parent.postMessage(payload, '*'); } catch(e) { console.error(e); }
@@ -1457,6 +1458,11 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         if (typeof sharePdfToWA !== 'function') {
             postToParent({ type: 'pdf-error', request_id: requestId, reason: 'belum ada data' });
             return;
+        }
+        // Terapkan opsi "Cetak Bulan Kemarin" dari URL kalau ada (tipe Harian).
+        if (opsiBulanLalu === '0' || opsiBulanLalu === '1') {
+            const sel = document.getElementById('opsiCetakBulanLalu');
+            if (sel) sel.value = opsiBulanLalu;
         }
         window.sharePdfToWA = async function(doc, filename) {
             try {
@@ -1492,6 +1498,12 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
     // Lewati kalau mode batch iframe aktif (dihandle hook di atas).
     const _p = new URLSearchParams(window.location.search);
     if (_p.get('prepare_pdf_blob') === '1') return;
+    // Terapkan opsi "Cetak Bulan Kemarin" dari URL kalau ada.
+    const _opsiBl = _p.get('opsi_bulan_lalu');
+    if (_opsiBl === '0' || _opsiBl === '1') {
+        const _sel = document.getElementById('opsiCetakBulanLalu');
+        if (_sel) _sel.value = _opsiBl;
+    }
     const p = new URLSearchParams(window.location.search);
     const mode = p.get('auto_share');
     if (!mode) return;

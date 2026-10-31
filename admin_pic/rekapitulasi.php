@@ -1456,6 +1456,7 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
     if (p.get('prepare_pdf_blob') !== '1') return;
     const tipe = p.get('tipe') || 'bulanan';
     const requestId = p.get('request_id') || '';
+    const opsiBulanLalu = p.get('opsi_bulan_lalu');
 
     function postToParent(payload) {
         try { window.parent.postMessage(payload, '*'); } catch(e) { console.error(e); }
@@ -1465,6 +1466,10 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
         if (typeof sharePdfToWA !== 'function') {
             postToParent({ type: 'pdf-error', request_id: requestId, reason: 'belum ada data' });
             return;
+        }
+        if (opsiBulanLalu === '0' || opsiBulanLalu === '1') {
+            const sel = document.getElementById('opsiCetakBulanLalu');
+            if (sel) sel.value = opsiBulanLalu;
         }
         window.sharePdfToWA = async function(doc, filename) {
             try {
@@ -1494,6 +1499,11 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
 (function autoShareHook(){
     const _p0 = new URLSearchParams(window.location.search);
     if (_p0.get('prepare_pdf_blob') === '1') return;
+    const _opsiBl = _p0.get('opsi_bulan_lalu');
+    if (_opsiBl === '0' || _opsiBl === '1') {
+        const _sel = document.getElementById('opsiCetakBulanLalu');
+        if (_sel) _sel.value = _opsiBl;
+    }
     const p = new URLSearchParams(window.location.search);
     const mode = p.get('auto_share');
     if (!mode) return;

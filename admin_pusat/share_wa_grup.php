@@ -40,9 +40,20 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
 .sg-btn-share{min-width:85px}
 .sg-chip-cabang{display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;font-size:.78rem;padding:4px 10px;border-radius:999px;margin:2px 2px 0 0}
 .sg-filter-card{background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1px solid #bbf7d0;border-radius:12px;padding:14px 18px}
-.sg-cabang-item{border-bottom:1px solid #f1f5f9;padding:10px 0}
+.sg-cabang-item{border-bottom:1px solid #f1f5f9;padding:10px 0;transition:background .15s}
 .sg-cabang-item:last-child{border-bottom:none}
+.sg-cabang-item.is-checked{background:#eff6ff}
 .sg-done{opacity:.5;text-decoration:line-through}
+/* Checkbox pemilihan: warna biru explicit (kadang Bootstrap custom theme kurang kontras) */
+.sg-cabang-check{width:20px!important;height:20px!important;accent-color:#2563eb;cursor:pointer}
+.sg-master-check{accent-color:#2563eb;cursor:pointer}
+/* Indikator "ikut batch" di dekat tombol Share WA — centang biru saat row dicentang */
+.sg-batch-indicator{color:#2563eb;font-size:1.1rem;line-height:1;display:none}
+.sg-cabang-item.is-checked .sg-batch-indicator{display:inline}
+/* Toggle "Cetak Bulan Kemarin" per cabang (hanya tampil utk tipe Harian) */
+.sg-opsi-bl{display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:.72rem;color:#334155;cursor:pointer;user-select:none;white-space:nowrap}
+.sg-opsi-bl input{accent-color:#2563eb;cursor:pointer}
+.sg-opsi-bl.off{background:#fef3c7;border-color:#fde68a;color:#92400e}
 /* z-index override: pastikan modal di atas sidebar (1000) & notifikasi bell (1060) */
 .modal{z-index:1070!important}
 .modal-backdrop{z-index:1065!important}
@@ -343,12 +354,14 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
 
                 <?php foreach ($anggota as $i => $c):
                     $url = $tipe['url_builder']((int)$c['id_cabang']);
+                    $is_harian = ($tipe_key === 'Harian');
                 ?>
-                <div class="sg-cabang-item d-flex align-items-center gap-3"
+                <div class="sg-cabang-item is-checked d-flex align-items-center gap-2 gap-md-3 flex-wrap"
                      data-cabang-id="<?= (int)$c['id_cabang'] ?>"
                      data-cabang-nama="<?= h($c['nama_cabang']) ?>"
+                     data-share-url-base="<?= h($url) ?>"
                      data-prepare-url-template="<?= h($tipe['prepare_url']((int)$c['id_cabang'], 'REQID')) ?>">
-                    <input type="checkbox" class="form-check-input m-0 sg-cabang-check" checked style="flex-shrink:0">
+                    <input type="checkbox" class="form-check-input sg-cabang-check" checked style="flex-shrink:0">
                     <div class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center" style="width:28px;height:28px;font-size:.75rem;font-weight:600;flex-shrink:0"><?= $i + 1 ?></div>
                     <div class="flex-grow-1 min-w-0">
                         <div class="fw-semibold small"><?= h($c['nama_cabang']) ?></div>
@@ -358,6 +371,13 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
                             </span>
                         </div>
                     </div>
+                    <?php if ($is_harian): ?>
+                    <label class="sg-opsi-bl" title="Cetak PDF termasuk halaman bulan sebelumnya">
+                        <input type="checkbox" class="sg-opsi-bulan-lalu" checked>
+                        <span>Cetak Bulan Kemarin</span>
+                    </label>
+                    <?php endif; ?>
+                    <span class="sg-batch-indicator" title="Ikut batch share"><i class="bi bi-check-circle-fill"></i></span>
                     <a href="<?= h($url) ?>" target="_blank" rel="noopener"
                        class="btn btn-sm btn-success fw-semibold tombol-share"
                        data-cabang-id="<?= (int)$c['id_cabang'] ?>" data-tipe="<?= $tipe_key ?>" data-grup="<?= $gid ?>">
@@ -438,12 +458,26 @@ function sgBuildRedaksi(grupNama, tipeLabel, periodeText, cabangList) {
 }
 
 // Core: orkestrasi batch share
-// ---- Checkbox cabang: master toggle + counter + sinkronisasi label tombol
+// ---- Helper: build URL dgn tambahan opsi_bulan_lalu (0/1) dari toggle per item
+function sgUrlWithOpsi(baseUrl, item) {
+    const toggle = item.querySelector('.sg-opsi-bulan-lalu');
+    if (!toggle) return baseUrl; // bukan tipe Harian — tidak perlu param
+    const val = toggle.checked ? '1' : '0';
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    return baseUrl + sep + 'opsi_bulan_lalu=' + val;
+}
+
+// ---- Checkbox cabang: master toggle + counter + highlight row + sinkronisasi label tombol
 function sgUpdateSelection(modal) {
     const items = modal.querySelectorAll('.sg-cabang-item');
-    const checks = modal.querySelectorAll('.sg-cabang-check');
     const total = items.length;
-    const selected = Array.from(checks).filter(c => c.checked).length;
+    let selected = 0;
+    items.forEach(function(it) {
+        const chk = it.querySelector('.sg-cabang-check');
+        const isOn = chk && chk.checked;
+        it.classList.toggle('is-checked', isOn);
+        if (isOn) selected++;
+    });
     const master = modal.querySelector('.sg-master-check');
     const counter = modal.querySelector('.sg-selected-count');
     const btn = modal.querySelector('.sg-batch-btn');
@@ -453,7 +487,6 @@ function sgUpdateSelection(modal) {
         master.checked = selected === total && total > 0;
         master.indeterminate = selected > 0 && selected < total;
     }
-    // Hanya update label tombol kalau TIDAK dalam state "siap kirim" (biar user gesture tidak reset).
     if (btn && !modal._sgPendingShare && SG_CAN_SHARE_FILES) {
         if (selected === 0) {
             btn.disabled = true;
@@ -477,13 +510,31 @@ document.querySelectorAll('.sg-modal-share').forEach(function(modal) {
     }
     modal.querySelectorAll('.sg-cabang-check').forEach(function(c) {
         c.addEventListener('change', function() {
-            // Setiap perubahan centang di tengah = reset pending share supaya
-            // user harus prepare ulang dengan pilihan baru.
             modal._sgPendingShare = null;
             sgUpdateSelection(modal);
         });
     });
-    // Init label pertama kali
+    // Toggle Cetak Bulan Kemarin per cabang — styling + reset pending
+    modal.querySelectorAll('.sg-opsi-bulan-lalu').forEach(function(t) {
+        const refresh = function() {
+            const lbl = t.closest('.sg-opsi-bl');
+            if (lbl) lbl.classList.toggle('off', !t.checked);
+        };
+        refresh();
+        t.addEventListener('change', function() {
+            refresh();
+            modal._sgPendingShare = null; // perubahan opsi = PDF harus di-regenerate
+        });
+    });
+    // Tombol Share WA per-cabang: inject opsi_bulan_lalu ke href SAAT diklik
+    modal.querySelectorAll('.tombol-share').forEach(function(a) {
+        a.addEventListener('click', function(ev) {
+            const item = a.closest('.sg-cabang-item');
+            if (!item) return;
+            const base = item.dataset.shareUrlBase || a.getAttribute('href');
+            a.setAttribute('href', sgUrlWithOpsi(base, item));
+        });
+    });
     sgUpdateSelection(modal);
 });
 
@@ -530,7 +581,8 @@ async function sgPreparePdfs(modal) {
     async function processCabang(item, idx) {
         return new Promise((resolve) => {
             const reqId = 'sg_' + grupId + '_' + tipeKode + '_' + idx + '_' + Date.now();
-            const url = sgBuildPrepareUrl(item.dataset.prepareUrlTemplate, reqId);
+            const baseUrl = sgBuildPrepareUrl(item.dataset.prepareUrlTemplate, reqId);
+            const url = sgUrlWithOpsi(baseUrl, item); // tambahkan opsi_bulan_lalu kalau tipe Harian
             const iframe = document.createElement('iframe');
             iframe.style.cssText = 'width:1200px;height:800px;border:0;';
             iframe.src = url;
