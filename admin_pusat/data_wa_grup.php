@@ -1,12 +1,12 @@
 <?php
 require '../config/koneksi.php';
 require '../config/wa_grup.php';
-include 'sidebar_pusat.php';
-
 require_role('pusat');
 
 // ============================================================
-// HANDLER CRUD
+// HANDLER CRUD — DIJALANKAN SEBELUM sidebar_pusat.php di-include,
+// supaya header() redirect selalu berjalan tanpa output HTML duluan
+// (sebelumnya pernah bikin blank putih pada beberapa skenario).
 // ============================================================
 $flash = null;
 
@@ -21,16 +21,22 @@ if (isset($_POST['tambah'])) {
     if ($nama === '') {
         $flash = ['danger', 'Nama grup wajib diisi.'];
     } else {
-        $stmt = $conn->prepare("INSERT INTO wa_grup (nama_grup, link_invite, keterangan) VALUES (?,?,?)");
-        $stmt->bind_param('sss', $nama, $link, $keterangan);
-        if ($stmt->execute()) {
+        try {
+            $stmt = $conn->prepare("INSERT INTO wa_grup (nama_grup, link_invite, keterangan) VALUES (?,?,?)");
+            $stmt->bind_param('sss', $nama, $link, $keterangan);
+            $stmt->execute();
             audit($conn, 'wa_grup_tambah', 'wa_grup', $stmt->insert_id, ['nama_grup' => $nama]);
             $stmt->close();
             header('Location: data_wa_grup.php?ok=tambah');
             exit;
+        } catch (Throwable $e) {
+            error_log('data_wa_grup tambah gagal: ' . $e->getMessage());
+            if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                $flash = ['danger', 'Nama grup "' . h($nama) . '" sudah ada. Pakai nama lain.'];
+            } else {
+                $flash = ['danger', 'Gagal tambah: ' . h($e->getMessage())];
+            }
         }
-        $flash = ['danger', 'Gagal tambah: ' . h($stmt->error)];
-        $stmt->close();
     }
 }
 
@@ -44,13 +50,22 @@ if (isset($_POST['edit'])) {
     $keterangan = trim($_POST['keterangan'] ?? '');
 
     if ($id > 0 && $nama !== '') {
-        $stmt = $conn->prepare("UPDATE wa_grup SET nama_grup=?, link_invite=?, keterangan=? WHERE id=?");
-        $stmt->bind_param('sssi', $nama, $link, $keterangan, $id);
-        $stmt->execute();
-        audit($conn, 'wa_grup_edit', 'wa_grup', $id, ['nama_grup' => $nama]);
-        $stmt->close();
-        header('Location: data_wa_grup.php?ok=edit');
-        exit;
+        try {
+            $stmt = $conn->prepare("UPDATE wa_grup SET nama_grup=?, link_invite=?, keterangan=? WHERE id=?");
+            $stmt->bind_param('sssi', $nama, $link, $keterangan, $id);
+            $stmt->execute();
+            audit($conn, 'wa_grup_edit', 'wa_grup', $id, ['nama_grup' => $nama]);
+            $stmt->close();
+            header('Location: data_wa_grup.php?ok=edit');
+            exit;
+        } catch (Throwable $e) {
+            error_log('data_wa_grup edit gagal: ' . $e->getMessage());
+            if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                $flash = ['danger', 'Nama grup "' . h($nama) . '" sudah dipakai grup lain.'];
+            } else {
+                $flash = ['danger', 'Gagal edit: ' . h($e->getMessage())];
+            }
+        }
     }
 }
 
@@ -88,6 +103,9 @@ if (isset($_POST['set_anggota'])) {
     if (!csrf_check($_POST['csrf'] ?? '')) die("<script>alert('Token tidak valid!'); history.back();</script>");
 
     $id       = (int) ($_POST['id'] ?? 0);
+    // $anggota sudah dibersihkan ke INT dgn array_map/intval + filter 0, aman utk dipakai
+    // literal di dalam SQL (bukan string user). Pakai literal supaya tidak perlu
+    // bind_param spread (yg kurang reliabel saat jumlah anggota banyak).
     $anggota  = array_values(array_filter(array_map('intval', $_POST['anggota'] ?? [])));
 
     if ($id > 0) {
@@ -101,10 +119,9 @@ if (isset($_POST['set_anggota'])) {
 
             // 2. Set cabang baru ke grup ini (akan menimpa grup lain-nya kalau sudah di-mapping).
             if ($anggota) {
-                $placeholders = implode(',', array_fill(0, count($anggota), '?'));
-                $types = 'i' . str_repeat('i', count($anggota));
-                $u2 = $conn->prepare("UPDATE cabang SET id_wa_grup=? WHERE id_cabang IN ($placeholders)");
-                $u2->bind_param($types, $id, ...$anggota);
+                $ids_literal = implode(',', $anggota); // sudah pure int
+                $u2 = $conn->prepare("UPDATE cabang SET id_wa_grup=? WHERE id_cabang IN ($ids_literal)");
+                $u2->bind_param('i', $id);
                 $u2->execute();
                 $u2->close();
             }
@@ -115,10 +132,16 @@ if (isset($_POST['set_anggota'])) {
             exit;
         } catch (Throwable $e) {
             $conn->rollback();
+            error_log('data_wa_grup set_anggota gagal: ' . $e->getMessage());
             $flash = ['danger', 'Gagal simpan anggota: ' . h($e->getMessage())];
         }
     }
 }
+
+// ============================================================
+// Handler selesai → sekarang baru render UI (sidebar + konten).
+// ============================================================
+include 'sidebar_pusat.php';
 
 // ============================================================
 // DATA UNTUK TAMPILAN
