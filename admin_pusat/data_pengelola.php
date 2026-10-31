@@ -696,6 +696,43 @@ include 'sidebar_pusat.php';
     const FILTER_LABEL   = <?= json_encode($filter_label) ?>;
     const CETAK_TGL      = <?= json_encode(date('d M Y')) ?>;
 
+    // Konstanta kop surat — DISAMAKAN dengan Export PDF Rekapitulasi
+    // (lihat admin_pusat/_rekap_script_export.php) supaya identitas
+    // perusahaan konsisten di semua PDF.
+    const ALAMAT_WBB = 'Kantor Pusat : Jl. Pamulang Permai Raya, Pamulang Bar., Kec. Pamulang, Kota Tangerang Selatan, Banten 15417';
+    const PHONE_WBB  = 'Phone : 087784838769';
+
+    // Gambar kop (logo + nama + alamat + phone + garis). Return: Y setelah
+    // garis (siap pakai utk mulai konten / judul tabel).
+    function gambarKopPengelola(doc, margin) {
+        const startY = 12;
+        let textX = margin;
+        const imgLogo = document.getElementById('logoWWB');
+        let logoH = 16, logoW = 16;
+        if (imgLogo) {
+            try {
+                const ratio = (imgLogo.naturalWidth || 1) / (imgLogo.naturalHeight || 1);
+                logoW = logoH * ratio;
+                doc.addImage(imgLogo, 'PNG', margin, startY, logoW, logoH);
+                textX = margin + logoW + 5;
+            } catch (e) { textX = margin; }
+        }
+        const textY = imgLogo ? startY + 4.5 : startY;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(40, 40, 40);
+        doc.text('WARTEG BUMI BAHARI', textX, textY);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 100, 100);
+        const alamatLines = doc.splitTextToSize(ALAMAT_WBB, 140);
+        doc.text(alamatLines, textX, textY + 5);
+        doc.text(PHONE_WBB, textX, textY + 5 + alamatLines.length * 3.5);
+
+        // Garis pembatas
+        const yLine = startY + 24;
+        doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.4);
+        const pageW = doc.internal.pageSize.getWidth();
+        doc.line(margin, yLine, pageW - margin, yLine);
+        return yLine + 2;
+    }
+
     function cetakPdfPengelola() {
         if (!PENGELOLA_ROWS.length) {
             alert('Tidak ada data pengelola untuk filter ini.');
@@ -703,13 +740,17 @@ include 'sidebar_pusat.php';
         }
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('portrait', 'mm', 'a4');
+        const margin = 14;
 
-        // Kop
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(27, 37, 89);
-        doc.text('DATA PENGELOLA — WARTEG BUMI BAHARI', 14, 18);
+        // KOP surat (logo + identitas perusahaan) — identik dgn PDF Rekapitulasi
+        let y = gambarKopPengelola(doc, margin);
+
+        // Judul laporan
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(27, 37, 89);
+        doc.text('DATA PENGELOLA', margin, y + 7);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80);
-        doc.text('Filter: ' + FILTER_LABEL + '   |   Dicetak: ' + CETAK_TGL + '   |   Total: ' + PENGELOLA_ROWS.length + ' pengelola', 14, 24);
-        doc.setDrawColor(200); doc.setLineWidth(0.3); doc.line(14, 27, 196, 27);
+        doc.text('Filter: ' + FILTER_LABEL, margin, y + 13);
+        doc.text('Dicetak: ' + CETAK_TGL + '   |   Total: ' + PENGELOLA_ROWS.length + ' pengelola', margin, y + 18);
 
         // Tabel
         const body = PENGELOLA_ROWS.map((r, i) => [
@@ -719,7 +760,7 @@ include 'sidebar_pusat.php';
             r.periode_aktif,
         ]);
         doc.autoTable({
-            startY: 32,
+            startY: y + 22,
             head: [['No', 'Nama Cabang', 'Nama Pengelola', 'Periode Aktif']],
             body: body,
             theme: 'grid',
@@ -731,12 +772,18 @@ include 'sidebar_pusat.php';
                 2: { cellWidth: 55 },
                 3: { cellWidth: 60 },
             },
-            margin: { left: 14, right: 14 },
+            // margin.top = tinggi kop supaya halaman 2+ otomatis mulai di bawah kop.
+            margin: { left: margin, right: margin, top: 40 },
             didDrawPage: function(data) {
-                const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+                // Kop di-redraw tiap halaman baru (halaman pertama sudah).
+                if (data.pageNumber > 1) {
+                    gambarKopPengelola(doc, margin);
+                }
+                // Nomor halaman
+                const pageH = doc.internal.pageSize.getHeight();
+                const pageW = doc.internal.pageSize.getWidth();
                 doc.setFontSize(8); doc.setTextColor(150);
-                doc.text('Hal. ' + doc.internal.getNumberOfPages(),
-                    doc.internal.pageSize.getWidth() - 20, pageHeight - 8);
+                doc.text('Hal. ' + doc.internal.getNumberOfPages(), pageW - 20, pageH - 8);
             }
         });
 
