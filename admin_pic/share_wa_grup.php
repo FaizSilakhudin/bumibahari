@@ -345,7 +345,7 @@ foreach ($list_grup as $g) $total_cab += (int)$g['jml_cabang'];
               <div class="modal-footer bg-light justify-content-between">
                 <small class="text-muted"><i class="bi bi-arrow-clockwise me-1"></i>Status tersimpan di browser.</small>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetStatusShare(<?= $gid ?>, '<?= $tipe_key ?>')"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold" onclick="resetStatusShare(<?= $gid ?>, '<?= $tipe_key ?>')"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset Semua</button>
                     <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Tutup</button>
                 </div>
               </div>
@@ -642,9 +642,26 @@ function refreshStatusModal(gid, tipe) {
         el.style.display = arr.includes(idc) ? '' : 'none';
     });
 }
+// Reset KOMPREHENSIF: kembalikan modal ke state awal.
 function resetStatusShare(gid, tipe) {
     try { localStorage.removeItem(statusShareKey(gid, tipe)); } catch(e){}
     refreshStatusModal(gid, tipe);
+    const modal = document.getElementById('modalShare' + gid + tipe);
+    if (!modal) return;
+    modal.querySelectorAll('.sg-cabang-check').forEach(c => { c.checked = true; });
+    modal.querySelectorAll('.sg-opsi-bulan-lalu').forEach(t => {
+        t.checked = true;
+        const lbl = t.closest('.sg-opsi-bl');
+        if (lbl) lbl.classList.remove('off');
+    });
+    modal._sgPendingShare = null;
+    const progressBox = modal.querySelector('.sg-batch-progress');
+    if (progressBox) progressBox.style.display = 'none';
+    const progressBar = modal.querySelector('.sg-progress-bar');
+    if (progressBar) { progressBar.style.width = '0%'; progressBar.textContent = ''; }
+    const progressDetail = modal.querySelector('.sg-progress-detail');
+    if (progressDetail) progressDetail.textContent = '';
+    if (typeof sgUpdateSelection === 'function') sgUpdateSelection(modal);
 }
 document.querySelectorAll('.tombol-share').forEach(function(btn) {
     btn.addEventListener('click', function() {

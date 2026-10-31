@@ -33,8 +33,12 @@ if (!function_exists('csrf_check')) {
 $open_modal_auto = isset($_GET['open_modal']) && $_GET['open_modal'] == '1';
 $selected_id_cabang = isset($_GET['id_cabang']) ? (int)$_GET['id_cabang'] : 0;
 
-// 2. FILTER SEARCH
+// 2. FILTER SEARCH + STATUS
 $search = trim($_GET['search'] ?? '');
+$filter = $_GET['filter'] ?? 'semua';
+$filter_opsi_valid = ['semua', 'aktif', 'nonaktif', 'baru'];
+if (!in_array($filter, $filter_opsi_valid, true)) $filter = 'semua';
+
 $where_sql = "WHERE 1=1";
 $params = [];
 $types = "";
@@ -45,6 +49,22 @@ if ($search !== '') {
     $params = [$search_param, $search_param, $search_param];
     $types = "sss";
 }
+
+if ($filter === 'aktif') {
+    $where_sql .= " AND p.status='aktif'";
+} elseif ($filter === 'nonaktif') {
+    $where_sql .= " AND p.status='nonaktif'";
+} elseif ($filter === 'baru') {
+    // Pengelola baru masuk = tgl_mulai dalam 30 hari terakhir.
+    $where_sql .= " AND p.tgl_mulai >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+}
+
+$filter_label = [
+    'semua'    => 'Semua Pengelola',
+    'aktif'    => 'Pengelola Aktif',
+    'nonaktif' => 'Pengelola Non-Aktif',
+    'baru'     => 'Pengelola Baru Masuk (30 Hari)',
+][$filter];
 
 // Total Pengelola Overall
 $total_pengelola_all = 0;
@@ -249,6 +269,35 @@ while ($r = $data->fetch_assoc()) {
 }
 $stmt->close();
 
+// Semua data terfilter TANPA pagination — khusus utk cetak PDF/Excel.
+// Hanya kolom yg dibutuhkan: nama_cabang, nama_pengelola, tgl_mulai, tgl_selesai.
+$sql_cetak = "SELECT c.nama_cabang, p.nama_pengelola, p.tgl_mulai, p.tgl_selesai, p.status
+              FROM pengelola p LEFT JOIN cabang c ON p.id_cabang=c.id_cabang
+              $where_sql
+              ORDER BY c.nama_cabang ASC, p.tgl_mulai DESC";
+$stmt_cetak = $conn->prepare($sql_cetak);
+if ($search !== '') {
+    $stmt_cetak->bind_param($types, ...$params);
+}
+$stmt_cetak->execute();
+$rows_cetak = [];
+$res_cetak = $stmt_cetak->get_result();
+while ($r = $res_cetak->fetch_assoc()) {
+    $rows_cetak[] = [
+        'nama_cabang'    => $r['nama_cabang'] ?? '-',
+        'nama_pengelola' => $r['nama_pengelola'] ?? '-',
+        'periode_aktif'  => (($r['tgl_mulai'] ?? null)
+                                ? date('d M Y', strtotime($r['tgl_mulai']))
+                                : '-')
+                            . ' s/d ' .
+                            (($r['tgl_selesai'] ?? null)
+                                ? date('d M Y', strtotime($r['tgl_selesai']))
+                                : 'sekarang'),
+        'status'         => $r['status'] ?? '-',
+    ];
+}
+$stmt_cetak->close();
+
 // AMBIL MASTER DATA CABANG UNTUK OPTION SELECT
 $cabang_array = [];
 $res_cabang = $conn->query("SELECT id_cabang, nama_cabang FROM cabang ORDER BY nama_cabang ASC");
@@ -334,14 +383,26 @@ include 'sidebar_pusat.php';
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center action-container gap-3 mb-4">
-        <div class="w-100 w-md-auto">
-            <button type="button" class="btn btn-premium d-flex align-items-center gap-2 w-100 justify-content-center" data-bs-toggle="modal" data-bs-target="#modalTambah">
+    <div class="d-flex flex-wrap justify-content-between align-items-center action-container gap-3 mb-4">
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-premium d-flex align-items-center gap-2 justify-content-center" data-bs-toggle="modal" data-bs-target="#modalTambah">
                 <i class="bi bi-plus-circle-fill"></i> Tambah Pengelola
             </button>
+            <button type="button" class="btn btn-danger d-flex align-items-center gap-2 justify-content-center fw-semibold" onclick="cetakPdfPengelola()" title="Cetak PDF dari data terfilter saat ini">
+                <i class="bi bi-file-earmark-pdf-fill"></i> Cetak PDF
+            </button>
+            <button type="button" class="btn btn-success d-flex align-items-center gap-2 justify-content-center fw-semibold" onclick="cetakExcelPengelola()" title="Cetak Excel dari data terfilter saat ini">
+                <i class="bi bi-file-earmark-excel-fill"></i> Cetak Excel
+            </button>
         </div>
-        
-        <form method="GET" class="d-flex gap-2 search-form">
+
+        <form method="GET" class="d-flex flex-wrap gap-2 search-form">
+            <select name="filter" class="form-select form-control-premium" style="max-width:220px" onchange="this.form.submit()">
+                <option value="semua"    <?= $filter==='semua'?'selected':'' ?>>Semua Pengelola</option>
+                <option value="aktif"    <?= $filter==='aktif'?'selected':'' ?>>Hanya Aktif</option>
+                <option value="nonaktif" <?= $filter==='nonaktif'?'selected':'' ?>>Hanya Non-Aktif</option>
+                <option value="baru"     <?= $filter==='baru'?'selected':'' ?>>Baru Masuk (30 Hari)</option>
+            </select>
             <div class="search-input-group flex-grow-1">
                 <input type="text" name="search" class="form-control form-control-premium w-100" placeholder="Cari nama, cabang, no rek..." value="<?= h($search) ?>">
             </div>
@@ -349,13 +410,19 @@ include 'sidebar_pusat.php';
                 <button type="submit" class="btn btn-premium-outline d-flex align-items-center gap-2 justify-content-center flex-grow-1">
                     <i class="bi bi-search"></i> Cari
                 </button>
-                <?php if ($search !== ''): ?>
-                    <a href="data_pengelola" class="btn btn-premium-outline bg-white text-secondary d-flex align-items-center justify-content-center" title="Reset Search">
+                <?php if ($search !== '' || $filter !== 'semua'): ?>
+                    <a href="data_pengelola" class="btn btn-premium-outline bg-white text-secondary d-flex align-items-center justify-content-center" title="Reset Filter & Search">
                         <i class="bi bi-arrow-clockwise"></i>
                     </a>
                 <?php endif; ?>
             </div>
         </form>
+    </div>
+
+    <div class="small text-muted mb-2">
+        <i class="bi bi-funnel-fill me-1"></i> Filter aktif: <strong><?= h($filter_label) ?></strong>
+        &middot; Ketemu: <strong><?= number_format($total_data) ?></strong> pengelola
+        &middot; <span class="text-success">Cetak PDF/Excel akan menyertakan seluruh <?= count($rows_cetak) ?> baris sesuai filter.</span>
     </div>
 
     <div class="card saas-card p-0 p-md-3 border-0 bg-transparent bg-md-white shadow-none shadow-md">
@@ -597,6 +664,84 @@ include 'sidebar_pusat.php';
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+    // ====== CETAK PDF & EXCEL DATA PENGELOLA (sesuai filter aktif) ======
+    const PENGELOLA_ROWS = <?= json_encode($rows_cetak, JSON_UNESCAPED_UNICODE) ?>;
+    const FILTER_LABEL   = <?= json_encode($filter_label) ?>;
+    const CETAK_TGL      = <?= json_encode(date('d M Y')) ?>;
+
+    function cetakPdfPengelola() {
+        if (!PENGELOLA_ROWS.length) {
+            alert('Tidak ada data pengelola untuk filter ini.');
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('portrait', 'mm', 'a4');
+
+        // Kop
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(27, 37, 89);
+        doc.text('DATA PENGELOLA — WARTEG BUMI BAHARI', 14, 18);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80);
+        doc.text('Filter: ' + FILTER_LABEL + '   |   Dicetak: ' + CETAK_TGL + '   |   Total: ' + PENGELOLA_ROWS.length + ' pengelola', 14, 24);
+        doc.setDrawColor(200); doc.setLineWidth(0.3); doc.line(14, 27, 196, 27);
+
+        // Tabel
+        const body = PENGELOLA_ROWS.map((r, i) => [
+            String(i + 1),
+            r.nama_cabang,
+            r.nama_pengelola,
+            r.periode_aktif,
+        ]);
+        doc.autoTable({
+            startY: 32,
+            head: [['No', 'Nama Cabang', 'Nama Pengelola', 'Periode Aktif']],
+            body: body,
+            theme: 'grid',
+            styles: { fontSize: 8.5, cellPadding: 2 },
+            headStyles: { fillColor: [27, 37, 89], textColor: 255, halign: 'center', fontSize: 9 },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 12 },
+                1: { cellWidth: 55 },
+                2: { cellWidth: 55 },
+                3: { cellWidth: 60 },
+            },
+            margin: { left: 14, right: 14 },
+            didDrawPage: function(data) {
+                const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+                doc.setFontSize(8); doc.setTextColor(150);
+                doc.text('Hal. ' + doc.internal.getNumberOfPages(),
+                    doc.internal.pageSize.getWidth() - 20, pageHeight - 8);
+            }
+        });
+
+        const filename = 'Data Pengelola - ' + FILTER_LABEL + ' - ' + CETAK_TGL + '.pdf';
+        doc.save(filename);
+    }
+
+    function cetakExcelPengelola() {
+        if (!PENGELOLA_ROWS.length) {
+            alert('Tidak ada data pengelola untuk filter ini.');
+            return;
+        }
+        const header = [['No', 'Nama Cabang', 'Nama Pengelola', 'Periode Aktif']];
+        const body = PENGELOLA_ROWS.map((r, i) => [i + 1, r.nama_cabang, r.nama_pengelola, r.periode_aktif]);
+        const info = [
+            ['DATA PENGELOLA — WARTEG BUMI BAHARI'],
+            ['Filter: ' + FILTER_LABEL],
+            ['Dicetak: ' + CETAK_TGL + '   Total: ' + PENGELOLA_ROWS.length + ' pengelola'],
+            [], // baris kosong
+        ];
+        const sheet = XLSX.utils.aoa_to_sheet([...info, ...header, ...body]);
+        sheet['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 30 }, { wch: 35 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, sheet, 'Pengelola');
+        XLSX.writeFile(wb, 'Data Pengelola - ' + FILTER_LABEL + ' - ' + CETAK_TGL + '.xlsx');
+    }
+</script>
 
 <script>
     // Kalau admin memilih PIC yang sudah ada, tidak perlu lanjut ke pembuatan akun baru.
