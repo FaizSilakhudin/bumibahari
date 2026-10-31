@@ -40,8 +40,9 @@ if (!function_exists('wa_grup_list')) {
             }
             $placeholders = implode(',', array_fill(0, count($cabang_ids), '?'));
             $filter_in = "AND c.id_cabang IN ($placeholders)";
-            $types = str_repeat('i', count($cabang_ids)) . str_repeat('i', count($cabang_ids));
-            $params = array_merge($cabang_ids, $cabang_ids);
+            // $filter_in hanya sekali di query (di subquery), jadi bind sekali.
+            $types  = str_repeat('i', count($cabang_ids));
+            $params = $cabang_ids;
         }
 
         $sql = "
