@@ -78,7 +78,7 @@ $ed_url_next = 'laporan.php?' . http_build_query([
           <div class="ed-head-sub">
             <span><i class="bi bi-shop me-1"></i><?= h($row['nama_cabang'] ?? '-') ?></span>
             <span><i class="bi bi-person me-1"></i><?= h($row['nama_pengelola'] ?? '-') ?></span>
-            <span><i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($row['tanggal'])) ?></span>
+            <span><i class="bi bi-calendar3 me-1"></i><?= nama_hari_id($row['tanggal']) ?>, <?= date('d M Y', strtotime($row['tanggal'])) ?></span>
           </div>
         </div>
         <div class="d-flex align-items-center gap-1 me-2 ed-nav-tanggal">

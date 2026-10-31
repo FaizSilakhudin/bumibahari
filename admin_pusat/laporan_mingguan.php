@@ -384,13 +384,13 @@ function lm_rp($n): string
                         <?php if ($row['libur']): ?>
                         <tr>
                             <td class="c"><?= $no++ ?></td>
-                            <td class="c"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
+                            <td class="c"><?= nama_hari_id($row['tanggal']) ?>, <?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
                             <td class="c" colspan="2" style="font-style:italic; color:#666;">LIBUR / TUTUP</td>
                         </tr>
                         <?php else: ?>
                         <tr>
                             <td class="c"><?= $no++ ?></td>
-                            <td class="c"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
+                            <td class="c"><?= nama_hari_id($row['tanggal']) ?>, <?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
                             <td class="num"><?= lm_rp($row['sewa']) ?></td>
                             <td class="num <?= $row['sisa_tunai'] < 0 ? 'lm-neg' : '' ?>"><?= $row['sisa_tunai'] < 0 ? '-' . lm_rp(abs($row['sisa_tunai'])) : lm_rp($row['sisa_tunai']) ?></td>
                         </tr>

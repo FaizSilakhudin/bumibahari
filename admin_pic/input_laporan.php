@@ -195,7 +195,7 @@ input.form-control-custom { text-align: right; }
         </div>
         <div class="flex-grow-1">
             <h5 class="mb-0 fw-bold"><?= h($nama_cabang) ?></h5>
-            <small class="opacity-75">Pengelola: <strong><?= h($nama_pengelola) ?></strong> &middot; Tanggal: <strong><?= date('d M Y', strtotime($tanggal)) ?></strong></small>
+            <small class="opacity-75">Pengelola: <strong><?= h($nama_pengelola) ?></strong> &middot; Tanggal: <strong><?= nama_hari_id($tanggal) ?>, <?= date('d M Y', strtotime($tanggal)) ?></strong></small>
         </div>
         <div class="ms-3 d-flex align-items-center gap-2 nav-tanggal">
             <a href="input_laporan.php?id_cabang=<?= (int)$id_cabang ?>&tanggal=<?= h($tgl_prev) ?>"

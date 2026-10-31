@@ -95,7 +95,7 @@ $rk_no = 1;
                 if (($rk_h['status_laporan'] ?? '') === 'libur'): ?>
                 <tr class="table-secondary">
                     <td class="text-center text-muted"><?= $rk_no++ ?></td>
-                    <td class="fw-medium"><?= date('d/m/Y', strtotime($rk_h['tanggal'])) ?></td>
+                    <td class="fw-medium"><?= substr(nama_hari_id($rk_h['tanggal']), 0, 3) ?>, <?= date('d/m/Y', strtotime($rk_h['tanggal'])) ?></td>
                     <td colspan="19" class="text-center text-muted fst-italic">
                         <i class="bi bi-moon-stars-fill me-1"></i> LIBUR / TUTUP
                     </td>
@@ -152,7 +152,7 @@ $rk_no = 1;
             ?>
                 <tr>
                     <td class="text-center text-muted"><?= $rk_no++ ?></td>
-                    <td class="fw-medium"><?= date('d/m/Y', strtotime($rk_h['tanggal'])) ?></td>
+                    <td class="fw-medium"><?= substr(nama_hari_id($rk_h['tanggal']), 0, 3) ?>, <?= date('d/m/Y', strtotime($rk_h['tanggal'])) ?></td>
                     <td class="text-end"><?= number_format($rk_tunai, 0, ',', '.') ?></td>
                     <td class="text-end"><?= $rk_qris_asli != 0 ? number_format($rk_qris_asli, 0, ',', '.') : '-' ?></td>
                     <td class="text-end"><?= $rk_pencairan != 0 ? number_format($rk_pencairan, 0, ',', '.') : '-' ?></td>

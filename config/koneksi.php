@@ -160,6 +160,17 @@ if (!function_exists('nama_bulan_id')) {
     }
 }
 
+if (!function_exists('nama_hari_id')) {
+    // Nama hari Indonesia dari tanggal 'YYYY-MM-DD' atau timestamp.
+    // Pakai date('N') yang ISO: Senin=1 .. Minggu=7.
+    function nama_hari_id(string $tanggal): string
+    {
+        $N = (int) date('N', strtotime($tanggal));
+        $nama = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu', 7 => 'Minggu'];
+        return $nama[$N] ?? '-';
+    }
+}
+
 if (!function_exists('csrf_token')) {
     function csrf_token(): string
     {
