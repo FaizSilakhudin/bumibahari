@@ -12,7 +12,8 @@
 
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     try {
-                        await navigator.share({ files: [file], title: 'Laporan WBB', text: teks });
+                        // Tanpa title — WA kadang treat title sebagai pesan terpisah → jadi 2 msg.
+                        await navigator.share({ files: [file], text: teks });
                         return;
                     } catch (e) {
                         if (e && e.name === 'AbortError') return;

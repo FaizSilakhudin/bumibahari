@@ -6,13 +6,17 @@
             // Fallback (desktop / browser tanpa dukungan share file): PDF didownload otomatis
             // dan WhatsApp Web dibuka dengan teks siap kirim, tinggal lampirkan filenya.
             async function sharePdfToWA(doc, filename) {
+                // WhatsApp Android membaca `text` sebagai CAPTION file (muncul di
+                // bawah PDF, 1 pesan). Kalau `title` juga dikirim → beberapa versi
+                // WA memperlakukan `title` sebagai subject terpisah → jadi 2 pesan.
+                // Jadi: cukup kirim text (nama file tanpa .pdf) satu baris saja.
                 const teks = filename.replace(/\.pdf$/i, '');
                 const blob = doc.output('blob');
                 const file = new File([blob], filename, { type: 'application/pdf' });
 
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     try {
-                        await navigator.share({ files: [file], title: 'Laporan WBB', text: teks });
+                        await navigator.share({ files: [file], text: teks });
                         return;
                     } catch (e) {
                         if (e && e.name === 'AbortError') return;

@@ -394,11 +394,11 @@ function sgBuildPrepareUrl(template, reqId) {
 }
 
 function sgBuildRedaksi(grupNama, tipeLabel, periodeText, cabangList) {
-    let txt = 'Laporan ' + tipeLabel + ' — ' + grupNama + '\n';
-    txt += 'Periode: ' + periodeText + '\n';
-    txt += cabangList.length + ' cabang:\n';
-    cabangList.forEach(function(c, i) { txt += (i+1) + '. ' + c.nama + '\n'; });
-    return txt;
+    // SINGLE LINE: supaya WhatsApp treat text sebagai CAPTION file (1 pesan),
+    // bukan "caption + pesan teks" (2 pesan).
+    const namaCabang = cabangList.map(c => c.nama).join(', ');
+    return 'Laporan ' + tipeLabel + ' ' + grupNama + ' — ' + periodeText +
+           ' (' + cabangList.length + ' cabang: ' + namaCabang + ')';
 }
 
 function sgUrlWithOpsi(baseUrl, item) {
@@ -568,10 +568,8 @@ async function sgPreparePdfs(modal) {
     }
 
     const redaksi = sgBuildRedaksi(grupNama, tipeLabel, periode, cabangList);
-    modal._sgPendingShare = {
-        files: files, text: redaksi,
-        title: 'Laporan ' + tipeLabel + ' ' + grupNama,
-    };
+    // TIDAK pakai title — WA kadang treat title sbg "subject" terpisah → 2 pesan.
+    modal._sgPendingShare = { files: files, text: redaksi };
 
     batchBtn.disabled = false;
     batchBtn.classList.remove('btn-secondary', 'btn-success');

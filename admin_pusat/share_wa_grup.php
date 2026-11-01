@@ -453,11 +453,12 @@ function sgBuildPrepareUrl(template, reqId) {
 
 // Helper: build teks redaksi WA
 function sgBuildRedaksi(grupNama, tipeLabel, periodeText, cabangList) {
-    let txt = 'Laporan ' + tipeLabel + ' — ' + grupNama + '\n';
-    txt += 'Periode: ' + periodeText + '\n';
-    txt += cabangList.length + ' cabang:\n';
-    cabangList.forEach(function(c, i) { txt += (i+1) + '. ' + c.nama + '\n'; });
-    return txt;
+    // SINGLE LINE: WhatsApp lebih reliabel treat text sebagai CAPTION file (1
+    // pesan) kalau text pendek + tanpa line-break. Multi-line kadang bikin
+    // WA split jadi "caption + pesan teks terpisah" = 2 pesan.
+    const namaCabang = cabangList.map(c => c.nama).join(', ');
+    return 'Laporan ' + tipeLabel + ' ' + grupNama + ' — ' + periodeText +
+           ' (' + cabangList.length + ' cabang: ' + namaCabang + ')';
 }
 
 // Core: orkestrasi batch share
@@ -638,11 +639,8 @@ async function sgPreparePdfs(modal) {
 
     // SIMPAN pending share — tap kedua yang akan trigger navigator.share
     const redaksi = sgBuildRedaksi(grupNama, tipeLabel, periode, cabangList);
-    modal._sgPendingShare = {
-        files: files,
-        text:  redaksi,
-        title: 'Laporan ' + tipeLabel + ' ' + grupNama,
-    };
+    // TIDAK pakai title — WA kadang treat title sbg "subject" terpisah → 2 pesan.
+    modal._sgPendingShare = { files: files, text: redaksi };
 
     batchBtn.disabled = false;
     batchBtn.classList.remove('btn-secondary', 'btn-success');

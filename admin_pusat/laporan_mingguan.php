@@ -505,7 +505,8 @@ function bagikanWA(btn) {
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
-                await navigator.share({ files: [file], title: 'Laporan Mingguan', text: teks });
+                // Tanpa title — WA kadang treat title sbg pesan terpisah → 2 msg di beberapa versi.
+                await navigator.share({ files: [file], text: teks });
                 return;
             } catch (e) {
                 if (e && e.name === 'AbortError') return; // dibatalkan user
