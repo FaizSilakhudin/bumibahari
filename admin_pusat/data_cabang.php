@@ -47,6 +47,8 @@ if (isset($_POST['tambah'])) {
     $no_rekening = trim($_POST['no_rekening'] ?? '');
     $nama_bank = trim($_POST['nama_bank'] ?? '');
     $atas_nama_rekening = trim($_POST['atas_nama_rekening'] ?? '');
+    $tipe_outlet_raw = trim($_POST['tipe_outlet'] ?? '');
+    $tipe_outlet = in_array($tipe_outlet_raw, ['Small','Medium','Large','Extra Large'], true) ? $tipe_outlet_raw : null;
 
     $cek = $conn->prepare("SELECT id_cabang FROM cabang WHERE nama_cabang=?");
     $cek->bind_param("s", $nama);
@@ -54,8 +56,8 @@ if (isset($_POST['tambah'])) {
     if ($cek->get_result()->num_rows > 0) {
         echo "<script>alert('Nama cabang sudah ada!');</script>";
     } else {
-        $stmt = $conn->prepare("INSERT INTO cabang (nama_cabang, alamat, no_telp, nama_pengelola, no_rekening_cabang, nama_bank_cabang, atas_nama_cabang) VALUES (?,?,?,?,?,?,?)");
-        $stmt->bind_param("sssssss", $nama, $alamat, $telp, $pengelola, $no_rekening, $nama_bank, $atas_nama_rekening);
+        $stmt = $conn->prepare("INSERT INTO cabang (nama_cabang, alamat, no_telp, nama_pengelola, no_rekening_cabang, nama_bank_cabang, atas_nama_cabang, tipe_outlet) VALUES (?,?,?,?,?,?,?,?)");
+        $stmt->bind_param("ssssssss", $nama, $alamat, $telp, $pengelola, $no_rekening, $nama_bank, $atas_nama_rekening, $tipe_outlet);
         
         if ($stmt->execute()) {
             $id_cabang_baru = $stmt->insert_id;
@@ -83,9 +85,11 @@ if (isset($_POST['edit'])) {
     $no_rekening = trim($_POST['no_rekening_cabang'] ?? '');
     $nama_bank = trim($_POST['nama_bank_cabang'] ?? '');
     $atas_nama_rekening = trim($_POST['atas_nama_cabang'] ?? '');
+    $tipe_outlet_raw = trim($_POST['tipe_outlet'] ?? '');
+    $tipe_outlet = in_array($tipe_outlet_raw, ['Small','Medium','Large','Extra Large'], true) ? $tipe_outlet_raw : null;
 
-    $stmt = $conn->prepare("UPDATE cabang SET nama_cabang=?, alamat=?, no_telp=?, nama_pengelola=?, no_rekening_cabang=?, nama_bank_cabang=?, atas_nama_cabang=? WHERE id_cabang=?");
-    $stmt->bind_param("sssssssi", $nama, $alamat, $telp, $pengelola, $no_rekening, $nama_bank, $atas_nama_rekening, $id);
+    $stmt = $conn->prepare("UPDATE cabang SET nama_cabang=?, alamat=?, no_telp=?, nama_pengelola=?, no_rekening_cabang=?, nama_bank_cabang=?, atas_nama_cabang=?, tipe_outlet=? WHERE id_cabang=?");
+    $stmt->bind_param("ssssssssi", $nama, $alamat, $telp, $pengelola, $no_rekening, $nama_bank, $atas_nama_rekening, $tipe_outlet, $id);
     $stmt->execute();
     $stmt->close();
     audit($conn, 'cabang_edit', 'cabang', $id, ['nama' => $nama]);
@@ -402,16 +406,17 @@ $no = $offset + 1;
                 <thead>
                     <tr>
                         <th width="5%" class="text-center">No</th>
-                        <th width="20%">Nama Cabang</th>
-                        <th width="25%">Pengelola / Alamat</th>
-                        <th width="25%">Rekening Pembayaran</th>
-                        <th width="15%">Investor Aktif</th>
+                        <th width="18%">Nama Cabang</th>
+                        <th width="22%">Pengelola / Alamat</th>
+                        <th width="22%">Rekening Pembayaran</th>
+                        <th width="13%">Investor Aktif</th>
+                        <th width="10%" class="text-center">Tipe Outlet</th>
                         <th width="10%" class="text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if ($data->num_rows == 0): ?>
-                        <tr><td colspan="6" class="text-center py-5 text-muted bg-white rounded-4">Data cabang belum tersedia.</td></tr>
+                        <tr><td colspan="7" class="text-center py-5 text-muted bg-white rounded-4">Data cabang belum tersedia.</td></tr>
                     <?php endif; ?>
                     <?php while ($row = $data->fetch_assoc()): ?>
                         <tr>
@@ -438,6 +443,23 @@ $no = $offset + 1;
                                     <span class="badge badge-soft-info rounded-pill px-2.5 py-1.5 fw-semibold"><?= h($row['nama_investor']) ?></span>
                                 <?php else: ?>
                                     <span class="badge badge-soft-warning rounded-pill px-2.5 py-1.5 fw-medium">Tanpa Investor</span>
+                                <?php endif; ?>
+                            </td>
+                            <td data-label="Tipe Outlet" class="text-md-center">
+                                <?php
+                                $tipe_warna = [
+                                    'Small'       => ['bg' => '#eff6ff', 'text' => '#1d4ed8'],
+                                    'Medium'      => ['bg' => '#f0fdf4', 'text' => '#15803d'],
+                                    'Large'       => ['bg' => '#fef3c7', 'text' => '#b45309'],
+                                    'Extra Large' => ['bg' => '#fef2f2', 'text' => '#b91c1c'],
+                                ];
+                                $tipe = $row['tipe_outlet'] ?? '';
+                                if (!empty($tipe) && isset($tipe_warna[$tipe])):
+                                    $c = $tipe_warna[$tipe];
+                                ?>
+                                    <span class="badge rounded-pill px-3 py-1.5 fw-bold" style="background:<?= $c['bg'] ?>;color:<?= $c['text'] ?>;font-size:.72rem"><?= h($tipe) ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted small">—</span>
                                 <?php endif; ?>
                             </td>
                             <td data-label="Aksi" class="text-md-center">
@@ -496,6 +518,16 @@ $no = $offset + 1;
                                                 <div class="col-12 col-md-4">
                                                     <label class="form-label fw-medium text-secondary small">Atas Nama Rekening</label>
                                                     <input type="text" name="atas_nama_cabang" value="<?= h($row['atas_nama_cabang'] ?? '') ?>" class="form-control form-control-premium" required>
+                                                </div>
+
+                                                <div class="col-12 col-md-4">
+                                                    <label class="form-label fw-medium text-secondary small">Tipe Outlet</label>
+                                                    <select name="tipe_outlet" class="form-select form-control-premium">
+                                                        <option value="">-- Belum Ditentukan --</option>
+                                                        <?php foreach (['Small','Medium','Large','Extra Large'] as $opt): ?>
+                                                            <option value="<?= $opt ?>" <?= (($row['tipe_outlet'] ?? '') === $opt) ? 'selected' : '' ?>><?= $opt ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
                                                 </div>
 
                                                 <div class="col-12"><hr class="my-2 border-light"></div>
@@ -563,6 +595,17 @@ $no = $offset + 1;
                         <div class="col-12 col-md-4"><label class="form-label fw-medium text-secondary small">Nama Bank</label><input type="text" name="nama_bank" placeholder="BCA / Mandiri" class="form-control form-control-premium" required></div>
                         <div class="col-12 col-md-4"><label class="form-label fw-medium text-secondary small">No. Rekening</label><input type="text" name="no_rekening" class="form-control form-control-premium" required></div>
                         <div class="col-12 col-md-4"><label class="form-label fw-medium text-secondary small">Atas Nama Rekening</label><input type="text" name="atas_nama_rekening" class="form-control form-control-premium" required></div>
+
+                        <div class="col-12"><hr class="my-2 border-light"></div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-medium text-secondary small">Tipe Outlet</label>
+                            <select name="tipe_outlet" class="form-select form-control-premium">
+                                <option value="">-- Belum Ditentukan --</option>
+                                <?php foreach (['Small','Medium','Large','Extra Large'] as $opt): ?>
+                                    <option value="<?= $opt ?>"><?= $opt ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer border-top-0 pt-0">
