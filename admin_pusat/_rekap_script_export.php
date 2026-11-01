@@ -301,8 +301,12 @@
                 const persen_admin    = <?= (float) ($persen_admin ?? 3) ?>;
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
-                const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "4. Klaim Bulanan"
-                const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
+                // Baca LIVE dari RK_TOTAL_KLAIM_* (di-update tiap user ubah form Klaim
+                // Bulanan — lihat _rekap_klaim_bulanan.php). Fallback ke nilai PHP
+                // server-side kalau variabel JS belum terdefinisi (edge case init).
+                // Supaya PDF ikut nilai klaim terbaru TANPA perlu refresh halaman.
+                const total_klaim_bulanan = (typeof RK_TOTAL_KLAIM_BULANAN === 'number') ? RK_TOTAL_KLAIM_BULANAN : <?= (float) ($total_klaim_bulanan ?? 0) ?>;
+                const total_klaim_dana_pusat = (typeof RK_TOTAL_KLAIM_DANA_PUSAT === 'number') ? RK_TOTAL_KLAIM_DANA_PUSAT : <?= (float) ($total_klaim_dana_pusat ?? 0) ?>;
                 const modal_awal      = angkaBersih('matrik_modal_awal');
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal;   // = Net Profit efektif (sebelum klaim)
@@ -557,8 +561,12 @@
                 const persen_admin    = <?= (float) ($persen_admin ?? 3) ?>;
                 const persen_investor = <?= (float) ($persen_investor ?? 50) ?>;
                 const persen_pengelola = <?= (float) ($persen_pengelola ?? 50) ?>;
-                const total_klaim_bulanan = <?= (float) ($total_klaim_bulanan ?? 0) ?>; // "4. Klaim Bulanan"
-                const total_klaim_dana_pusat = <?= (float) ($total_klaim_dana_pusat ?? 0) ?>; // subset klaim ber-sumber 'pusat' -> Admin Management Pusat
+                // Baca LIVE dari RK_TOTAL_KLAIM_* (di-update tiap user ubah form Klaim
+                // Bulanan — lihat _rekap_klaim_bulanan.php). Fallback ke nilai PHP
+                // server-side kalau variabel JS belum terdefinisi (edge case init).
+                // Supaya PDF ikut nilai klaim terbaru TANPA perlu refresh halaman.
+                const total_klaim_bulanan = (typeof RK_TOTAL_KLAIM_BULANAN === 'number') ? RK_TOTAL_KLAIM_BULANAN : <?= (float) ($total_klaim_bulanan ?? 0) ?>;
+                const total_klaim_dana_pusat = (typeof RK_TOTAL_KLAIM_DANA_PUSAT === 'number') ? RK_TOTAL_KLAIM_DANA_PUSAT : <?= (float) ($total_klaim_dana_pusat ?? 0) ?>;
                 const modal_awal      = angkaBersih('matrik_modal_awal');
                 const talangan_val    = parseFloat(document.getElementById('inv_modal')?.value || 0);
                 const laba_akumulasi  = net_profit_100 - modal_awal;
