@@ -1361,8 +1361,8 @@ $nama_file_export = "Rekapitulasi Bulanan " . $nama_cabang . " " . nama_bulan_id
                     <tr class="table-light">
                         <td class="px-4 fw-semibold text-dark">Admin Management Pusat</td>
                         <td><span class="badge bg-danger bg-opacity-10 text-danger px-2.5 py-1.5 fw-bold" style="font-size: 0.75rem;">Internal Admin</span></td>
-                        <td class="font-monospace text-muted" style="font-size: 0.85rem; letter-spacing: 0.5px;">1662598199</td>
-                        <td class="fw-medium text-dark">WARDOYO</td>
+                        <td class="font-monospace text-muted" style="font-size: 0.85rem; letter-spacing: 0.5px;">8011202870</td>
+                        <td class="fw-medium text-dark">SWARA BUMI AGUNG CV</td>
                         <td><span class="badge bg-light text-dark border px-2.5 py-1 fw-medium">BCA</span></td>
                         <td class="text-end px-4 fw-bold text-danger">
                             <span id="final_admin" class="fs-6">Rp <?= number_format(($share_admin ?? 0) + ($total_klaim_dana_pusat ?? 0), 0, ',', '.') ?></span>
