@@ -1,0 +1,26 @@
+{
+  "name": "Warteg Bumi Bahari",
+  "short_name": "WBB",
+  "description": "Sistem Informasi Manajemen Cabang - Warteg Bumi Bahari",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1b6b3d",
+  "theme_color": "#1b6b3d",
+  "orientation": "any",
+  "lang": "id",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

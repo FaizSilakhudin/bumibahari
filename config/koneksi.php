@@ -13,10 +13,36 @@
 
 // ---------------------------------------------------------------------------
 // 0. Buffer output → header()/redirect tetap jalan walau ada output duluan.
+//    Callback wbb_pwa_inject menyuntikkan PWA meta-tags ke tiap halaman HTML
+//    secara otomatis (manifest, theme-color, apple-touch-icon, SW registration).
 // ---------------------------------------------------------------------------
-if (ob_get_level() === 0) {
-    ob_start();
+if (!defined('APP_BASE')) {
+    $__doc  = rtrim(str_replace('\\', '/', (string)($_SERVER['DOCUMENT_ROOT'] ?? '')), '/');
+    $__root = rtrim(str_replace('\\', '/', dirname(__DIR__)), '/');
+    $__base = ($__doc !== '' && str_starts_with($__root, $__doc))
+        ? substr($__root, strlen($__doc))
+        : '';
+    define('APP_BASE', rtrim($__base, '/'));
 }
+
+function wbb_pwa_inject(string $html): string {
+    if (stripos($html, '</head>') === false) return $html;
+    $b = APP_BASE;
+    $tags = <<<HTML
+
+    <link rel="manifest" href="{$b}/manifest.json">
+    <meta name="theme-color" content="#1b6b3d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WBB">
+    <link rel="apple-touch-icon" href="{$b}/assets/icons/icon-192.png">
+    <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('{$b}/sw.js');</script>
+HTML;
+    return str_ireplace('</head>', $tags . "\n</head>", $html);
+}
+
+ob_start('wbb_pwa_inject');
 
 // ---------------------------------------------------------------------------
 // 1. Lingkungan (production vs development)
