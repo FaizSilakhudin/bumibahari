@@ -7,6 +7,7 @@
 # Konfigurasi lokal / rahasia
 /config/env.php
 /config/db_credentials.php
+/config/backup_key.php
 .env
 .env.*
 /deploy.txt

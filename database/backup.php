@@ -1,19 +1,19 @@
 <?php
 /**
- * database/backup.php — cadangan harian otomatis: database + folder uploads
- * (foto nota, surat perjanjian) + regenerasi database/db_bumi_bahari.sql
- * supaya dump skema/data resmi tidak pernah basi.
+ * database/backup.php — cadangan otomatis (3 hari sekali) + enkripsi AES-256-CBC:
+ *   database + folder uploads + regenerasi database/db_bumi_bahari.sql
  *
  * Jalankan dari CLI:
  *     C:\xampp\php\php.exe C:\xampp\htdocs\warteg-bumi-bahari\database\backup.php
  *
- * Hasil:
- *   database/backups/db_bumi_bahari_YYYYMMDD_HHMMSS.sql   (RETENSI_DB terbaru disimpan)
- *   database/backups/uploads_YYYYMMDD_HHMMSS.zip          (RETENSI_UPLOADS terbaru disimpan)
- *   database/db_bumi_bahari.sql                            (selalu ditimpa dengan data terbaru)
+ * Hasil di database/backups/:
+ *   db_bumi_bahari_YYYYMMDD_HHMMSS.sql.enc   (terenkripsi — RETENSI_DB terbaru)
+ *   uploads_YYYYMMDD_HHMMSS.zip.enc          (terenkripsi — RETENSI_UPLOADS terbaru)
+ *   database/db_bumi_bahari.sql              (dump resmi — tidak dienkripsi, selalu segar)
  *
+ * Enkripsi: AES-256-CBC, kunci 256-bit dari config/backup_key.php (dibuat otomatis sekali).
+ * Dekripsi: gunakan database/decrypt_backup.php <file.enc>
  * Tiap langkah independen — kalau salah satu gagal, yang lain tetap dicoba.
- * Untuk penjadwalan lihat database/README.md (Windows Task Scheduler + backup.bat).
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -21,8 +21,8 @@ if (PHP_SAPI !== 'cli') {
     exit('Script ini hanya boleh dijalankan dari command line.');
 }
 
-const RETENSI_DB      = 30; // jumlah cadangan database yang dipertahankan
-const RETENSI_UPLOADS = 14; // jumlah cadangan uploads yang dipertahankan (berkas besar)
+const RETENSI_DB      = 30; // jumlah cadangan database (.sql.enc) yang dipertahankan
+const RETENSI_UPLOADS = 14; // jumlah cadangan uploads (.zip.enc) yang dipertahankan
 
 $root       = dirname(__DIR__);
 $backup_dir = __DIR__ . DIRECTORY_SEPARATOR . 'backups';
@@ -32,11 +32,87 @@ if (!is_dir($backup_dir) && !mkdir($backup_dir, 0755, true)) {
     exit(1);
 }
 
-// --- Kredensial: pakai config/db_credentials.php bila ada, jika tidak default root ---
+// --- Kredensial DB ---
 $db = ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'db_bumi_bahari'];
 $cred_file = $root . '/config/db_credentials.php';
 if (is_file($cred_file)) {
     $db = array_merge($db, (array) require $cred_file);
+}
+
+// =============================================================================
+// ENKRIPSI — kunci AES-256-CBC dari config/backup_key.php
+// Jika file belum ada, dibuat otomatis sekali dan ditampilkan di log.
+// SIMPAN isi config/backup_key.php di tempat yang aman (di luar mesin ini).
+// =============================================================================
+$kunci_file = $root . '/config/backup_key.php';
+
+function muat_atau_buat_kunci(string $kunci_file): string
+{
+    if (is_file($kunci_file)) {
+        $hex = trim((string)(require $kunci_file));
+        if (strlen($hex) === 64 && ctype_xdigit($hex)) {
+            return hex2bin($hex);
+        }
+        fwrite(STDERR, "PERINGATAN: format kunci di $kunci_file tidak valid. Membuat kunci baru.\n");
+    }
+
+    // Buat kunci baru 256-bit (32 byte)
+    $bytes = random_bytes(32);
+    $hex   = bin2hex($bytes);
+
+    $isi = "<?php\n// Kunci enkripsi backup AES-256-CBC — JANGAN di-commit, SIMPAN di tempat aman!\n// Tanpa kunci ini file .enc TIDAK BISA didekripsi.\nreturn '$hex';\n";
+    if (file_put_contents($kunci_file, $isi) === false) {
+        fwrite(STDERR, "GAGAL menyimpan kunci ke $kunci_file\n");
+        exit(1);
+    }
+
+    echo "  [KUNCI BARU] Dibuat: $kunci_file\n";
+    echo "  !! PENTING: Salin & simpan kunci ini di luar mesin ini !!\n";
+    echo "  Kunci (hex): $hex\n\n";
+    return $bytes;
+}
+
+$kunci = muat_atau_buat_kunci($kunci_file);
+
+/** Enkripsi $src dengan AES-256-CBC, simpan ke $dest.enc, hapus $src. */
+function enkripsi_dan_hapus(string $src, string $kunci): ?string
+{
+    $data = file_get_contents($src);
+    if ($data === false) {
+        fwrite(STDERR, "  Gagal membaca $src untuk enkripsi\n");
+        return null;
+    }
+
+    $iv        = random_bytes(16);
+    $encrypted = openssl_encrypt($data, 'AES-256-CBC', $kunci, OPENSSL_RAW_DATA, $iv);
+    if ($encrypted === false) {
+        fwrite(STDERR, "  Enkripsi gagal: " . openssl_error_string() . "\n");
+        return null;
+    }
+
+    $dest = $src . '.enc';
+    // Format: 16 byte IV + data terenkripsi
+    if (file_put_contents($dest, $iv . $encrypted) === false) {
+        fwrite(STDERR, "  Gagal menulis $dest\n");
+        return null;
+    }
+
+    unlink($src); // hapus versi tidak terenkripsi
+    return $dest;
+}
+
+/** Pangkas berkas cadangan lama, simpan yang terbaru. */
+function pangkas_lama(string $pattern, int $retensi): void
+{
+    $files = glob($pattern);
+    if (!$files || count($files) <= $retensi) {
+        return;
+    }
+    usort($files, fn($a, $b) => filemtime($b) <=> filemtime($a));
+    foreach (array_slice($files, $retensi) as $old) {
+        unlink($old);
+        echo '  hapus lama: ' . basename($old) . "\n";
+    }
 }
 
 function cari_mysqldump(): ?string
@@ -55,11 +131,9 @@ function cari_mysqldump(): ?string
     return null;
 }
 
-/** Jalankan mysqldump dengan argumen tambahan, tulis ke $target. Return true bila sukses. */
 function jalankan_mysqldump(string $mysqldump, array $db, array $extra_args, string $target): bool
 {
     putenv('MYSQL_PWD=' . $db['pass']);
-
     $args = array_merge([
         $mysqldump,
         '--host=' . $db['host'],
@@ -92,21 +166,6 @@ function jalankan_mysqldump(string $mysqldump, array $db, array $extra_args, str
     return true;
 }
 
-/** Pangkas berkas cadangan lama sesuai pola & retensi, tersimpan yang terbaru. */
-function pangkas_lama(string $pattern, int $retensi): void
-{
-    $files = glob($pattern);
-    if (!$files || count($files) <= $retensi) {
-        return;
-    }
-    usort($files, fn($a, $b) => filemtime($b) <=> filemtime($a));
-    foreach (array_slice($files, $retensi) as $old) {
-        unlink($old);
-        echo '  hapus lama: ' . basename($old) . "\n";
-    }
-}
-
-/** Zip seluruh isi $src_dir (rekursif) ke $zip_path. Return true bila sukses & tidak kosong. */
 function zip_folder(string $src_dir, string $zip_path): bool
 {
     if (!is_dir($src_dir)) {
@@ -141,18 +200,24 @@ $mysqldump = cari_mysqldump();
 if ($mysqldump === null) {
     fwrite(STDERR, "mysqldump tidak ditemukan. Sesuaikan path di backup.php.\n");
 }
-$stamp = date('Ymd_His');
+$stamp    = date('Ymd_His');
 $ada_error = false;
 
 // =============================================================================
-// 1. CADANGAN DATABASE (timestamped, tersimpan RETENSI_DB terbaru)
+// 1. CADANGAN DATABASE → dump SQL → enkripsi → .sql.enc
 // =============================================================================
 echo "[1/3] Backup database...\n";
 if ($mysqldump !== null) {
     $target = $backup_dir . DIRECTORY_SEPARATOR . $db['name'] . "_$stamp.sql";
     if (jalankan_mysqldump($mysqldump, $db, [], $target)) {
-        echo '  OK  ' . basename($target) . '  (' . number_format(filesize($target) / 1024, 1) . " KB)\n";
-        pangkas_lama($backup_dir . DIRECTORY_SEPARATOR . $db['name'] . '_*.sql', RETENSI_DB);
+        $ukuran_asli = number_format(filesize($target) / 1024, 1);
+        $enc = enkripsi_dan_hapus($target, $kunci);
+        if ($enc !== null) {
+            echo "  OK  " . basename($enc) . "  ($ukuran_asli KB → terenkripsi)\n";
+            pangkas_lama($backup_dir . DIRECTORY_SEPARATOR . $db['name'] . '_*.sql.enc', RETENSI_DB);
+        } else {
+            $ada_error = true;
+        }
     } else {
         $ada_error = true;
     }
@@ -161,20 +226,26 @@ if ($mysqldump !== null) {
 }
 
 // =============================================================================
-// 2. CADANGAN FOLDER uploads/ (foto nota, surat perjanjian) → zip timestamped
+// 2. CADANGAN uploads/ → zip → enkripsi → .zip.enc
 // =============================================================================
 echo "[2/3] Backup folder uploads...\n";
 $uploads_dir = $root . DIRECTORY_SEPARATOR . 'uploads';
 $zip_target  = $backup_dir . DIRECTORY_SEPARATOR . "uploads_$stamp.zip";
 if (zip_folder($uploads_dir, $zip_target)) {
-    echo '  OK  ' . basename($zip_target) . '  (' . number_format(filesize($zip_target) / 1024 / 1024, 2) . " MB)\n";
-    pangkas_lama($backup_dir . DIRECTORY_SEPARATOR . 'uploads_*.zip', RETENSI_UPLOADS);
+    $ukuran_asli = number_format(filesize($zip_target) / 1024 / 1024, 2);
+    $enc = enkripsi_dan_hapus($zip_target, $kunci);
+    if ($enc !== null) {
+        echo "  OK  " . basename($enc) . "  ($ukuran_asli MB → terenkripsi)\n";
+        pangkas_lama($backup_dir . DIRECTORY_SEPARATOR . 'uploads_*.zip.enc', RETENSI_UPLOADS);
+    } else {
+        $ada_error = true;
+    }
 } else {
     echo "  (tidak ada berkas di uploads/, dilewati)\n";
 }
 
 // =============================================================================
-// 3. REGENERASI database/db_bumi_bahari.sql — dump skema+data resmi selalu segar
+// 3. REGENERASI database/db_bumi_bahari.sql — dump skema+data resmi (tidak dienkripsi)
 // =============================================================================
 echo "[3/3] Regenerasi dump skema resmi...\n";
 if ($mysqldump !== null) {
@@ -190,4 +261,5 @@ if ($mysqldump !== null) {
     $ada_error = true;
 }
 
+echo "\nSelesai" . ($ada_error ? " (ada error — periksa log)" : " tanpa error") . ".\n";
 exit($ada_error ? 1 : 0);
