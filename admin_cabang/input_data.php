@@ -12,13 +12,33 @@ $tgl = date('Y-m-d', strtotime('-1 day'));
 // (bukan pengelola aktif sekarang — supaya rotasi pengelola tidak menimpa
 //  atribusi laporan; lihat config/koneksi.php: pengelola_pada_tanggal()).
 // =====================================================
-$stmt = $conn->prepare("SELECT nama_cabang FROM cabang WHERE id_cabang = ?");
+$stmt = $conn->prepare("SELECT nama_cabang, tanggal_aktif FROM cabang WHERE id_cabang = ?");
 $stmt->bind_param("i", $id_cabang);
 $stmt->execute();
 $data_cabang = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 $cabang = $data_cabang['nama_cabang'] ?? '-';
+
+// Blokir input sebelum tanggal aktif cabang.
+$tanggal_aktif_cabang = $data_cabang['tanggal_aktif'] ?? null;
+if ($tanggal_aktif_cabang && $tgl < $tanggal_aktif_cabang) {
+    ?>
+    <div class="container py-5">
+        <div class="alert alert-info rounded-4 d-flex align-items-start gap-3 shadow-sm border-0" style="background:#e8f4fd;">
+            <i class="bi bi-calendar-x fs-4 text-info flex-shrink-0 mt-1"></i>
+            <div>
+                <h6 class="mb-1 fw-semibold text-info-emphasis">Belum Ada Laporan</h6>
+                <p class="mb-0 text-secondary">Cabang <strong><?= h($cabang) ?></strong> baru aktif mulai
+                <strong><?= date('d M Y', strtotime($tanggal_aktif_cabang)) ?></strong>.
+                Tidak ada laporan untuk tanggal <strong><?= date('d M Y', strtotime($tgl)) ?></strong>.</p>
+            </div>
+        </div>
+    </div>
+    <?php
+    exit;
+}
+
 $nama_pengelola = pengelola_pada_tanggal($conn, $id_cabang, $tgl);
 $_SESSION['nama_pengelola'] = $nama_pengelola;
 

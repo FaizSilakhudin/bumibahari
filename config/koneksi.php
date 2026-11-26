@@ -484,6 +484,26 @@ if (!function_exists('resolve_periode_bulanan')) {
         $akhir_kalender = date('Y-m-t', strtotime($awal_kalender));
         $hasil = ['tgl_mulai' => $awal_kalender, 'tgl_selesai' => $akhir_kalender, 'digabung' => false, 'periode_kosong' => false];
 
+        // Jika cabang punya tanggal_aktif, pakai itu sebagai batas mulai resmi.
+        // Tidak perlu logika "digabung ke bulan berikutnya" — setiap bulan tampil mandiri.
+        $st = $conn->prepare("SELECT tanggal_aktif FROM cabang WHERE id_cabang = ?");
+        $st->bind_param('i', $id_cabang);
+        $st->execute();
+        $tanggal_aktif = $st->get_result()->fetch_assoc()['tanggal_aktif'] ?? null;
+        $st->close();
+
+        if ($tanggal_aktif !== null) {
+            if ($tanggal_aktif > $akhir_kalender) {
+                // Cabang belum aktif di bulan ini sama sekali.
+                $hasil['periode_kosong'] = true;
+            } elseif ($tanggal_aktif > $awal_kalender) {
+                // Cabang aktif di pertengahan bulan — mulai dari tanggal_aktif.
+                $hasil['tgl_mulai'] = $tanggal_aktif;
+            }
+            return $hasil;
+        }
+
+        // === Logika lama untuk cabang tanpa tanggal_aktif ===
         $mulai_pembukuan = cabang_mulai_pembukuan($conn, $id_cabang);
         if ($mulai_pembukuan === null) {
             return $hasil; // belum ada laporan sama sekali — tidak ada yang bisa digeser

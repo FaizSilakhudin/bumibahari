@@ -26,13 +26,15 @@ if (!empty($cabang_ids)) {
     $placeholders = implode(',', array_fill(0, count($cabang_ids), '?'));
 
     // Ringkasan status dihitung dari SEMUA cabang (bukan cuma halaman ini).
+    // Filter tanggal_aktif: cabang yang belum aktif pada tanggal ini tidak ditampilkan.
     $sql_all = "SELECT lc.status_laporan, lc.foto_nota1, lc.foto_nota2, lc.foto_nota3
                 FROM cabang c
                 LEFT JOIN laporan_cabang lc ON lc.id_cabang = c.id_cabang AND lc.tanggal = ?
-                WHERE c.id_cabang IN ($placeholders)";
+                WHERE c.id_cabang IN ($placeholders)
+                  AND (c.tanggal_aktif IS NULL OR c.tanggal_aktif <= ?)";
     $stmt_all = $conn->prepare($sql_all);
-    $types = 's' . str_repeat('i', count($cabang_ids));
-    $stmt_all->bind_param($types, $tanggal, ...$cabang_ids);
+    $types = 's' . str_repeat('i', count($cabang_ids)) . 's';
+    $stmt_all->bind_param($types, ...array_merge([$tanggal], $cabang_ids, [$tanggal]));
     $stmt_all->execute();
     $res_all = $stmt_all->get_result();
     while ($row = $res_all->fetch_assoc()) {
@@ -53,11 +55,12 @@ if (!empty($cabang_ids)) {
             FROM cabang c
             LEFT JOIN laporan_cabang lc ON lc.id_cabang = c.id_cabang AND lc.tanggal = ?
             WHERE c.id_cabang IN ($placeholders)
+              AND (c.tanggal_aktif IS NULL OR c.tanggal_aktif <= ?)
             ORDER BY c.nama_cabang ASC
             LIMIT ? OFFSET ?";
     $stmt = $conn->prepare($sql);
-    $types_limit = 's' . str_repeat('i', count($cabang_ids)) . 'ii';
-    $stmt->bind_param($types_limit, $tanggal, ...array_merge($cabang_ids, [$limit, $offset]));
+    $types_limit = 's' . str_repeat('i', count($cabang_ids)) . 'sii';
+    $stmt->bind_param($types_limit, ...array_merge([$tanggal], $cabang_ids, [$tanggal, $limit, $offset]));
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
