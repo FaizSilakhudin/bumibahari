@@ -132,6 +132,7 @@ CREATE TABLE `cabang` (
   `no_rekening_cabang` varchar(50) DEFAULT NULL,
   `atas_nama_cabang` varchar(100) DEFAULT NULL,
   `tipe_outlet` enum('Small','Medium','Large','Extra Large') DEFAULT NULL,
+  `tanggal_aktif` date DEFAULT NULL,
   `nama_bank_cabang` varchar(50) DEFAULT NULL,
   `id_investor` int(11) DEFAULT NULL,
   PRIMARY KEY (`id_cabang`),
