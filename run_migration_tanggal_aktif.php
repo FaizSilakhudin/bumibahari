@@ -7,7 +7,7 @@ if (($_GET['token'] ?? '') !== 'wbb2026migrate') {
     exit('Akses ditolak.');
 }
 
-require __DIR__ . '/../config/koneksi.php';
+require __DIR__ . '/config/koneksi.php';
 
 $steps = [];
 $ok    = true;
